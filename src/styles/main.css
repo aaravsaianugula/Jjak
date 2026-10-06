@@ -28,7 +28,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='paper']) {
+  :root:not([data-theme='paper']):not([data-theme='light']) {
     --bg: #1c1b19;
     --bg-deep: #161513;
     --surface: #262421;
@@ -45,7 +45,8 @@
     color-scheme: dark;
   }
 }
-:root[data-theme='ink'] {
+:root[data-theme='ink'],
+:root[data-theme='dark'] {
   --bg: #1c1b19;
   --bg-deep: #161513;
   --surface: #262421;

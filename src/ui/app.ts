@@ -38,9 +38,13 @@ export function setBackFallback(fn: () => void): void {
 export function applyTheme(): void {
   const t = save.settings.theme;
   const html = document.documentElement;
-  if (t === 'auto') html.removeAttribute('data-theme');
-  else html.setAttribute('data-theme', t);
-  const dark = t === 'ink' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  // In "auto" leave any host-provided light/dark attribute alone.
+  const prev = html.getAttribute('data-theme');
+  if (t === 'auto') {
+    if (prev === 'paper' || prev === 'ink') html.removeAttribute('data-theme');
+  } else html.setAttribute('data-theme', t);
+  const hostTheme = html.getAttribute('data-theme');
+  const dark = t === 'ink' || (t === 'auto' && (hostTheme === 'dark' || (hostTheme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)));
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#1c1b19' : '#f3ecdf');
   if (Capacitor.isNativePlatform()) {
     void SystemBars.setStyle({ style: dark ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});

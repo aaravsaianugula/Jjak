@@ -13,3 +13,4 @@ android/keystore.properties
 *.keystore
 android/app/release/
 android/capacitor-cordova-android-plugins/build/
+dist-demo/
