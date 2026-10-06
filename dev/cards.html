@@ -1,0 +1,13 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Card gallery</title>
+<style>body{background:#efe8da;margin:0;padding:16px;font-family:sans-serif}
+.g{display:grid;grid-template-columns:repeat(8,90px);gap:10px}
+.g svg{width:90px;height:126px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}</style></head>
+<body><div class="g" id="g"></div>
+<script type="module">
+import '../src/styles/fonts.css';
+import { installCardSprite, cardSvg } from '../src/art/cards.ts';
+installCardSprite();
+let h=''; for (let i=0;i<48;i++) h+=cardSvg(i); h+=cardSvg('back');
+document.getElementById('g').innerHTML=h;
+</script></body></html>
