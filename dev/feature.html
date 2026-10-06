@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Feature graphic</title>
+<style>
+html,body{margin:0}
+#f{width:1024px;height:500px;position:relative;overflow:hidden;background:#f3ecdf;font-family:'Gowun Batang',serif;color:#2a2724}
+#f::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.left{position:absolute;left:72px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.row{display:flex;align-items:center;gap:22px}
+.seal{width:104px;height:104px;border-radius:14%;background:#c4472f;color:#fbf5ea;display:grid;place-items:center;font-size:60px;font-weight:700;transform:rotate(-5deg);position:relative}
+.seal::after{content:'';position:absolute;inset:8%;border:2px solid rgba(251,245,234,.8);border-radius:9%}
+.word{font-size:92px;font-weight:700;line-height:1}
+.tag{font-size:30px;line-height:1.35;max-width:430px}
+.sub{font-family:'Gowun Dodum',sans-serif;font-size:20px;color:#6e665c}
+.ja{font-family:'Zen Old Mincho',serif}
+.fan{position:absolute;right:50px;top:0;width:470px;height:500px}
+.fan svg{position:absolute;left:50%;bottom:150px;width:150px;height:210px;margin-left:-75px;transform-origin:50% 135%;filter:drop-shadow(0 10px 16px rgba(60,40,20,.28))}
+</style></head><body><div id="f">
+<div class="left">
+  <div class="row"><div class="seal">짝</div><div class="word">Jjak</div></div>
+  <div class="tag">Pair the flowers of the four seasons.</div>
+  <div class="sub"><span>꽃을 맞추다</span> · <span class="ja">花を合わせる</span> · calm puzzles, daily</div>
+</div>
+<div class="fan" id="fan"></div>
+</div>
+<script type="module">
+import '../src/styles/fonts.css';
+import { installCardSprite } from '../src/art/cards.ts';
+installCardSprite();
+const ids = [11, 23, 31, 39, 47];
+document.getElementById('fan').innerHTML = ids.map((id, i) => `<svg viewBox="0 0 100 140" style="transform:rotate(${(i - 2) * 13}deg)"><use href="#card-${id}"/></svg>`).join('');
+await document.fonts.ready;
+document.body.dataset.ready = '1';
+</script></body></html>

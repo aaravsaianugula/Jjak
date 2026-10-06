@@ -1,0 +1,126 @@
+# Jjak (짝) — Game Design Document
+
+**One-liner:** a calm, beautiful pair-connecting puzzle built on the 48-card flower deck
+that Korea (Hwatu 화투) and Japan (Hanafuda 花札) share.
+**Audience:** global, ages 10–25 (US first). **Platform:** Android (Google Play) via
+Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md`](RESEARCH.md).
+
+---
+
+## 1. Pillars
+
+| Pillar | What it means in practice |
+|---|---|
+| **Readable in 3 seconds** | Tap two matching flowers. Month numerals on every card. |
+| **Quietly juicy** | Ink-stroke paths, petal bursts, a bell that rises with each combo, and a seal stamp when you clear a board. Nothing loud. |
+| **Culture as texture** | Hanji paper, sumi ink, vermilion seals, Korean and Japanese names. Never a theme park. |
+| **Respect the player** | No forced ads mid-puzzle, no pay-to-win, no streak shaming, and progress saved offline. |
+
+## 2. Core loop (10–90 seconds)
+
+1. **See** a grid of flower cards (and, later, stones).
+2. **Pair** two cards of the same month whose connecting path has ≤ 2 turns
+   (Shisen-sho rule). The path may run around the outside of the board.
+3. **Chain** pairs within 4 s for a combo (×2…×5): 짝짝, 짝짝짝… The Korean clap
+   onomatopoeia doubles as the combo counter.
+4. **Clear** the board. A seal stamps it, you get up to three blossoms, petals, and an
+   album card.
+
+**Tap rules (gentle by design)**
+
+* Tapping a card of a *different* flower moves the selection; there's no penalty.
+* Same flower but no legal path: a soft shake, plus a coach tip on early levels.
+* No moves left: the board auto-reshuffles into a solvable layout (this costs the
+  no-assist blossom).
+
+## 3. Meta loops
+
+| Loop | Cadence | Hook |
+|---|---|---|
+| **Journey** | Session | Endless levels in 4 seasonal chapters × 12 levels, then "Year 2" with more stones. |
+| **Daily Jjak** | Daily | One worldwide board per date. Streak counter and an emoji share card. |
+| **Album** | Weeks | 48 collectible cards with KR/JP names, romanization, and culture notes. One new card per first clear and per Daily. |
+| **Zen** | Any time | Endless, untimed, no stars. |
+
+## 4. Level curve
+
+| Levels | Board | Months | Variants | Stones | Teaches |
+|---|---|---|---|---|---|
+| 1 | 4×4 | 4 | identical | 0 | Tapping pairs, path bends |
+| 2–5 | 4×4 → 6×5 | 6 → 12 | identical | 0 | Scanning bigger boards |
+| 6 | 6×4 | 12 | **4 per flower** | 0 | "Match the flower, not the picture" (tip sheet) |
+| 7–12 (Spring) | 6×5 → 8×6 | 12 | yes | 0 | Full 48-card boards |
+| 13–24 (Summer) | as above | 12 | yes | 2 from slot 4 | Routing around stones |
+| 25–36 (Autumn) | as above | 12 | yes | 2–4 | Planning order |
+| 37–48 (Winter) | as above | 12 | yes | 2–6 | Mastery |
+| 49+ | loops | 12 | yes | up to `maxStones` | Endless |
+
+`maxStones(rows, cols) = floor(interior / 4)` (rounded down to an even number) keeps
+boards open. **Par time** = `ceil((pairs × 4.5 + 10) / 5) × 5` seconds.
+
+## 5. Generation (solvable by construction)
+
+Pairs are placed one at a time into cells that are connectable *given only the pairs
+already placed*. Removing them in reverse order is then always legal. Heuristics:
+
+* most-constrained cell first;
+* deep (interior) cells first, so the last placements, which are the player's first
+  moves, sit near the rim;
+* a look-ahead that rejects any placement leaving a free cell with no partner;
+* retries, then drop two stones at a time as a last resort.
+
+The tests fuzz 1,000 seeded boards and confirm full solvability by DFS on a sample. A
+greedy play-through of levels 1–48 always finishes. Boards are deterministic per seed,
+which is why the Daily is identical worldwide.
+
+## 6. Economy and fair-ads policy
+
+| Item | Source | Sink |
+|---|---|---|
+| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board | Hint (20), Shuffle (15) |
+| **Hints/Shuffles** | 3 / 2 at start, +1 each per chapter finished, rewarded ad (+1) | Using them |
+| **Album cards** | First clear of each level, each Daily, optional rewarded "draw one more" | — |
+
+**Ads** (all IDs in `src/config.ts`):
+
+| Format | Where | Rules |
+|---|---|---|
+| Rewarded | Out-of-hints/shuffles dialog, "Double petals", "Draw one more card" | Always opt-in, and the reward is granted only on completion. |
+| Interstitial | *Between* boards only | Never before level 5. At most once every 3 clears and once every 150 s. Never mid-puzzle. |
+| Banner | Home and Album | Never over the board. |
+
+**Age-appropriate ads.** A neutral birth-year screen appears on first launch.
+* Under 13 (or unknown): child-directed treatment, under-age-of-consent, max rating G,
+  non-personalized.
+* 13–15: under-age-of-consent, PG.
+* 16–17: PG.
+* 18+: T.
+
+Consent goes through Google UMP before any ad request.
+
+## 7. Art and audio direction
+
+* **Palette (Paper):** paper #F3ECDF, ink #2A2724, vermilion #C4472F, gold #B8893B,
+  indigo #2F4A6D. **Ink (dark):** #1C1B19 background with warm paper text.
+* **Type:** Gowun Batang (display/Hangul), Gowun Dodum (UI), Zen Old Mincho (kanji/kana).
+  All are SIL OFL, bundled, and subset by `npm run fonts`.
+* **Cards:** original SVG motifs for 12 flowers. The plain / ribbon (poetry, red, blue) /
+  animal (gold medallion with kanji) / bright (vermilion sun) overlays follow the real
+  deck's structure. Korean decks use blue ribbons where Japanese decks use purple; we use
+  the Korean blue.
+* **Sound:** WebAudio synthesis only. A wood "tok" for taps and a pentatonic bell that
+  climbs with the combo. The stamp sound is a low thump plus a chord.
+
+## 8. Accessibility
+
+Month number on every card, distinct silhouettes and ground colours per month (not
+colour alone), ≥ 44 px tap targets, `prefers-reduced-motion` honoured, the screen-reader
+label on each card names its flower and month, and sound/haptics can be toggled.
+
+## 9. Roadmap (post-launch)
+
+1. Localize the UI (ko, ja, es, pt-BR, id). The card names are already trilingual.
+2. Play Games Services: Daily leaderboard and achievements ("Complete the Album").
+3. "Remove ads" in-app purchase and cosmetic card backs and board papers.
+4. Weekly "Festival" boards tied to real seasonal events (Seollal, Hanami, Chuseok, Tsukimi).
+5. Optional "Yaku" sets (Korean *Godori*, red/blue ribbons) as bonus objectives, with no wagering.

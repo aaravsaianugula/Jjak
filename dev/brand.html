@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Brand renders</title>
+<style>
+html,body{margin:0;background:transparent}
+#s{position:relative;display:grid;place-items:center;overflow:hidden}
+.paper{background:#f3ecdf}
+.ink{background:#1c1b19}
+.seal{display:grid;place-items:center;background:#c4472f;color:#fbf5ea;font-family:'Gowun Batang',serif;font-weight:700;border-radius:14%;position:relative;transform:rotate(-5deg);box-shadow:0 .02em 0 rgba(0,0,0,.08)}
+.seal::after{content:'';position:absolute;inset:8%;border:.025em solid rgba(251,245,234,.8);border-radius:9%}
+.word{font-family:'Gowun Batang',serif;font-weight:700;margin-top:.35em;letter-spacing:.02em}
+</style></head><body><div id="s"></div>
+<script type="module">
+import '../src/styles/fonts.css';
+const q = new URLSearchParams(location.search);
+const size = +q.get('size'), seal = +q.get('seal'), bg = q.get('bg') || '', word = q.get('word');
+const s = document.getElementById('s');
+s.style.width = s.style.height = size + 'px';
+if (bg) s.classList.add(bg);
+const wrap = document.createElement('div');
+wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center';
+wrap.innerHTML = `<div class="seal" style="width:${seal}px;height:${seal}px;font-size:${seal*0.56}px;line-height:1">짝</div>` +
+  (word ? `<div class="word" style="font-size:${seal*0.42}px;color:${bg==='ink'?'#eee6d7':'#2a2724'}">${word}</div>` : '');
+s.append(wrap);
+await document.fonts.ready;
+document.body.dataset.ready = '1';
+</script></body></html>

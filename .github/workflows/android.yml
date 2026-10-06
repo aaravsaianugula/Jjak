@@ -1,0 +1,76 @@
+name: Android build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      HAS_KEYSTORE: ${{ secrets.JJAK_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests (engine)
+        run: npm test
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Prepare release signing (optional)
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.JJAK_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/jjak-upload.jks"
+          echo "JJAK_KEYSTORE_PATH=$RUNNER_TEMP/jjak-upload.jks" >> "$GITHUB_ENV"
+
+      - name: Gradle build (debug APK + release AAB)
+        working-directory: android
+        env:
+          JJAK_KEYSTORE_PASSWORD: ${{ secrets.JJAK_KEYSTORE_PASSWORD }}
+          JJAK_KEY_ALIAS: ${{ secrets.JJAK_KEY_ALIAS }}
+          JJAK_KEY_PASSWORD: ${{ secrets.JJAK_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug bundleRelease -PversionCode=${{ github.run_number }}
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jjak-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: jjak-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab

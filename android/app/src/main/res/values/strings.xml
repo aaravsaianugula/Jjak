@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Jjak</string>
+    <string name="title_activity_main">Jjak</string>
+    <string name="package_name">com.jjak.puzzle</string>
+    <string name="custom_url_scheme">com.jjak.puzzle</string>
+    <!-- AdMob APPLICATION id. This is Google's public TEST app id: replace with yours before release
+         (docs/PLAY_STORE_RELEASE.md → AdMob). Must match the ad units in src/config.ts. -->
+    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
+</resources>

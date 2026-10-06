@@ -11,10 +11,11 @@ const base = process.argv[2] ?? 'http://localhost:5173/';
 const out = process.argv[3] ?? 'screenshots';
 const scale = Number(process.env.SCALE ?? 2);
 const theme = process.env.THEME ?? 'paper';
+const [vw, vh] = (process.env.VIEW ?? '390x844').split('x').map(Number);
 mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium' });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: scale, hasTouch: true, colorScheme: theme === 'ink' ? 'dark' : 'light' });
+const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: scale, hasTouch: true, colorScheme: theme === 'ink' ? 'dark' : 'light' });
 let page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('pageerror:', e.message));
 page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && console.log('console:', m.text()));
@@ -23,7 +24,7 @@ const loadWith = async (data) => {
   const origin = new URL(base).origin;
   const t = JSON.stringify(data);
   const fresh = await browser.newContext({
-    viewport: { width: 390, height: 844 }, deviceScaleFactor: scale, hasTouch: true, colorScheme: theme === 'ink' ? 'dark' : 'light',
+    viewport: { width: vw, height: vh }, deviceScaleFactor: scale, hasTouch: true, colorScheme: theme === 'ink' ? 'dark' : 'light',
     storageState: { cookies: [], origins: [{ origin, localStorage: [{ name: 'jjak.save.v1', value: t }, { name: 'CapacitorStorage.jjak.save.v1', value: t }] }] },
   });
   page = await fresh.newPage();
