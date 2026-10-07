@@ -518,6 +518,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
   function scoreGain(n: number) {
     if (n <= 0) return;
+    scoreStat.querySelectorAll('.hud__gain').forEach((x) => x.remove());
     const g = h('span', { class: 'hud__gain', 'aria-hidden': 'true' }, `+${fmt(n)}`);
     scoreStat.append(g);
     setTimeout(() => g.remove(), 900);
