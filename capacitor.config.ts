@@ -9,7 +9,8 @@ const config: CapacitorConfig = {
   // (or the phone's light/dark setting) before the page draws.
   android: {
     allowMixedContent: false,
-    webContentsDebuggingEnabled: false,
+    // Unset on purpose: Capacitor then enables chrome://inspect only for debuggable (debug) builds,
+    // so device QA can profile the WebView while release builds stay locked.
   },
   plugins: {
     SplashScreen: {
