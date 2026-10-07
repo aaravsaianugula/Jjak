@@ -12,7 +12,7 @@ import {
   routeOf,
 } from '../../data/route';
 import { type LevelSpec, windOf } from '../../engine/levels';
-import { shownSpec } from '../../director';
+import { shownSpec, shownYears } from '../../director';
 import { GOALS } from '../../engine/goals';
 import { MECHANICS } from '../../engine/mechanics';
 
@@ -67,7 +67,7 @@ export function mapScreen(): Screen {
   const here = routeOf(unlocked);
   // Nothing past level 600 shows until the player has cleared it (the road reads as finished).
   const endless = save.level > ROUTE_LEVELS;
-  const maxYear = endless ? here.year : 0;
+  const maxYear = shownYears(save.level);
   let year = maxYear;
   let open: number | null = here.index;
 

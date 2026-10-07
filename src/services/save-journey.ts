@@ -137,6 +137,7 @@ export function hydrateEndless(raw: unknown): EndlessSave {
     lastPartners: strings(r.lastPartners),
     lastGoal: typeof r.lastGoal === 'string' ? r.lastGoal : null,
     stretch: { centre: step(st.centre), twoBend: step(st.twoBend) },
-    seq: isNum(r.seq) ? Math.max(0, r.seq) : Math.max(0, ...kept.map(([, e]) => e.at)),
+    // Never behind an entry it numbered (the cap keeps the newest by it).
+    seq: Math.max(0, isNum(r.seq) ? r.seq : 0, ...kept.map(([, e]) => e.at)),
   };
 }
