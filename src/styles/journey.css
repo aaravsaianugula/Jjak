@@ -327,13 +327,15 @@
 .stop__body {
   padding: 0 12px 14px;
 }
+/* Opening a chapter: the stops below glide down (map.ts, FLIP) and the levels
+   fade in a beat later, as if the card unfolds. */
 .stop__body.is-in {
-  animation: road-open 300ms var(--ease-out) both;
+  animation: road-open 340ms var(--ease-out) 60ms backwards;
 }
 @keyframes road-open {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-8px);
   }
 }
 .stop__postcard {

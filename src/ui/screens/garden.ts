@@ -21,6 +21,7 @@ import { type Screen } from '../app';
 import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
+import { petalBump } from '../motion';
 import { nav } from '../nav';
 
 const SEASONS = [
@@ -76,12 +77,10 @@ export function gardenScreen(): Screen {
   const petalsEl = el.querySelector<HTMLElement>('.gd-petals')!;
   let fresh = takeNewPieces();
 
+  let shownPetals = save.petals;
   const updatePetals = () => {
-    petalsEl.setAttribute('aria-label', `${save.petals} petals`);
-    petalsEl.querySelector('.petals__n')!.textContent = String(save.petals);
-    petalsEl.classList.remove('is-bump');
-    void petalsEl.offsetWidth;
-    petalsEl.classList.add('is-bump');
+    petalBump(petalsEl, shownPetals, save.petals);
+    shownPetals = save.petals;
   };
 
   /** A previewed season only shows today's visitor if it would come then. */

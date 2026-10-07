@@ -252,6 +252,7 @@
 .mk-body {
   padding-top: 6px;
   padding-bottom: 32px;
+  overflow-x: hidden;
 }
 .mk-lede {
   margin: 6px 2px 14px;
@@ -320,6 +321,22 @@
 }
 
 /* Tiles */
+/* Tab switch: the section's parts slide in from the tapped side, one after another. */
+.mk-body.is-switching > * {
+  animation: mk-tab-in 300ms var(--ease-out) backwards;
+}
+.mk-body.is-switching > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.mk-body.is-switching > :nth-child(n + 3) {
+  animation-delay: 80ms;
+}
+@keyframes mk-tab-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--tab-dir, 1) * 16px));
+  }
+}
 .mk-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

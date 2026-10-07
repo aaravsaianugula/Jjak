@@ -207,40 +207,61 @@ select:focus-visible,
   display: flex;
   flex-direction: column;
   padding: calc(var(--safe-top) + 8px) 16px calc(var(--safe-bottom) + var(--banner-h) + 12px);
-  animation: screen-in 300ms var(--ease-out) both;
+  /* The old screen fades first, then this one drifts in: little overlap, no ghosting. */
+  animation: screen-in 340ms var(--ease-out) 60ms both;
 }
 .screen--back {
   animation-name: screen-in-back;
 }
+/* Into a board: the table rises a little instead of sliding sideways. */
+.screen--rise {
+  animation-name: screen-rise;
+  animation-duration: 380ms;
+}
 .screen--leaving {
-  animation: screen-out 190ms ease-in both;
+  animation: screen-out 170ms ease-in both;
   pointer-events: none;
 }
 .screen--leaving-back {
   animation-name: screen-out-back;
 }
+.screen--leaving-sink {
+  animation-name: screen-sink;
+}
 @keyframes screen-in {
   from {
     opacity: 0;
-    transform: translateX(14px);
+    transform: translateX(18px);
   }
 }
 @keyframes screen-in-back {
   from {
     opacity: 0;
-    transform: translateX(-14px);
+    transform: translateX(-18px);
+  }
+}
+@keyframes screen-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
   }
 }
 @keyframes screen-out {
   to {
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(-10px);
   }
 }
 @keyframes screen-out-back {
   to {
     opacity: 0;
-    transform: translateX(8px);
+    transform: translateX(10px);
+  }
+}
+@keyframes screen-sink {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
   }
 }
 .scroll {
@@ -1480,6 +1501,54 @@ button.panel:active {
 }
 .home::-webkit-scrollbar {
   display: none;
+}
+/* Entrance: the scene settles, then the strip, journey, Daily and tiles rise in
+   one after another. `backwards` so press states (transforms) work afterwards. */
+.home > * {
+  animation: home-rise 440ms var(--ease-out) backwards;
+}
+.home > .home__head {
+  animation-delay: 60ms;
+}
+.home > .fp-strip {
+  animation-delay: 110ms;
+}
+.home > .scene {
+  animation-name: home-fade;
+  animation-duration: 520ms;
+}
+.home > .journey {
+  animation-delay: 150ms;
+}
+.home > .daily {
+  animation-delay: 200ms;
+}
+.home > .tiles {
+  animation-delay: 250ms;
+}
+/* Coming back from a board: the same order, quicker. */
+.home.screen--back > * {
+  animation-duration: 340ms;
+}
+.home.screen--back > .journey {
+  animation-delay: 100ms;
+}
+.home.screen--back > .daily {
+  animation-delay: 130ms;
+}
+.home.screen--back > .tiles {
+  animation-delay: 160ms;
+}
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes home-fade {
+  from {
+    opacity: 0;
+  }
 }
 .home > .panel,
 .home > .tiles {
@@ -3544,6 +3613,40 @@ a.row:active {
 }
 
 /* ───────────────────────────── Motion & layout guards ───────────────────────────── */
+/* ───────────────────────────── Press states ─────────────────────────────
+   One feel everywhere: the press lands quickly, the release eases back. */
+.gd-visit,
+.road__fold-btn {
+  transition: transform 160ms var(--ease-out), background 160ms;
+}
+.gd-visit:active,
+.road__fold-btn:active {
+  transform: scale(0.985);
+}
+.road__fold-btn:active {
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--ink));
+}
+.btn:active,
+.icon-btn:active,
+.chip-btn:active,
+button.panel:active,
+button.row:active,
+.seg button:active,
+.tool:active,
+.mk-tile:active,
+.mk-tab:active,
+.gd-piece:active,
+.gd-visit:active,
+.gd-time:active,
+.fp-strip:active,
+.chest:active,
+.lvl:not([disabled]):active,
+.stop__head:not([disabled]):active,
+.month__cards button:active,
+.road__fold-btn:active {
+  transition-duration: 70ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -36,6 +36,7 @@ import { brushStroke, burstFx, type Pt } from '../brush-fx';
 import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { type SheetHandle, openSheet } from '../modal';
+import { petalBump } from '../motion';
 import { nav } from '../nav';
 
 // ── Extension points ────────────────────────────────────────────────
@@ -350,9 +351,12 @@ export function marketScreen(tab?: string): Screen {
   const balanceN = h('span', { class: 'petals__n num' }, fmt(save.petals));
   const balance = h('span', { class: 'petals mk-balance', role: 'status', 'aria-label': `${save.petals} petals`, html: ICONS.petal });
   balance.append(balanceN);
+  let shownBalance = save.petals;
+  /** Show the balance; a change counts over and bumps the pill (the purchase ghost already counted down). */
   const setBalance = (n = save.petals) => {
-    balanceN.textContent = fmt(n);
-    balance.setAttribute('aria-label', `${n} petals`);
+    if (n === shownBalance) return;
+    petalBump(balance, shownBalance, n, { format: fmt, ms: 360 });
+    shownBalance = n;
   };
 
   const rail = h('div', { class: 'mk-rail scroll', role: 'tablist', 'aria-label': 'Market sections' });
@@ -421,6 +425,10 @@ export function marketScreen(tab?: string): Screen {
   function showTab(id: string, keepScroll = false) {
     const t = MARKET_TABS.find((x) => x.id === id) ?? MARKET_TABS[0];
     const changed = t.id !== current;
+    // The new section slides in from the side of the tab that was tapped.
+    const dir = MARKET_TABS.findIndex((x) => x.id === t.id) > MARKET_TABS.findIndex((x) => x.id === current) ? 1 : -1;
+    body.style.setProperty('--tab-dir', String(dir));
+    body.classList.toggle('is-switching', changed);
     current = lastTab = t.id;
     renderRail();
     const btn = rail.querySelector<HTMLElement>(`[data-tab="${t.id}"]`);

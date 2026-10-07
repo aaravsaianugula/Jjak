@@ -29,6 +29,7 @@ import { choose, openSheet } from '../modal';
 import { showHowToPlay } from './settings';
 import { boardReport, rushReport } from '../../services/meta';
 import { pathResult, rankUpMoment } from './path';
+import { petalBump } from '../motion';
 import { nav } from '../nav';
 import { MARKET_PAPER_IDS } from '../../data/market';
 import { activeBrush, activeFx } from '../../services/market';
@@ -947,7 +948,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (runPetals > 0) {
       const pill = h('span', { class: 'petals', html: `${ICONS.petal}<b>+${runPetals}</b>` });
       stagger(h('div', { class: 'earned' }, h('div', { class: 'earned__k' }, h('span', { class: 'reward__label' }, 'Petals'), pill)));
-      if (!rm) setTimeout(() => pill.isConnected && retrigger(pill, 'is-bump'), rewardAt + 200);
+      petalBump(pill, 0, runPetals, { delay: rewardAt + 100, format: (n) => `+${n}` });
     }
     if (fp && (fp.xp > 0 || fp.missions.length)) stagger(pathResult(fp, rewardAt));
     if (seals.length) stagger(sealRow(seals));

@@ -11,7 +11,7 @@ import { cardSvg } from '../../art/cards';
 import { IAP } from '../../config';
 import { cardDef, monthDef } from '../../data/deck';
 import {
-  MAX_RANK, PATH_EXCLUSIVES, type RankTitle, type Reward, TITLES, WEEKLY, exclusiveName, isTitleRank, nextTitle, rankReward, titleFor,
+  MAX_RANK, PATH_EXCLUSIVES, type RankTitle, type Reward, TITLES, WEEKLY, exclusiveName, isTitleRank, nextTitle, rankInfo, rankReward, titleFor,
 } from '../../data/meta';
 import { routeOf } from '../../data/route';
 import { CHAPTERS, LEVELS_PER_CHAPTER, dailyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
@@ -29,6 +29,7 @@ import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
 import { nav } from '../nav';
+import { petalBump, retrigger } from '../motion';
 
 type Tab = 'path' | 'missions' | 'chests';
 
@@ -85,6 +86,44 @@ export function pathStrip(): string {
     <span class="fp-strip__missions" aria-hidden="true">${done >= 3 ? ICONS.check : '<i class="fp-strip__ring"></i>'}<b>${done}</b>/3</span>
     ${p.total ? '<i class="fp-strip__dot" aria-hidden="true"></i>' : ''}
   </button>`;
+}
+
+/**
+ * Fill the Home strip's bar from `fromXp` to the XP now (rolling over on a
+ * rank-up), sliding the fill with a transform. Nothing to do when no XP came in.
+ */
+export function fillStrip(strip: HTMLElement | null, fromXp: number, delay = 0): void {
+  if (!strip || fromXp >= save.meta.xp || reducedMotion()) return;
+  const bar = strip.querySelector<HTMLElement>('.fp-bar i');
+  const seal = strip.querySelector<HTMLElement>('.fp-seal');
+  if (!bar) return;
+  const before = rankInfo(fromXp);
+  const after = rank();
+  const up = after.rank > before.rank;
+  const at = (pct: number) => `translateX(${((Math.max(pct, 0.04) - 1) * 100).toFixed(1)}%)`;
+  bar.style.width = '100%';
+  bar.style.minWidth = '0';
+  bar.style.transform = at(before.pct);
+  if (up && seal) seal.querySelector('b')!.textContent = String(before.rank);
+  const go = (pct: number, ms: number) => {
+    bar.style.transition = `transform ${ms}ms cubic-bezier(0.3, 0.7, 0.2, 1)`;
+    bar.style.transform = at(pct);
+  };
+  setTimeout(() => {
+    if (!bar.isConnected) return;
+    if (!up) return go(after.pct, 900);
+    go(1, 600);
+    setTimeout(() => {
+      bar.style.transition = 'none';
+      bar.style.transform = at(0);
+      if (seal) {
+        seal.querySelector('b')!.textContent = String(after.rank);
+        retrigger(seal, 'is-up');
+      }
+      void bar.offsetWidth;
+      go(after.pct, 700);
+    }, 640);
+  }, delay);
 }
 
 // ───────────────────────────── Result sheet ─────────────────────────────
@@ -267,13 +306,10 @@ export function pathScreen(): Screen {
   const pane = el.querySelector<HTMLElement>('.fp-pane')!;
   const petalsN = el.querySelector<HTMLElement>('.petals__n')!;
 
+  let shownPetals = save.petals;
   const refreshPetals = () => {
-    petalsN.textContent = String(save.petals);
-    petalsN.parentElement!.setAttribute('aria-label', `${save.petals} petals`);
-    const pill = petalsN.parentElement!;
-    pill.classList.remove('is-bump');
-    void pill.offsetWidth;
-    pill.classList.add('is-bump');
+    petalBump(petalsN.parentElement, shownPetals, save.petals);
+    shownPetals = save.petals;
   };
 
   function renderHero() {
