@@ -247,40 +247,57 @@ pack and petal pouches. In the IARC questionnaire, answer **Yes** to "digital pu
 
 ## 8. Pre-launch QA checklist
 
-- [ ] First launch: welcome (three rules) → Level 1 tutorial shows a hint and coach text
-- [ ] Level 6 shows the "Match the flower" tip with its tap-the-pair practice (wrong pick explains, right pick turns the button into "Start Level 6")
-- [ ] First appearances show their tip once: Stones L14 · Falling leaves L26 · First snow L38 · Lucky cards L50 · Knots L74 (with practice) · Wind L98 (with practice). Level 12 is the first festival board and stamps the Gyeongju passport page
-- [ ] Map: the route scrolls to the current place; opening a place lists its 12 levels and any unlocked level replays
-- [ ] Flower Path: XP shows on the result sheet and the Rush end sheet; claiming a rank stamps it and pays out; Claim all works; exclusives appear as owned in the Market
-- [ ] Missions: 3 a day, reroll once each, progress ticks during play, the weekly chest opens at 15
-- [ ] Market: buy, equip and unequip in each tab; "can't afford" shows how many petals are missing; Warm tea stops at 2; Album card hides when the album is complete
-- [ ] Deck style and card back persist after a restart; every deck style keeps the 12 months distinguishable on an 8×6 board
-- [ ] Garden: pieces appear where expected, put-away works, night mode by the clock, the daily visitor pays once a day
-- [ ] Petal pouches (license tester): petals credited once, purchase consumed (buy the same pouch twice). Supporter pack: ads off, 1,500 petals once, Lucky-clouds back owned, "Restore purchase" after reinstall restores ads-off and the back without paying petals again
-- [ ] Seals: earning one shows it on the result sheet and adds petals
-- [ ] Settings → Board paper: locked papers can't be picked; a completed flower unlocks its paper
-- [ ] EU test (UMP debug geography EEA): consent form appears, and Settings shows "Ad privacy choices"
-- [ ] Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s
-- [ ] Rewarded: closing early grants nothing, and finishing grants the item
-- [ ] After a rewarded ad, no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card
-- [ ] Remove ads: buy as a license tester → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back
-- [ ] Petal pouch: buy → petals credited once; buy the same pouch again right away (proves it was consumed); kill the app mid-purchase → next launch credits it once
-- [ ] Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice
-- [ ] Flower Path: Home strip shows rank, title, XP bar and missions; a result sheet shows +XP and the bar fills; a rank-up shows the rank-up moment; claims stamp and pay out
-- [ ] Missions: 3 a day, progress during play with a small toast; one reroll each; the weekly chest opens at 15
-- [ ] Warm tea: miss a day with tea → the Daily keeps the streak and says "Warm tea kept your streak" once
-- [ ] Rush: timer, +time floaters, next board on clear, "Keep going +20s" once per run
-- [ ] Daily gift opens once a day; claiming advances the calendar; skipping a day doesn't reset it
-- [ ] Daily reminder: offered after the first Daily; Android 13+ asks for notification permission; a notification arrives at the chosen hour with the day's theme and doesn't arrive for days already played
-- [ ] Music: starts after the first tap, changes with the season, fades during ads, stops in the background
-- [ ] Banner on Home and Album only; the layout isn't covered (bottom padding adjusts)
-- [ ] Android back button: closes sheets → returns home → minimizes on home
-- [ ] Rotate / split-screen / large-screen: layout still fits (portrait locked on phones)
-- [ ] Airplane mode: game fully playable, ads simply absent
-- [ ] Kill and relaunch mid-level: progress (levels, album, petals) persists
-- [ ] Dark mode: Ink theme, with status bar icons readable
-- [ ] Daily: completing once counts toward the streak; replays are marked "practice"
-- [ ] Play Console pre-launch report: no crashes, accessibility warnings reviewed
+Legend: **[x] web-verified** = checked in Chromium on the web build at 360×640 and 390×844, paper and
+ink themes (and reduced motion where motion matters), with no console errors, on the
+launch-candidate commit. **[ ] 📱 device** = needs a real Android device or Play Console (billing,
+ads, notifications, the hardware Back button, WebView behaviour). Re-run the device items on the
+first internal-test build.
+
+**Onboarding and teaching**
+- [x] web-verified · First launch: the animated first minute (pair, bends, blocked path, combo) with Skip from the first frame; a fresh player's first real pair lands in ~8.6 s; ends in Level 1 with the first pair glowing
+- [x] web-verified · Returning players never see the first minute; Settings → How to play → Replay intro plays it again
+- [x] web-verified · Each idea gets a one-time animated intro (demo, then "your turn") the first time it appears: Level 6 variants · Stones L14 · Falling leaves L26 · First snow L38 · Lucky cards L50 · Knots L74 · Wind L98 · Gates L122 · Fences L158 · each goal kind on its first goal board
+- [x] web-verified · Pause → Replay intro shows the board's newest idea; the clock stays stopped
+- [x] web-verified · Level 12 is the first festival board and stamps the Gyeongju passport page
+
+**Level Director**
+- [x] web-verified · Levels 1–30 played start to finish in the browser (and 121–124, 157–159, 598–600): every board clears, intros show once, tiers adapt (a fast, clean player reaches tier 4 by level 10)
+- [x] web-verified · A retry or replay gives the same board (tier pinned per level)
+- [x] web-verified · Nothing mentions levels past 600 until level 600 is cleared; then "The road goes on" plays once, Home and the Map show Wanderer · Year 2
+- [ ] 📱 device · Endless levels (601+) generate in a Web Worker without a visible pause on a mid-range phone
+
+**Screens**
+- [x] web-verified · Map: scrolls to the current place; opening a place lists its 12 levels (gates 門, fences 垣, goal marks); any unlocked level replays
+- [x] web-verified · Flower Path: XP shows on the result sheet **and the Rush end sheet**; Claim all stamps ranks and pays out; missions reroll; star chests open
+- [x] web-verified · Market: every tab, buy, equip, "can't afford" shows what's missing; petal pouches / Supporter section shows "Available in the Android app" on the web
+- [x] web-verified · Garden: empty, partial, full, night; the visitor line follows the previewed season; tapping open water opens the pond, not the koi
+- [x] web-verified · Album (bonus + gold leaf), Seals (a burst of many seals gives one short toast), Settings, gift calendar
+- [x] web-verified · Reset progress: cosmetics fall back to defaults; Remove ads, Supporter and pouch receipts survive (unit test + browser check)
+- [x] web-verified · Rush: timer, +time floaters, next board on clear, end sheet with petals, XP and seals
+- [x] web-verified · Reduced motion: no deal cascade, static intro steps, the reveal shows its end state
+- [ ] 📱 device · Deck style and card back persist after a restart; every deck style keeps the 12 months distinguishable on an 8×7 board
+
+**Purchases (license tester)**
+- [ ] 📱 device · Remove ads: buy → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back
+- [ ] 📱 device · Petal pouch: buy → petals credited once; buy the same pouch again right away (proves it was consumed); kill the app mid-purchase → next launch credits it once
+- [ ] 📱 device · Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice
+
+**Ads**
+- [ ] 📱 device · EU test (UMP debug geography EEA): consent form appears, and Settings shows "Ad privacy choices"
+- [ ] 📱 device · Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s
+- [ ] 📱 device · Rewarded: closing early grants nothing, and finishing grants the item; afterwards no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card
+- [ ] 📱 device · Banner on Home and Album only; the layout isn't covered (bottom padding adjusts)
+
+**Platform**
+- [ ] 📱 device · Daily reminder: offered after the first Daily; Android 13+ asks for notification permission; a notification arrives at the chosen hour and not on days already played
+- [ ] 📱 device · Music: starts after the first tap, changes with the season, fades during ads, stops in the background
+- [ ] 📱 device · Android back button: closes sheets → pauses a board in progress → returns home → minimizes on home
+- [ ] 📱 device · Rotate / split-screen / large-screen: layout still fits (portrait locked on phones)
+- [ ] 📱 device · Airplane mode: game fully playable, ads simply absent
+- [ ] 📱 device · Kill and relaunch mid-level: progress (levels, album, petals, analytics) persists
+- [ ] 📱 device · Dark mode: Ink theme, with status bar icons readable
+- [x] web-verified · Daily: completing once counts toward the streak; replays are marked "practice"; Warm tea keeps a streak through a missed day (unit tests)
+- [ ] 📱 device · Play Console pre-launch report: no crashes, accessibility warnings reviewed
 
 ## 9. Native edits already applied (for reference if you regenerate `android/`)
 
