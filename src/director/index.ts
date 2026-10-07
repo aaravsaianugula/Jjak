@@ -17,17 +17,32 @@
  *   bank.ts      the shipped level bank (1–600 × 5 tiers)
  *   endless.ts   levels past 600 (C5)
  */
-import { ROUTE_LEVELS } from '../data/route';
+import { ROUTE_LEVELS, routeOf } from '../data/route';
 import { type LevelSpec } from '../engine/levels';
 import { bankSpec } from './bank';
 import { chooseTier } from './director';
 import { endlessSpec, prepareEndless } from './endless';
+import { levelPlan } from './plan';
 
 export { type LevelPlan, designedBase, levelPlan } from './plan';
 
 export function playLevel(n: number): LevelSpec {
   if (n > ROUTE_LEVELS) return endlessSpec(n);
   return bankSpec(n, chooseTier(n).tier);
+}
+
+/**
+ * Wanderer years the Map may show for a player at `level` (0 = the first pass only):
+ * nothing past 600 until level 600 is behind them.
+ */
+export const shownYears = (level: number): number => (level > ROUTE_LEVELS ? routeOf(level).year : 0);
+
+/**
+ * The spec to *show* for level n (Home, the Map): its identity, or for an endless
+ * level the board already made for this player. No side effects (unlike playLevel).
+ */
+export function shownSpec(n: number): LevelSpec {
+  return n > ROUTE_LEVELS ? endlessSpec(n) : levelPlan(n).spec;
 }
 
 export async function prepareLevel(n: number): Promise<LevelSpec> {
