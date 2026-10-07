@@ -27,7 +27,13 @@ function seal(cx: number, cy: number, s: number, seed: number, rot = -5): string
   const y = cy - s / 2;
   const k = s / 36;
   let wear = '';
-  for (let i = 0; i < 12; i++) wear += `<circle cx="${f(x + 4 * k + r() * (s - 8 * k))}" cy="${f(y + 4 * k + r() * (s - 8 * k))}" r="${f((0.2 + r() * 0.5) * k)}" fill="${PAPER}" opacity="${f(0.25 + r() * 0.3)}"/>`;
+  // ink wear: three dry streaks where the vermilion didn't take
+  for (let i = 0; i < 3; i++) {
+    const sx = x + 4 * k + r() * (s * 0.45);
+    const sy = y + 5 * k + r() * (s - 10 * k);
+    const l = s * (0.22 + r() * 0.2);
+    wear += `<path d="M${f(sx)} ${f(sy)}q${f(l / 2)} ${f(-0.6 * k)} ${f(l)} 0q${f(-l / 2)} ${f(0.4 * k)} ${f(-l)} 0Z" fill="${PAPER}" opacity=".38"/>`;
+  }
   return (
     `<g transform="rotate(${rot} ${cx} ${cy})">` +
     `<rect x="${f(x + 1)}" y="${f(y + 1.2)}" width="${s}" height="${s}" rx="${f(5 * k)}" fill="#000" opacity=".25"/>` +
@@ -72,7 +78,7 @@ function seigaiha(): string {
     `<g clip-path="url(#card-clip)">${s}<rect x="4" y="4" width="92" height="132" fill="url(#bk-sei-glow)"/></g>` +
     frame('#f3efe4', '#0e1a30', 0.8) +
     roundel('#f3efe4', '#2c5285', 23.5) +
-    `<circle cx="50" cy="70" r="19.6" fill="none" stroke="#2c5285" stroke-opacity=".3" stroke-width=".5" stroke-dasharray="1 1.6"/>` +
+    `<circle cx="50" cy="70" r="19.6" fill="none" stroke="#2c5285" stroke-opacity=".22" stroke-width=".45"/>` +
     seal(50, 70, 27, 11)
   );
 }
@@ -122,7 +128,7 @@ function rosette(cx: number, cy: number, R: number, withSeal: boolean): string {
     petalRing(cx, cy, 16, 13 * k, 13.4 * k, 4.6 * k, [DC.red, DC.ver, DC.pink, DC.white]) +
     petalRing(cx, cy, 8, 7 * k, 10 * k, 4.8 * k, [DC.navy, DC.blue, DC.sky, DC.white], 22.5) +
     `<circle cx="${cx}" cy="${cy}" r="${f(10.6 * k)}" fill="${DC.green}" stroke="${DC.ink}" stroke-width=".35"/>` +
-    `<circle cx="${cx}" cy="${cy}" r="${f(9.2 * k)}" fill="none" stroke="${DC.white}" stroke-width="${f(0.9 * k)}" stroke-dasharray="${f(0.9 * k)} ${f(1.5 * k)}"/>` +
+    `<circle cx="${cx}" cy="${cy}" r="${f(9.2 * k)}" fill="none" stroke="${DC.white}" stroke-width="${f(0.7 * k)}" stroke-opacity=".85"/>` +
     `<circle cx="${cx}" cy="${cy}" r="${f(7.6 * k)}" fill="${DC.yellow}" stroke="${DC.ink}" stroke-width=".35"/>` +
     (withSeal ? '' : `<circle cx="${cx}" cy="${cy}" r="${f(3.4 * k)}" fill="${DC.ver}"/><circle cx="${cx}" cy="${cy}" r="${f(1.4 * k)}" fill="${DC.white}"/>`)
   );
@@ -145,9 +151,14 @@ function dancheong(): string {
     top += `<rect x="0" y="${a}" width="100" height="${f(b - a)}" fill="${c}"/>`;
     bot += `<rect x="0" y="${f(140 - b)}" width="100" height="${f(b - a)}" fill="${c}"/>`;
   }
-  // a comb of little white "teeth" (빗살) along the inner edge of the bands
-  let comb = '';
-  for (let x = 6; x < 96; x += 3) comb += `M${x} 23V25.4M${x} 117V114.6`;
+  // a white scalloped edging (instead of a comb of ticks) along the inner edge of the bands
+  let comb = 'M4 23.4';
+  let combB = 'M4 116.6';
+  for (let x = 4; x < 96; x += 4) {
+    comb += `Q${x + 2} 26.2 ${x + 4} 23.4`;
+    combB += `Q${x + 2} 113.8 ${x + 4} 116.6`;
+  }
+  comb += combB;
   // half rosettes hanging from the bands, and small side rosettes
   const half = (x: number, y: number, flip: boolean) =>
     `<g transform="translate(${x} ${y})${flip ? ' scale(1 -1)' : ''}">` +
@@ -163,7 +174,7 @@ function dancheong(): string {
     `<path d="M4 46H96M4 94H96" stroke="${DC.greenLt}" stroke-width=".5" stroke-opacity=".6"/>` +
     top +
     bot +
-    `<path d="${comb}" stroke="${DC.white}" stroke-width=".8"/>` +
+    `<path d="${comb}" fill="none" stroke="${DC.white}" stroke-width=".8"/>` +
     half(18, 23, false) +
     half(50, 23, false) +
     half(82, 23, false) +
@@ -220,9 +231,6 @@ function asanoha(): string {
 
 /* ---------- 瑞雲 · Lucky clouds: gold maki-e clouds on black lacquer ---------- */
 function clouds(): string {
-  const r = rng(21);
-  let dust = '';
-  for (let i = 0; i < 150; i++) dust += `M${f(4 + r() * 92)} ${f(4 + r() * 132)}h.01`;
   const gold = 'url(#bk-cl-gold)';
   const cl = (x: number, y: number, s: number, fl: 1 | -1, red = false) => luckyCloud(x, y, s, fl, red ? '#a8352a' : gold, red ? '#d8b25a' : '#7a5a24', 0.5);
   return (
@@ -233,7 +241,6 @@ function clouds(): string {
     `<rect width="100" height="140" rx="9" fill="#1d1a19"/>` +
     `<g clip-path="url(#card-clip)">` +
     `<rect x="4" y="4" width="92" height="132" fill="url(#bk-cl-glow)"/>` +
-    `<path d="${dust}" stroke="#d0a24a" stroke-width=".7" stroke-linecap="round" opacity=".45"/>` +
     cl(18, 24, 1.25, 1) +
     cl(80, 40, 0.95, -1) +
     cl(66, 14, 0.62, -1, true) +
@@ -251,12 +258,13 @@ function clouds(): string {
 /* ---------- 보름달 · Harvest moon: a full moon over silver grass ---------- */
 function moon(): string {
   const r = rng(8);
-  let stars = '';
+  // (no stars: a clear night; the draws keep the grass below as it was tuned)
   for (let i = 0; i < 18; i++) {
     const x = 8 + r() * 84;
     const y = 8 + r() * 70;
     if (Math.hypot(x - 50, y - 50) < 34) continue;
-    stars += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(0.25 + r() * 0.45)}" fill="#e8e6f2" opacity="${f(0.35 + r() * 0.5)}"/>`;
+    r();
+    r();
   }
   // silver grass: blades and nodding plumes, as on the August cards
   let blades = '';
@@ -288,7 +296,6 @@ function moon(): string {
     `<rect width="100" height="140" rx="9" fill="#141a33"/>` +
     `<g clip-path="url(#card-clip)">` +
     `<rect x="4" y="4" width="92" height="132" fill="url(#bk-mo-sky)"/>` +
-    stars +
     `<circle cx="50" cy="52" r="44" fill="url(#bk-mo-halo)"/>` +
     `<circle cx="50" cy="52" r="26" fill="url(#bk-mo-face)"/>` +
     `<path d="M38 43c4-3 9-2 11 1s-1 6-5 6-8-4-6-7zM55 57c3-2 8-1 9 2s-2 5-5 5-6-4-4-7zM57 38c2-1 5 0 5 2s-2 3-4 2-3-3-1-4z" fill="#e2cf9e" opacity=".5"/>` +

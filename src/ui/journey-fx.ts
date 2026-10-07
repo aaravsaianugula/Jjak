@@ -17,33 +17,81 @@ import { reducedMotion, retrigger } from './motion';
 
 // ── Knots ─────────────────────────────────────────────────────────────
 /**
- * A doubled red silk cord around the card with a butterfly knot (나비매듭) and
- * a tassel (술) with a gold band. Drawn in card units (100 × 140).
+ * A doubled red silk cord around the card, tied at the centre with a
+ * chrysanthemum knot (국화매듭): four looped petals around a woven square, a
+ * small hanging loop, then a gold-capped tassel (술) of fine silk. The cord's
+ * twist is drawn as a light and a dark thread winding along it (continuous
+ * lines, no dashes). Drawn in card units (100 × 140); the knot is centred on
+ * (50, 81), the pivot of the tug and untie animations.
  */
-const CORD = (y: number) => `M-4 ${y}C18 ${y - 2.6} 34 ${y + 2.2} 50 ${y}S82 ${y - 2.2} 104 ${y + 0.6}`;
+const KN = (v: number) => String(Math.round(v * 10) / 10);
+/** Centre line of one cord across the card (a gentle sag either side of the knot). */
+const cordY = (x: number, y: number) => y + Math.sin(((x + 4) / 108) * Math.PI * 2) * 1.4;
+function cordPath(y: number, wave = 0, phase = 0): string {
+  let d = '';
+  for (let x = -4; x <= 104; x += wave ? 2 : 6) {
+    const yy = cordY(x, y) + Math.sin(x * 0.9 + phase) * wave;
+    d += `${x === -4 ? 'M' : 'L'}${x} ${KN(yy)}`;
+  }
+  return d;
+}
+const CORD_RED = '#b8283a';
+const CORD_DARK = '#651019';
+const CORD_LIGHT = '#f08e93';
+const KNOT_CORDS = [77.5, 84.5]
+  .map(
+    (y) =>
+      `<path d="${cordPath(y + 0.9)}" stroke="${CORD_DARK}" stroke-width="5.6" fill="none" stroke-linecap="round" opacity=".45"/>` +
+      `<path d="${cordPath(y)}" stroke="${CORD_RED}" stroke-width="4.2" fill="none" stroke-linecap="round"/>` +
+      `<path d="${cordPath(y + 0.3, 1.25, 1.6)}" stroke="${CORD_DARK}" stroke-width=".7" fill="none" opacity=".55"/>` +
+      `<path d="${cordPath(y - 0.4, 1.1)}" stroke="${CORD_LIGHT}" stroke-width=".75" fill="none" opacity=".85"/>`,
+  )
+  .join('');
+/** One looped petal of the knot: a cord running out from the centre and back. */
+function petal(rot: number): string {
+  const d = 'M0 -3.6C-6.4 -6 -9.6 -15.2 -3.4 -17.2C.4 -18.4 4.6 -15.4 3.6 -10.4C3 -7.4 1.4 -5.2 0 -3.6';
+  return (
+    `<g transform="rotate(${rot})">` +
+    `<path d="${d}" stroke="${CORD_DARK}" stroke-width="4.4" fill="none" stroke-linecap="round"/>` +
+    `<path d="${d}" stroke="${CORD_RED}" stroke-width="3" fill="none" stroke-linecap="round"/>` +
+    `<path d="M-1.2 -5.4C-5.8 -8 -7.4 -14.4 -3.2 -15.6" stroke="${CORD_LIGHT}" stroke-width=".7" fill="none" stroke-linecap="round" opacity=".9"/>` +
+    `</g>`
+  );
+}
+// The woven square at the heart of the knot: cords crossing over and under.
+const WEAVE =
+  `<rect x="-6.2" y="-6.2" width="12.4" height="12.4" rx="2.6" transform="rotate(45)" fill="${CORD_RED}" stroke="${CORD_DARK}" stroke-width="1.1"/>` +
+  `<path d="M-5.2 -1.6L-1.6 -5.2M-3.4 3.4L3.4 -3.4M1.6 5.2L5.2 1.6" stroke="${CORD_DARK}" stroke-width=".8" opacity=".7"/>` +
+  `<path d="M-5.2 1.6L-1.6 5.2M-3.4 -3.4L3.4 3.4M1.6 -5.2L5.2 -1.6" stroke="${CORD_LIGHT}" stroke-width=".7" opacity=".8"/>`;
+// Tassel: a fine fan of silk threads under a gold cap, flaring a little and
+// shading darker at the sides.
+const TASSEL = (() => {
+  let threads = '';
+  for (let k = 0; k <= 10; k++) {
+    const t = k / 10 - 0.5;
+    threads += `M${KN(50 + t * 6.6)} 108.5Q${KN(50 + t * 8.4)} 118 ${KN(50 + t * 10.4)} ${KN(130 - Math.abs(t) * 3)}`;
+  }
+  return (
+    // hanging cord from the knot to the cap
+    `<path d="M50 89.5V101" stroke="${CORD_DARK}" stroke-width="3.2" stroke-linecap="round"/><path d="M50 89.5V101" stroke="${CORD_RED}" stroke-width="2.1" stroke-linecap="round"/>` +
+    // body of the tassel
+    `<path d="M46.4 107C44.6 116 43.6 123 44.2 130.4Q50 132.4 55.8 130.4C56.4 123 55.4 116 53.6 107Z" fill="url(#knot-silk)"/>` +
+    `<path d="${threads}" stroke="${CORD_LIGHT}" stroke-width=".35" fill="none" opacity=".75"/>` +
+    // gold cap with a lit band
+    `<path d="M45.6 101.2Q50 99.2 54.4 101.2L54.8 108.6Q50 110.2 45.2 108.6Z" fill="#c8963e" stroke="#7a5418" stroke-width=".7"/>` +
+    `<path d="M46.4 103.2Q50 101.8 53.6 103.2" stroke="#f4d585" stroke-width=".9" fill="none"/><path d="M45.8 106.4Q50 107.6 54.2 106.4" stroke="#8a6020" stroke-width=".6" fill="none"/>`
+  );
+})();
 export const KNOT_SVG =
   `<svg class="knot__art" viewBox="0 0 100 140" aria-hidden="true">` +
-  `<g class="knot__cord">` +
-  [78, 85]
-    .map(
-      (y) =>
-        `<path d="${CORD(y)}" stroke="#5e0f17" stroke-width="6.4" fill="none" stroke-linecap="round" opacity=".55"/>` +
-        `<path d="${CORD(y)}" stroke="#c0303a" stroke-width="4.6" fill="none" stroke-linecap="round"/>` +
-        `<path d="${CORD(y - 0.9)}" stroke="#f3a0a3" stroke-width=".9" fill="none" stroke-linecap="round" opacity=".75" stroke-dasharray="3 2.2"/>`,
-    )
-    .join('') +
-  `</g>` +
-  `<g class="knot__bow"><g transform="translate(50 81) scale(1.2) translate(-50 -81)">` +
-  // Two loops, then the knot itself.
-  `<path d="M50 81C40 66 24 64 25 75C26 84 40 85 50 81Z" fill="#c0303a" stroke="#5e0f17" stroke-width="1.3" stroke-linejoin="round"/>` +
-  `<path d="M50 81C60 66 76 64 75 75C74 84 60 85 50 81Z" fill="#c0303a" stroke="#5e0f17" stroke-width="1.3" stroke-linejoin="round"/>` +
-  `<path d="M31 74C34 70 41 71 46 78M69 74C66 70 59 71 54 78" stroke="#f3a0a3" stroke-width=".9" fill="none" opacity=".8"/>` +
-  `<rect x="44.2" y="75.5" width="11.6" height="11.6" rx="3.4" fill="#a8232d" stroke="#5e0f17" stroke-width="1.2"/>` +
-  `<path d="M46.5 79.5H53.5M46.5 83.2H53.5" stroke="#f3a0a3" stroke-width=".8" opacity=".8"/>` +
-  // Tassel: two cords down to a gold band, then a soft fringe.
-  `<path d="M48 87C47 95 47 101 48 107M52 87C53 95 53 101 52 107" stroke="#c0303a" stroke-width="2.2" fill="none" stroke-linecap="round"/>` +
-  `<rect x="44.5" y="106" width="11" height="5.6" rx="2" fill="#d6a447" stroke="#7a5418" stroke-width=".8"/>` +
-  `<path d="M45.6 112C45 118 44.5 123 44 128M48 112V129M50 112V130M52 112V129M54.4 112C55 118 55.5 123 56 128" stroke="#c0303a" stroke-width="1.5" fill="none" stroke-linecap="round"/>` +
+  `<defs><linearGradient id="knot-silk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${CORD_DARK}"/><stop offset=".35" stop-color="${CORD_RED}"/><stop offset=".6" stop-color="#cf4553"/><stop offset="1" stop-color="${CORD_DARK}"/></linearGradient></defs>` +
+  `<g class="knot__cord">${KNOT_CORDS}</g>` +
+  `<g class="knot__bow">${TASSEL}<g transform="translate(50 81)">` +
+  // the little hanging loop on top
+  `<path d="M-2.2 -8.4C-3.6 -14 3.6 -14 2.2 -8.4" stroke="${CORD_DARK}" stroke-width="3" fill="none" stroke-linecap="round"/>` +
+  `<path d="M-2.2 -8.4C-3.6 -14 3.6 -14 2.2 -8.4" stroke="${CORD_RED}" stroke-width="1.9" fill="none" stroke-linecap="round"/>` +
+  [45, 135, 225, 315].map(petal).join('') +
+  WEAVE +
   `</g></g></svg>`;
 
 /** Tie or untie (instantly) the cord on a card element. */
