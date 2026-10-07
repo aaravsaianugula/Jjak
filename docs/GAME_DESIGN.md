@@ -68,18 +68,18 @@ the board each player gets comes from the offline-built bank at their tier
 |---|---|---|---|
 | 1 | 4×4 | identical | Tapping pairs, path bends |
 | 2–5 | 4×4 → 6×5 | identical | Scanning bigger boards |
-| 6 | 6×4 | **4 per flower** | "Match the flower, not the picture" (tip with a tap-the-pair practice) |
+| 6 | 7×6 | **4 per flower** | "Match the flower, not the picture" (animated intro, then a your-turn pair) |
 | Chapter 1 (levels 1–12) | up to 8×6 | yes | Full 48-card boards |
 | Chapter 2 | | yes | **Stones** block paths |
 | Chapter 3 | | yes | **Falling leaves**: cards drop to fill gaps after each pair |
 | Chapter 4 | | yes | **First snow**: some cards start face-down and turn over when a neighbour clears |
 | Chapter 5 | | yes | **Lucky cards**: a bonus pair (보너스패) worth +500 points and +10 petals |
-| Chapter 7 | | yes | **Knots (매듭)**: a tied card can't be picked until a card beside it clears (tip with practice) |
-| Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair (tip with practice) |
+| Chapter 7 | | yes | **Knots (매듭)**: a tied card can't be picked until a card beside it clears |
+| Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair |
 | Chapter 11 | | yes | **Gates (門)**: a gate opens when its flower is paired |
 | Chapter 14 | | yes | **Fences (울타리)**: paths can't cross a bamboo fence |
 | Chapters 6–50 | | yes | Each place features one idea or a mix; level goals on about one board in four |
-| 601+ (Wanderer) | | yes | The same road, fuller boards, slightly tighter par |
+| 601+ (Wanderer) | | yes | Hidden until level 600 is cleared, then revealed ("The road goes on"). Each level is generated live for this player in a Web Worker, with the same validators |
 
 **Inside every chapter** the 12 slots follow a rhythm: a warm-up, the chapter's idea, a
 plain board, a mix, a smaller breather in the middle, a peak, and the **festival board**
@@ -88,6 +88,19 @@ plain board, a mix, a smaller breather in the middle, a peak, and the **festival
 sawtooth inside each chapter (open and rest boards dip, the peak tops it) on a road that
 rises; partner ideas and goals come from bag randomisers so neighbours don't repeat.
 Snow and fences never share a board with falling leaves or wind.
+
+**Show, don't tell.** New players get an animated first minute instead of a rules
+screen: the brush pairs two cards and the 0/1/2-bend rule draws itself, the player
+makes a pair, a blocked pair is crossed out, and quick pairs build a combo. Every
+new idea arrives the same way: a 2–4 s demo on a mini board stepped through the real
+rules, then the player does it once (`src/ui/demo.ts`, scripts in `src/ui/demos.ts`).
+
+**Adaptive difficulty (the Level Director).** The place, role, shape, mechanics, goal and
+par of a level are the same for everyone; the board inside it comes from one of five
+skill tiers, chosen on the device from how this player plays (time vs par, think time,
+first taps, misreads, hints and quits) with relief boards after a struggle and stretch
+boards after an easy streak. A level's tier is pinned so a retry is the same board.
+See `docs/EXPANSION_PLAN.md` §C1.
 
 **Mechanic safety nets** (never the player's fault, never a penalty): if snow or knots are
 the only reason a board is stuck, they clear for free; if a board is still stuck it
