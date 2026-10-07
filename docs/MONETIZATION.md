@@ -27,6 +27,8 @@ Numbers from vendor blogs are directional. Validate them with Jjak's own data (s
 | **Rush** | Minutes | A 60-second score attack. Pairs add 1 s (2 s at ×3+), clearing a board adds 8 s, and boards grow as the run goes on. You chase your personal best. |
 | **Daily Jjak** | Daily | The same board worldwide, a weekday theme, a streak, a 7-day strip, and a share card. |
 | **Gift calendar** | Daily | Seven days of gifts ending in an album card. **Missing a day never resets it.** |
+| **Daily reminder** | Daily | Opt-in only, offered inline after your first Daily (never a pop-up). It names that day's theme ("Leaf-fall Wednesday · Daily #8 is ready"), skips days you've already played, and uses inexact alarms (no special permission). |
+| **Card sets** | Per board | Clearing a real yaku set inside one board scores a named bonus, a discovery layer for players who learn the deck. |
 | **Album, Seals, papers** | Weeks | 48 cards, 31 seals including real yaku sets, and 12 board papers. |
 
 We deliberately avoid dark patterns: no paid loot boxes, no energy or lives, no streak

@@ -40,12 +40,13 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 | **Journey** | Session | Endless levels in 4 seasonal chapters × 12 levels, then "Year 2" with more stones. |
 | **Daily Jjak** | Daily | One worldwide board per date with a weekday theme (Stone Monday, Snowy Tuesday, Leaf-fall Wednesday…). Streak counter, a 7-day strip on Home, a countdown to the next board, and an emoji share card. |
 | **Album** | Weeks | 48 collectible cards with KR/JP names, romanization, and culture notes. One new card per first clear and per Daily. Each card shows which real card sets (yaku) it belongs to. |
-| **Seals 印** | Weeks–months | 31 achievements in four groups (Play, Journey, Daily, Album sets), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
+| **Seals 印** | Weeks–months | 33 achievements in four groups (Play, Journey, Daily, Album sets), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
 | **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif) under Settings. 12 to collect. |
 | **Journey map** | Any time | Every unlocked level with its blossoms, so you can replay for missing ones. |
 | **Zen** | Any time | Endless, untimed, no stars. |
 | **Rush** | Minutes | 60-second score attack: pairs add time, cleared boards add more, boards grow. Personal best, plus an optional rewarded "keep going +20 s" once per run. |
 | **Fever** | Seconds | A ×5 combo starts 6 s of 만개 · 満開 "full bloom": double points and a glowing board. |
+| **Card sets on the board** | Per board | Clearing every card of a real Go-Stop / Koi-Koi set (yaku) within one board scores a named bonus: 고도리 Godori +700, 猪鹿蝶 +700, 홍단/청단/초단 +500, 月見酒/花見酒 +400, 삼광 Three brights +900, 오광 Five brights +2000. The intro card hints when a board holds one. |
 | **Gifts** | Daily / every 4 levels | 7-day gift calendar (never resets) and a lantern gift every 4th Journey level. |
 
 ## 4. Level curve
@@ -126,6 +127,7 @@ Consent goes through Google UMP before any ad request.
 * **Game feel:** a title card at the start of each board, a two-layer ink-brush path with
   blots at both ends, a seal stamp and petal shower on clear, and a pause menu (Back
   never throws away a board in progress).
+* **Music:** generative and synthesised live. Plucked notes wander a seasonal pentatonic scale (spring major, summer warm, autumn yo, winter in-scale) over a slow drone with a soft echo. It fades out during ads and pauses in the background.
 * **Sound:** WebAudio synthesis only. A wood "tok" for taps and a pentatonic bell that
   climbs with the combo. The stamp sound is a low thump plus a chord.
 

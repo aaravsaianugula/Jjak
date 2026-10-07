@@ -4,6 +4,8 @@ import { completedMonths } from '../../services/progress';
 import { APP_VERSION, LINKS } from '../../config';
 import { ads } from '../../services/ads';
 import { store } from '../../services/store';
+import { music } from '../../services/music';
+import { REMINDER_TIMES, disableReminder, enableReminder } from '../../services/reminders';
 import { resetSave, save, persist, type Theme } from '../../services/storage';
 import { applyTheme, type Screen } from '../app';
 import { esc, frag, h, toast } from '../dom';
@@ -21,8 +23,14 @@ export function settingsScreen(): Screen {
     <div class="scroll" style="flex:1;padding-top:8px">
       <div class="section-label">Play</div>
       <div class="list">
-        <div class="row"><span>Sound</span><button class="switch" role="switch" data-toggle="sound" aria-label="Sound"></button></div>
+        <div class="row"><span>Sound effects</span><button class="switch" role="switch" data-toggle="sound" aria-label="Sound effects"></button></div>
+        <div class="row"><span>Music<small>Generative, changes with the seasons</small></span><button class="switch" role="switch" data-toggle="music" aria-label="Music"></button></div>
         <div class="row"><span>Haptics</span><button class="switch" role="switch" data-toggle="haptics" aria-label="Haptics"></button></div>
+        <div class="row row--wrap"><span>Daily reminder<small>A quiet nudge when the new Daily is ready</small></span>
+          <div class="seg" role="group" aria-label="Daily reminder">
+            <button data-remind="off">Off</button>${REMINDER_TIMES.map((t) => `<button data-remind="${t.hour}">${t.hour}:00</button>`).join('')}
+          </div>
+        </div>
         <button class="row" data-act="paper"><span>Board paper<small data-paper-name></small></span><span class="muted">›</span></button>
         <div class="row"><span>Theme</span>
           <div class="seg" role="group" aria-label="Theme">
@@ -53,9 +61,12 @@ export function settingsScreen(): Screen {
 
   const paperName = () => (save.paper === 'plain' ? 'Plain hanji' : MONTHS[Number(save.paper)].en);
   const sync = () => {
+    el.querySelectorAll<HTMLElement>('[data-remind]').forEach((b) =>
+      b.setAttribute('aria-pressed', String(b.dataset.remind === (save.reminder.hour == null ? 'off' : String(save.reminder.hour)))),
+    );
     el.querySelector('[data-paper-name]')!.textContent = paperName();
     el.querySelectorAll<HTMLElement>('[data-toggle]').forEach((b) => {
-      const k = b.dataset.toggle as 'sound' | 'haptics';
+      const k = b.dataset.toggle as 'sound' | 'music' | 'haptics';
       b.setAttribute('aria-checked', String(save.settings[k]));
     });
     el.querySelectorAll<HTMLElement>('[data-set-theme]').forEach((b) => b.setAttribute('aria-pressed', String(save.settings.theme === b.dataset.setTheme)));
@@ -67,9 +78,17 @@ export function settingsScreen(): Screen {
     if (t.closest('[data-back]')) return nav.home();
     const tog = t.closest<HTMLElement>('[data-toggle]');
     if (tog) {
-      const k = tog.dataset.toggle as 'sound' | 'haptics';
+      const k = tog.dataset.toggle as 'sound' | 'music' | 'haptics';
       save.settings[k] = !save.settings[k];
       persist();
+      if (k === 'music') music.refresh();
+      sync();
+      return;
+    }
+    const rm = t.closest<HTMLElement>('[data-remind]');
+    if (rm) {
+      if (rm.dataset.remind === 'off') await disableReminder();
+      else if (!(await enableReminder(Number(rm.dataset.remind)))) toast('Notifications are off for Jjak. Allow them in Android settings.');
       sync();
       return;
     }

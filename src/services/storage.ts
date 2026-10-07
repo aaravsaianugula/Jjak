@@ -24,7 +24,7 @@ export interface SaveData {
   shuffles: number;
   album: number[];
   daily: { streak: number; best: number; lastDate: string | null; results: Record<string, DailyResult> };
-  settings: { sound: boolean; haptics: boolean; theme: Theme };
+  settings: { sound: boolean; music: boolean; haptics: boolean; theme: Theme };
   stats: {
     pairs: number;
     clears: number;
@@ -51,6 +51,10 @@ export interface SaveData {
     /** date key of the last gentle "remove ads" mention */
     lastUpsell: string | null;
   };
+  /** daily reminder: hour of day (local) or null when off; asked = we've offered it */
+  reminder: { hour: number | null; asked: boolean };
+  /** card sets (yaku) the player has completed on a board, by id */
+  yakuSeen: string[];
   /** owns the one-time "Remove ads" purchase */
   adFree: boolean;
   rush: { best: number; runs: number; bestRound: number };
@@ -72,12 +76,14 @@ export const defaultSave = (): SaveData => ({
   shuffles: ECONOMY.startShuffles,
   album: [],
   daily: { streak: 0, best: 0, lastDate: null, results: {} },
-  settings: { sound: true, haptics: true, theme: 'auto' },
+  settings: { sound: true, music: true, haptics: true, theme: 'auto' },
   stats: { pairs: 0, clears: 0, bestCombo: 0, zenBoards: 0, cleanClears: 0, fastClears: 0, bestDailyMs: 0 },
   seals: [],
   paper: 'plain',
   ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0, lastRewardedAt: 0, interstitialsShown: 0, rewardedWatched: 0, lastUpsell: null },
   adFree: false,
+  yakuSeen: [],
+  reminder: { hour: null, asked: false },
   rush: { best: 0, runs: 0, bestRound: 0 },
   gift: { day: 0, lastClaim: null },
   seenTips: [],
@@ -98,6 +104,7 @@ function hydrate(raw: unknown): SaveData {
     ads: { ...base.ads, ...(r.ads ?? {}) },
     rush: { ...base.rush, ...(r.rush ?? {}) },
     gift: { ...base.gift, ...(r.gift ?? {}) },
+    reminder: { ...base.reminder, ...(r.reminder ?? {}) },
   };
 }
 

@@ -8,8 +8,8 @@ import { save } from './storage';
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 
-function ac(): AudioContext | null {
-  if (!save.settings.sound) return null;
+/** The shared AudioContext (created on demand), regardless of the sound setting. */
+export function audioContext(): AudioContext | null {
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
@@ -22,8 +22,13 @@ function ac(): AudioContext | null {
   return ctx;
 }
 
+function ac(): AudioContext | null {
+  if (!save.settings.sound) return null;
+  return audioContext();
+}
+
 /** Call from the first user gesture so iOS/Android webviews unlock audio. */
-export const unlockAudio = () => void ac();
+export const unlockAudio = () => void audioContext();
 
 function tone(freq: number, start: number, dur: number, type: OscillatorType, vol: number, glideTo?: number) {
   const c = ctx!;

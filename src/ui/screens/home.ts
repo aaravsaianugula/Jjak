@@ -2,6 +2,7 @@ import { sceneParticles, sceneSvg } from '../../art/scene';
 import { GIFTS } from '../../config';
 import { cardSvg } from '../../art/cards';
 import { ads } from '../../services/ads';
+import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
 import { CHAPTERS, LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
@@ -31,6 +32,7 @@ export function homeScreen(): Screen {
   const loop = Math.floor(chapterIndex / CHAPTERS.length);
   const dots = Array.from({ length: LEVELS_PER_CHAPTER }, (_, i) => `<span class="${i < slot ? 'done' : i === slot ? 'now' : ''}"></span>`).join('');
   const spec = journeyLevel(level);
+  music.setSeason(chapterIndex % 4);
   const twist = spec.gravity ? 'Falling leaves' : spec.snow ? 'First snow' : spec.stones ? 'Stones' : '';
 
   const today = localDateKey();

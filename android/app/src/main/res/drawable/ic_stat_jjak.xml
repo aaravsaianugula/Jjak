@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icon for Daily reminders: a five-petal plum blossom (white on transparent). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M12,2.2a3.6,3.6 0,0 1,3.4 4.8a3.6,3.6 0,0 1,3.1 5.9a3.6,3.6 0,0 1,-1.9 6.6a3.6,3.6 0,0 1,-4.6 2.6a3.6,3.6 0,0 1,-4.6 -2.6a3.6,3.6 0,0 1,-1.9 -6.6a3.6,3.6 0,0 1,3.1 -5.9A3.6,3.6 0,0 1,12 2.2zM12,10a2,2 0,1 0,0 4a2,2 0,1 0,0 -4z" />
+</vector>

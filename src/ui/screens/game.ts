@@ -4,10 +4,13 @@ import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
 import { type Point, STONE, cardsLeft, isCard } from '../../engine/board';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, journeyLevel, rushLevel, zenLevel } from '../../engine/levels';
 import { FEVER_MS, Session, formatTime } from '../../engine/session';
+import { type Yaku, possibleYaku } from '../../engine/yaku';
 import { checkSeals, type Seal } from '../../services/achievements';
 import { ads } from '../../services/ads';
 import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
+import { music } from '../../services/music';
+import { REMINDER_TIMES, disableReminder, enableReminder, planReminders } from '../../services/reminders';
 import { type ClearSummary, completedMonths, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, shareTextFor } from '../../services/progress';
 import { store } from '../../services/store';
 import { AD_POLICY } from '../../config';
@@ -37,6 +40,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   let spec = initialSpec;
   let session = new Session(spec, performance.now());
   let total = cardsLeft(session.board);
+  // Journey plays its chapter's season; other modes follow the real calendar.
+  music.setSeason(spec.mode === 'journey' ? Math.floor((spec.number - 1) / 12) % 4 : [3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3][new Date().getMonth()]);
   /** Rush run state (null in other modes). */
   const rush =
     spec.mode === 'rush'
@@ -375,6 +380,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     haptic.medium();
     showCombo(res.combo, res.fever);
     if (res.feverStarted) startFever();
+    if (res.yaku.length) showYaku(res.yaku);
     if (rush) {
       const add = res.combo >= 3 ? RUSH.perComboPairMs : RUSH.perPairMs;
       rush.left += add;
@@ -406,6 +412,18 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     setTimeout(() => banner.remove(), 1600);
     if (feverTimer) clearTimeout(feverTimer);
     feverTimer = setTimeout(() => el.classList.remove('is-fever'), FEVER_MS);
+  }
+
+  /** A completed card set: named banner, bonus, and a record for the seal book. */
+  function showYaku(list: Yaku[]) {
+    for (const y of list) if (!save.yakuSeen.includes(y.id)) save.yakuSeen.push(y.id);
+    persist();
+    const y = list[list.length - 1];
+    sfx.reveal();
+    haptic.success();
+    const banner = h('div', { class: 'yaku' }, h('span', { class: 'yaku__k' }, 'Card set'), h('b', {}, y.native), h('span', {}, `${y.en} · +${list.reduce((n, x) => n + x.bonus, 0)}`));
+    stage.append(banner);
+    setTimeout(() => banner.remove(), 2000);
   }
 
   /** Small rising label over a cell (Rush time bonus). */
@@ -729,6 +747,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (newPaper) content.append(frag(`<p class="unlock">A flower is complete — a new board paper is ready in Settings.</p>`));
     if (seals.length) content.append(sealRow(seals));
     if (spec.mode === 'daily') content.append(frag(`<p class="muted" style="text-align:center;margin-top:14px">Next Daily in ${formatCountdown(msToNextDaily())}</p>`));
+    if (summary.daily?.counted) {
+      void planReminders();
+      if (!save.reminder.asked) content.append(reminderOffer());
+    }
 
     const actions = h('div', { class: 'sheet__actions' });
     content.append(actions);
@@ -804,6 +826,30 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     }
   }
 
+  /** Inline, one-time offer of a daily reminder (never a pop-up). */
+  function reminderOffer(): HTMLElement {
+    const box = frag(`<div class="remind">
+      <div><b>A gentle nudge tomorrow?</b><br><span class="muted">One quiet reminder a day for the new board. Change it any time in Settings.</span></div>
+      <div class="remind__times">${REMINDER_TIMES.map((t) => `<button data-hour="${t.hour}">${esc(t.label)}</button>`).join('')}<button data-hour="off" class="remind__no">No thanks</button></div>
+    </div>`);
+    box.addEventListener('click', async (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hour]');
+      if (!b) return;
+      if (b.dataset.hour === 'off') {
+        save.reminder.asked = true;
+        persist();
+        await disableReminder();
+        box.remove();
+        return;
+      }
+      const ok = await enableReminder(Number(b.dataset.hour));
+      box.innerHTML = ok
+        ? `<p style="margin:0">Reminder set for ${esc(b.textContent ?? '')}. See you tomorrow.</p>`
+        : `<p style="margin:0" class="muted">Notifications are off for Jjak. You can allow them in Android settings.</p>`;
+    });
+    return box;
+  }
+
   function sealRow(seals: Seal[]): HTMLElement {
     const shown = seals.slice(0, 3);
     const more = seals.length - shown.length;
@@ -864,13 +910,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       paused = true;
       pausedAt = performance.now();
     }
-    const tog = (k: 'sound' | 'haptics', label: string) =>
+    const tog = (k: 'sound' | 'music' | 'haptics', label: string) =>
       `<div class="row"><span>${label}</span><button class="switch" role="switch" data-toggle="${k}" aria-checked="${save.settings[k]}" aria-label="${label}"></button></div>`;
     const content = frag(`<div>
       <div class="detail__kind">Paused</div>
       <h2>${esc(titleFor(spec))}</h2>
       <p class="muted">${esc(sub)} · ${session.pairsMade} of ${total / 2} pairs · ${formatTime(session.elapsedMs(pausedAt))}</p>
-      <div class="list" style="margin:14px 0 0">${tog('sound', 'Sound')}${tog('haptics', 'Haptics')}</div>
+      <div class="list" style="margin:14px 0 0">${tog('sound', 'Sound effects')}${tog('music', 'Music')}${tog('haptics', 'Haptics')}</div>
       <div class="sheet__actions">
         <button class="btn btn--primary btn--block" data-p="resume">Resume ${ICONS.play}</button>
         <div class="sheet__row">
@@ -885,10 +931,11 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       const t = e.target as HTMLElement;
       const sw = t.closest<HTMLElement>('[data-toggle]');
       if (sw) {
-        const k = sw.dataset.toggle as 'sound' | 'haptics';
+        const k = sw.dataset.toggle as 'sound' | 'music' | 'haptics';
         save.settings[k] = !save.settings[k];
         sw.setAttribute('aria-checked', String(save.settings[k]));
         persist();
+        if (k === 'music') music.refresh();
         return;
       }
       const act = t.closest<HTMLElement>('[data-p]')?.dataset.p;
@@ -921,13 +968,16 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   /** Title card at the start of a board; the clock starts when it clears. */
   function intro(): Promise<void> {
+    const sets = possibleYaku(session.board.cells.filter((v) => v >= 0));
+    const setNote = sets.length ? `<div class="intro__set">This board holds a card set: <b>${esc(sets[0].native)}</b></div>` : '';
     const twistNote = rush
       ? `${RUSH.startMs / 1000} seconds · pairs add time`
       : spec.gravity ? 'Cards fall to fill the gaps' : spec.snow ? 'Some cards start under snow' : spec.stones ? 'Stones block the way' : '';
     const card = frag(`<div class="intro" aria-hidden="true">
       <div class="intro__kicker">${esc(spec.mode === 'journey' ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}` : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : 'Zen · 禅')}</div>
       <div class="intro__title">${esc(titleFor(spec))}</div>
-      <div class="intro__sub">${rush ? '' : `${total / 2} pairs · `}${esc(twistNote)}</div>
+      <div class="intro__sub">${esc([rush ? '' : `${total / 2} pairs`, twistNote].filter(Boolean).join(' · '))}</div>
+      ${setNote}
     </div>`);
     stage.append(card);
     busy = true;

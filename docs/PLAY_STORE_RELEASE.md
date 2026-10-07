@@ -174,7 +174,8 @@ The cards come from the 48-card flower deck that Korea (Hwatu 화투) and Japan
 ◆ DAILY JJAK — one board for the whole world each day, with a new theme every weekday.
   Keep your streak, share your time
 ◆ RUSH — a 60-second score attack. Chain combos into Full Bloom for double points
-◆ ZEN — endless boards with no clock at all
+◆ ZEN — endless boards with no clock at all, with gentle generative music that changes with the seasons
+◆ CARD SETS — clear Godori, the red ribbons or the Five Brights on one board for a bonus
 ◆ ALBUM — collect all 48 cards and learn each flower's name in Korean and Japanese,
   with little stories behind them (why is the October deer looking away?)
 ◆ SEALS — 28 achievements, including the classic card sets players in Korea and Japan
@@ -217,6 +218,8 @@ rewarded ads are always your choice.
 - [ ] Remove ads: buy as a license tester → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back
 - [ ] Rush: timer, +time floaters, next board on clear, "Keep going +20s" once per run
 - [ ] Daily gift opens once a day; claiming advances the calendar; skipping a day doesn't reset it
+- [ ] Daily reminder: offered after the first Daily; Android 13+ asks for notification permission; a notification arrives at the chosen hour with the day's theme and doesn't arrive for days already played
+- [ ] Music: starts after the first tap, changes with the season, fades during ads, stops in the background
 - [ ] Banner on Home and Album only; the layout isn't covered (bottom padding adjusts)
 - [ ] Android back button: closes sheets → returns home → minimizes on home
 - [ ] Rotate / split-screen / large-screen: layout still fits (portrait locked on phones)

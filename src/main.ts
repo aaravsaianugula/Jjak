@@ -6,6 +6,8 @@ import { installCardSprite } from './art/cards';
 import { ads } from './services/ads';
 import { store } from './services/store';
 import { haptic } from './services/haptics';
+import { music } from './services/music';
+import { planReminders } from './services/reminders';
 import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
@@ -31,7 +33,25 @@ async function boot() {
   installCardSprite();
   installWebBannerPreview();
   setBackFallback(() => nav.home());
-  installPlatformHooks(() => void flush(), () => {});
+  let heard = false;
+  installPlatformHooks(
+    () => {
+      void flush();
+      music.stop();
+    },
+    () => {
+      if (heard) music.refresh();
+    },
+  );
+  // Music may only start after a user gesture (browser and WebView autoplay rules).
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      heard = true;
+      music.refresh();
+    },
+    { once: true, capture: true },
+  );
   // A light tick on every button press (cards handle their own feedback).
   document.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('button');
@@ -46,6 +66,7 @@ async function boot() {
   }
 
   void store.init();
+  void planReminders();
   if (!save.onboarded) nav.welcome();
   else {
     nav.home();

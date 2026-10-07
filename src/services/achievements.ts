@@ -39,6 +39,8 @@ export const SEALS: Seal[] = [
   { id: 'fever', group: 'Play', title: 'Full bloom', native: '만개 · 満開', desc: 'Trigger Fever with a ×5 combo.', reward: 15, progress: () => [Math.min(save.stats.bestCombo, 5), 5] },
   { id: 'rush5k', group: 'Play', title: 'Quick hands', desc: 'Score 5,000 in a Rush run.', reward: 15, progress: () => [save.rush.best, 5000] },
   { id: 'rush15k', group: 'Play', title: 'Lightning brush', desc: 'Score 15,000 in a Rush run.', reward: 40, progress: () => [save.rush.best, 15000] },
+  { id: 'yaku1', group: 'Play', title: 'A set on the board', native: '약 · 役', desc: 'Clear all the cards of a card set (yaku) within one board.', reward: 15, progress: () => [Math.min(1, save.yakuSeen.length), 1] },
+  { id: 'yaku5', group: 'Play', title: 'Set collector', desc: 'Complete five different card sets on boards.', reward: 40, progress: () => [save.yakuSeen.length, 5] },
   { id: 'zen10', group: 'Play', title: 'Still water', native: '禅', desc: 'Finish 10 Zen boards.', reward: 15, progress: () => [save.stats.zenBoards, 10] },
 
   // Journey

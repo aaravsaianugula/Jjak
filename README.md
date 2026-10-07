@@ -22,7 +22,7 @@ and collect every card with its Korean and Japanese name.
 |---|---|
 | **Modes** | Journey (4 seasonal chapters, endless, with a level map), Rush (60 s score attack), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed), Album (48 collectible cards) |
 | **Mechanics** | Stones (Summer), Falling leaves (Autumn), First snow (Winter), mixed from Year 2 |
-| **Meta** | Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, 31 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
+| **Meta** | Card-set (yaku) bonuses on the board, generative seasonal music, opt-in Daily reminders, Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, 33 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
 | **Engine** | Shisen-sho path rule (≤ 2 turns, edge routing), boards that are **solvable by construction**, deterministic seeds, auto-reshuffle on dead ends |
 | **Monetization** | See [`docs/MONETIZATION.md`](docs/MONETIZATION.md). Rewarded-first ads, smart interstitials (cooldown after rewarded, "short break" notice), menu-only banners, and a one-time Remove ads purchase (Google Play Billing). |
 | **Ads (detail)** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, ads capped at PG content (13+ audience) |

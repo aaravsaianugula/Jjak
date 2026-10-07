@@ -17,6 +17,7 @@ import {
   MaxAdContentRating,
 } from '@capacitor-community/admob';
 import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
+import { music } from './music';
 import { persist, save } from './storage';
 
 const native = Capacitor.isNativePlatform();
@@ -159,6 +160,7 @@ class AdService {
     if (!this.interstitialDue(journeyLevelCleared)) return false;
     if (native && (!this.ready || !this.interstitialLoaded)) return false;
     await adBreakNotice();
+    music.duck(true);
     try {
       if (native) {
         this.interstitialLoaded = false;
@@ -174,6 +176,7 @@ class AdService {
     } catch {
       return false; // no fill: skip silently
     } finally {
+      music.duck(false);
       void this.preloadInterstitial();
     }
   }
@@ -186,6 +189,7 @@ class AdService {
   /** Show a rewarded ad. Resolves true only if the reward was earned. */
   async rewarded(): Promise<boolean> {
     let ok = false;
+    music.duck(true);
     if (!native) ok = await webStub('Rewarded ad', 'On Android a short video plays here.', 1400);
     else if (this.ready) {
       if (!this.rewardedLoaded) await this.preloadRewarded();
@@ -201,6 +205,7 @@ class AdService {
         }
       }
     }
+    music.duck(false);
     if (ok) {
       save.ads.lastRewardedAt = Date.now();
       save.ads.rewardedWatched++;

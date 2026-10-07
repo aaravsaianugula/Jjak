@@ -4,6 +4,7 @@ import { type LevelSpec, buildBoard, pickSnow } from './levels';
 import { applyGravity, findMove } from './moves';
 import { findPath } from './path';
 import { createRng, type Rng } from './rng';
+import { type Yaku, newYaku } from './yaku';
 
 /** Next jjak within this window keeps the combo alive. */
 export const COMBO_WINDOW_MS = 4000;
@@ -34,6 +35,8 @@ export type TapResult =
       fever: boolean;
       /** this pair started Fever */
       feverStarted: boolean;
+      /** card sets completed by this pair (bonus already added to score) */
+      yaku: Yaku[];
     }
   | { kind: 'hidden'; cell: number }
   | { kind: 'ignore' };
@@ -69,6 +72,9 @@ export class Session {
   /** Fever ends at this timestamp */
   feverUntil = -Infinity;
   feverCount = 0;
+  /** card ids cleared this board, and the yaku already scored */
+  readonly cleared = new Set<number>();
+  readonly yakuDone = new Set<string>();
   private rng: Rng;
 
   constructor(spec: LevelSpec, now: number, board?: Board) {
@@ -114,6 +120,8 @@ export class Session {
   }
 
   private applyMatch(a: number, b: number, path: Point[], now: number): TapResult {
+    this.cleared.add(this.board.cells[a]);
+    this.cleared.add(this.board.cells[b]);
     this.board.cells[a] = EMPTY;
     this.board.cells[b] = EMPTY;
     this.selected = -1;
@@ -128,7 +136,9 @@ export class Session {
       feverStarted = true;
     }
     const fever = now < this.feverUntil;
-    const gained = BASE_PAIR_SCORE * this.combo * (fever ? 2 : 1);
+    const yaku = newYaku(this.cleared, this.yakuDone);
+    for (const y of yaku) this.yakuDone.add(y.id);
+    const gained = BASE_PAIR_SCORE * this.combo * (fever ? 2 : 1) + yaku.reduce((sum, y) => sum + y.bonus, 0);
     this.score += gained;
     this.pairsMade++;
 
@@ -158,7 +168,7 @@ export class Session {
         reshuffled = true;
       }
     }
-    return { kind: 'match', a, b, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, fever, feverStarted };
+    return { kind: 'match', a, b, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, fever, feverStarted, yaku };
   }
 
   /** Uncover snowy cards that now touch an empty cell (or the board edge). */

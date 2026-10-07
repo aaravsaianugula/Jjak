@@ -320,3 +320,22 @@ describe('fever & rush', () => {
     }
   });
 });
+
+describe('yaku (card sets cleared on the board)', () => {
+  it('scores a set once, when its last card is cleared', () => {
+    // Godori birds: Feb warbler (7), Apr cuckoo (15), Aug geese (30) — each paired with a same-month card.
+    const b: Board = { rows: 1, cols: 6, cells: [7, 4, 15, 12, 30, 28] };
+    const s = new Session(journeyLevel(20), 0, b);
+    const play = (i: number, j: number, t: number) => {
+      s.tap(i, t);
+      return s.tap(j, t);
+    };
+    const r1 = play(0, 1, 100);
+    const r2 = play(2, 3, 20000);
+    const r3 = play(4, 5, 40000);
+    expect(r1.kind === 'match' && r1.yaku.length).toBe(0);
+    expect(r2.kind === 'match' && r2.yaku.length).toBe(0);
+    expect(r3.kind === 'match' && r3.yaku.map((y) => y.id)).toEqual(['godori']);
+    expect(r3.kind === 'match' && r3.gained).toBe(100 + 700);
+  });
+});
