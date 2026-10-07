@@ -15,19 +15,35 @@ export interface JourneySave {
   luckyPairs: number;
   /** petals earned from lucky pairs, lifetime */
   luckyPetals: number;
+  /**
+   * Past level 600 (the endless road): stamps per place and year, keyed
+   * `${chapterId}@${year}` (year ≥ 1), date of the festival clear.
+   */
+  yearStamps: Record<string, string>;
+  /** the "road goes on" moment after level 600 has been shown */
+  revealed: boolean;
 }
 
-export const defaultJourney = (): JourneySave => ({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0 });
+export const defaultJourney = (): JourneySave => ({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false });
 
 /** Merge a stored slice over the defaults so new fields appear after updates. */
 export function hydrateJourney(raw: unknown): JourneySave {
   const base = defaultJourney();
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Partial<JourneySave>;
-  const stamps: Record<string, string> = {};
-  if (r.stamps && typeof r.stamps === 'object') {
-    for (const [k, v] of Object.entries(r.stamps)) if (typeof v === 'string') stamps[k] = v;
-  }
+  const dates = (o: unknown) => {
+    const out: Record<string, string> = {};
+    if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) if (typeof v === 'string') out[k] = v;
+    return out;
+  };
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
-  return { ...base, ...r, stamps, luckyPairs: num(r.luckyPairs), luckyPetals: num(r.luckyPetals) };
+  return {
+    ...base,
+    ...r,
+    stamps: dates(r.stamps),
+    yearStamps: dates(r.yearStamps),
+    revealed: r.revealed === true,
+    luckyPairs: num(r.luckyPairs),
+    luckyPetals: num(r.luckyPetals),
+  };
 }

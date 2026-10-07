@@ -469,7 +469,7 @@ describe('solvability fuzz across the mechanics', () => {
 describe('journey save slice and stamps', () => {
   it('hydrates old and broken slices', () => {
     expect(hydrateJourney(undefined)).toEqual(defaultJourney());
-    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0 });
+    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false });
     const h = hydrateJourney({ v: 1, stamps: { gyeongju: '2026-10-07', bad: 3 }, luckyPairs: -2, luckyPetals: 30 });
     expect(h.stamps).toEqual({ gyeongju: '2026-10-07' });
     expect(h.luckyPairs).toBe(0);
@@ -525,5 +525,34 @@ describe('recordClear: lucky petals and passport stamps', () => {
     expect(syncStamps()).toBe(1);
     expect(save.journey.stamps.kamakura).toBeTruthy();
     expect(syncStamps()).toBe(0);
+  });
+});
+
+describe('past level 600: Wanderer stamps', () => {
+  it('stamps each place once per year on the endless road, apart from the first-pass passport', async () => {
+    const { save } = await import('../src/services/storage');
+    const { recordClear } = await import('../src/services/progress');
+    save.journey = defaultJourney();
+    save.stars = {};
+    save.level = 612;
+    const play = (n: number) => {
+      const s = new Session({ ...journeyLevel(n), number: n }, 0, { rows: 1, cols: 2, cells: [0, 1] });
+      s.tap(0, 10);
+      s.tap(1, 20);
+      return recordClear(s);
+    };
+    const r = play(612); // Gyeongju, year 1
+    expect(r.stamp).toMatchObject({ id: 'gyeongju', year: 1 });
+    expect(save.journey.yearStamps['gyeongju@1']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(save.journey.stamps.gyeongju).toBeUndefined();
+    expect(play(612).stamp).toBeUndefined();
+    expect(play(1212).stamp).toMatchObject({ id: 'gyeongju', year: 2 });
+  });
+
+  it('hydrates the endless-road fields on older saves', () => {
+    const j = hydrateJourney({ v: 1, stamps: { gyeongju: '2026-10-01' } });
+    expect(j.yearStamps).toEqual({});
+    expect(j.revealed).toBe(false);
+    expect(hydrateJourney({ revealed: 'yes', yearStamps: { 'a@1': 3 } })).toMatchObject({ revealed: false, yearStamps: {} });
   });
 });

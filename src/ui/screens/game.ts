@@ -9,7 +9,8 @@ import { fencesMarkup, gateInner, gateLabel } from '../../art/mechanics';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, rushLevel, zenLevel } from '../../engine/levels';
 import { levelPlan } from '../../director';
 import { isBonus } from '../../data/deck';
-import { SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
+import { ROUTE_LEVELS, SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
+import { roadGoesOn } from '../reveal';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
 import { breeze, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windVane } from '../journey-fx';
 import { type IntroId, contextOf, introFor, openIntro, replayIntroFor, tipKey } from '../intros';
@@ -1405,7 +1406,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (summary.stamp) {
       // The passport stamp gets its own beat: it lands after everything else has settled.
       const at = rewardAt + 260;
-      stagger(stampMoment(summary.stamp.id, summary.stamp.date, at));
+      stagger(stampMoment(summary.stamp.id, summary.stamp.date, at, summary.stamp.year));
       rewardAt += 260;
     }
     if (newPaper) stagger(frag(`<p class="unlock">A flower is complete — a new board paper is ready in the Market.</p>`));
@@ -1447,7 +1448,21 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       );
     }
     const next = nextSpec();
-    if (next) {
+    // Level 600 closes the Flower Road. The first time, the road reveals that it goes on.
+    const reveal = spec.mode === 'journey' && spec.number === ROUTE_LEVELS && !save.journey.revealed;
+    if (reveal) {
+      actions.append(
+        h('button', {
+          class: 'btn btn--primary btn--block btn--next',
+          onclick: async () => {
+            sheet.close();
+            await roadGoesOn();
+            nav.home();
+          },
+          html: `Walk on ${ICONS.play}`,
+        }),
+      );
+    } else if (next) {
       actions.append(
         h('button', {
           class: 'btn btn--primary btn--block btn--next',

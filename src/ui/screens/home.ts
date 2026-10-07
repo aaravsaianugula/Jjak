@@ -8,7 +8,8 @@ import { cardDef, monthDef } from '../../data/deck';
 import { LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
 import { levelPlan } from '../../director';
 import { formatTime } from '../../engine/session';
-import { ROUTE_CHAPTERS, routeOf } from '../../data/route';
+import { ROUTE_CHAPTERS, ROUTE_LEVELS, routeOf } from '../../data/route';
+import { roadGoesOn } from '../reveal';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
 import { GOALS } from '../../engine/goals';
 import { SEALS } from '../../services/achievements';
@@ -101,7 +102,7 @@ export function homeScreen(): Screen {
     <div class="panel journey">
       <span class="journey__season ja" aria-hidden="true">${chapter.ja}</span>
       <div class="journey__top">
-        <span class="eyebrow"><span class="journey__kicker">Journey · </span>${esc(chapter.name)} · ${road.year > 0 ? `Wanderer ${road.year}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
+        <span class="eyebrow"><span class="journey__kicker">Journey · </span>${esc(chapter.name)} · ${road.year > 0 ? `Wanderer · Year ${road.year + 1}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
         <button class="chip-btn journey__map" data-go="map" aria-label="Journey map">${ICONS.map}<span>Map</span></button>
       </div>
       ${roadPlace}
@@ -158,7 +159,11 @@ export function homeScreen(): Screen {
     if (go === 'settings') nav.settings();
     if (go === 'path') nav.path();
   });
-  if (pendingGift() && !giftShownThisSession) {
+  // Level 600 is behind the player but the road's reveal hasn't played yet (say the
+  // app closed on the result sheet): play it before anything else.
+  if (save.level > ROUTE_LEVELS && !save.journey.revealed) {
+    setTimeout(() => el.isConnected && void roadGoesOn().then(() => nav.home()), 400);
+  } else if (pendingGift() && !giftShownThisSession) {
     giftShownThisSession = true;
     setTimeout(() => openGift(el), 650);
   }

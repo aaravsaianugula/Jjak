@@ -17,8 +17,8 @@ export interface ClearSummary {
   lantern?: { petals: number; hints: number; shuffles: number };
   /** petals from lucky bonus pairs on this board (already added to the balance; not part of `petals`) */
   lucky?: number;
-  /** passport stamp earned by first clearing a chapter's festival board */
-  stamp?: { id: string; date: string };
+  /** passport stamp earned by first clearing a chapter's festival board (year ≥ 1 past level 600) */
+  stamp?: { id: string; date: string; year?: number };
 }
 
 const yesterdayKey = (today: string) => {
@@ -91,11 +91,16 @@ export function recordClear(s: Session): ClearSummary {
       save.shuffles++;
     }
     // The place's passport stamp, the first time its festival board is cleared.
+    // Past 600 every place-year earns its own stamp on the Wanderer pages.
     if (n % ROUTE_LEVELS_PER_CHAPTER === 0) {
-      const id = routeOf(n).chapter.id;
-      if (!save.journey.stamps[id]) {
+      const pos = routeOf(n);
+      const id = pos.chapter.id;
+      if (pos.year === 0 && !save.journey.stamps[id]) {
         save.journey.stamps[id] = localDateKey();
         out.stamp = { id, date: save.journey.stamps[id] };
+      } else if (pos.year > 0 && !save.journey.yearStamps[`${id}@${pos.year}`]) {
+        save.journey.yearStamps[`${id}@${pos.year}`] = localDateKey();
+        out.stamp = { id, date: localDateKey(), year: pos.year };
       }
     }
   } else if (s.spec.mode === 'daily') {

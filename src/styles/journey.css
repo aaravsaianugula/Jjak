@@ -879,3 +879,195 @@
     transition: none;
   }
 }
+
+/* ───────────────────────────── The road goes on (after level 600) ───────────────────────────── */
+.reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  grid-template-rows: 1fr auto auto auto;
+  justify-items: center;
+  gap: 10px;
+  padding: calc(var(--safe-top) + 16px) 24px calc(var(--safe-bottom) + 20px);
+  background: var(--bg);
+  color: var(--ink);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-out);
+}
+.reveal.is-on {
+  opacity: 1;
+}
+.reveal.is-out {
+  opacity: 0;
+}
+.reveal__land {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.reveal__hill {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 900ms var(--ease-out), transform 1200ms var(--ease-out);
+}
+.reveal__hill--far {
+  fill: color-mix(in srgb, var(--ink) 9%, var(--bg));
+  transition-delay: 300ms;
+}
+.reveal__hill--mid {
+  fill: color-mix(in srgb, var(--ink) 15%, var(--bg));
+  transition-delay: 550ms;
+}
+.reveal__hill--near {
+  fill: color-mix(in srgb, var(--ink) 22%, var(--bg));
+  transition-delay: 800ms;
+}
+.reveal__moon {
+  fill: color-mix(in srgb, var(--gold) 55%, var(--bg));
+  opacity: 0;
+  transition: opacity 1400ms ease 1500ms;
+}
+.reveal.is-on .reveal__hill {
+  opacity: 1;
+  transform: none;
+}
+.reveal.is-on .reveal__moon {
+  opacity: 0.8;
+}
+.reveal__road {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1500ms cubic-bezier(0.45, 0.05, 0.3, 1) 700ms;
+}
+.reveal__road--wash {
+  stroke-width: 11;
+  opacity: 0.12;
+}
+.reveal.is-on .reveal__road {
+  stroke-dashoffset: 0;
+}
+.reveal__last {
+  position: absolute;
+  left: 7%;
+  bottom: 9%;
+  width: 92px;
+  transform: rotate(-6deg);
+  opacity: 0;
+  transition: opacity 500ms ease 200ms;
+}
+.reveal.is-on .reveal__last {
+  opacity: 1;
+}
+/* An empty stamp outline waits where the road leads. */
+.reveal__next {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 75%, transparent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  opacity: 0;
+  transform: scale(1.6);
+  transform-origin: 292px 184px;
+  transition: opacity 400ms ease 2200ms, transform 500ms cubic-bezier(0.2, 1.4, 0.4, 1) 2200ms;
+}
+.reveal.is-on .reveal__next {
+  opacity: 1;
+  transform: none;
+}
+.reveal__words {
+  position: relative;
+  grid-row: 2;
+  padding: 10px 26px;
+  text-align: center;
+  /* A soft paper halo keeps the words clear of the road behind them. */
+  background: radial-gradient(closest-side, var(--bg) 62%, color-mix(in srgb, var(--bg) 0%, transparent));
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 700ms var(--ease-out) 2600ms, transform 700ms var(--ease-out) 2600ms;
+}
+.reveal__words h2 {
+  margin: 0;
+  font-family: var(--font-display, 'Gowun Batang', serif);
+  font-size: 28px;
+}
+.reveal__native {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.reveal.is-on .reveal__words {
+  opacity: 1;
+  transform: none;
+}
+/* A fresh passport page turns over. */
+.reveal__page {
+  position: relative;
+  grid-row: 3;
+  perspective: 600px;
+}
+.reveal__leaf {
+  display: grid;
+  grid-template-columns: repeat(4, 22px);
+  grid-template-rows: auto auto 22px;
+  gap: 4px 10px;
+  justify-content: center;
+  padding: 12px 18px 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gold) 10%, var(--bg));
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 12%, transparent), 0 8px 20px -12px rgb(0 0 0 / 0.4);
+  transform-origin: left center;
+  transform: rotateY(-100deg);
+  opacity: 0;
+  transition: transform 800ms var(--ease-out) 3300ms, opacity 300ms ease 3300ms;
+}
+.reveal__leaf b,
+.reveal__leaf span {
+  grid-column: 1 / -1;
+  text-align: center;
+}
+.reveal__leaf span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.reveal__leaf i {
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 50%;
+}
+.reveal.is-on .reveal__leaf {
+  transform: none;
+  opacity: 1;
+}
+.reveal__go {
+  position: relative;
+  grid-row: 4;
+  width: min(320px, 100%);
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+.reveal.is-done .reveal__go {
+  opacity: 1;
+  pointer-events: auto;
+}
+.reveal.is-skip *,
+.reveal.is-still * {
+  transition-delay: 0ms !important;
+  transition-duration: 0ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal * {
+    transition-delay: 0ms !important;
+    transition-duration: 200ms !important;
+  }
+  .reveal__hill,
+  .reveal__leaf,
+  .reveal__words,
+  .reveal__next {
+    transform: none !important;
+  }
+}

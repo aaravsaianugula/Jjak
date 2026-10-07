@@ -4,6 +4,7 @@ import {
   type Focus,
   ROUTE,
   ROUTE_CHAPTERS,
+  ROUTE_LEVELS,
   ROUTE_LEVELS_PER_CHAPTER,
   SEASON_NAMES,
   chapterFirstLevel,
@@ -52,7 +53,7 @@ function twistOf(spec: LevelSpec): { glyph: string; name: string } {
   return { glyph: '', name: '' };
 }
 
-const YEAR_LABEL = (y: number) => (y === 0 ? 'The road' : `Wanderer ${y}`);
+const YEAR_LABEL = (y: number) => (y === 0 ? 'The road' : `Year ${y + 1}`);
 
 /**
  * The Flower Road: fifty places from Gyeongju to Okinawa, top to bottom. Each
@@ -64,7 +65,9 @@ export function mapScreen(): Screen {
   installStampDefs();
   const unlocked = save.level;
   const here = routeOf(unlocked);
-  const maxYear = here.year;
+  // Nothing past level 600 shows until the player has cleared it (the road reads as finished).
+  const endless = save.level > ROUTE_LEVELS;
+  const maxYear = endless ? here.year : 0;
   let year = maxYear;
   let open: number | null = here.index;
 
@@ -84,7 +87,7 @@ export function mapScreen(): Screen {
         <div><b>${unlocked}</b><span>Level</span></div>
       </div>
       ${
-        maxYear > 0
+        endless && maxYear > 0
           ? `<div class="road__years" role="tablist" aria-label="Journey year">${Array.from({ length: maxYear + 1 }, (_, y) => `<button role="tab" data-year="${y}" aria-selected="${y === year}">${YEAR_LABEL(y)}</button>`).join('')}</div>`
           : ''
       }
@@ -101,10 +104,12 @@ export function mapScreen(): Screen {
         <span><span class="ja lucky-key" aria-hidden="true">福</span>Lucky cards</span>
         <span>${ICONS.lantern}Lantern gift</span>
       </div>
-      <p class="road__end">Past Okinawa the road begins again, as a Wanderer: the same fifty places, fuller boards.</p>
+      ${endless ? '<p class="road__end">Past Okinawa the road goes on: the fifty places again, in new seasons, with a stamp for every place each year.</p>' : ''}
     </div>
   </section>`);
   const list = el.querySelector<HTMLElement>('.road__stops')!;
+
+  const stampOf = (id: string, y: number): string | null => (y === 0 ? save.journey.stamps[id] : save.journey.yearStamps[`${id}@${y}`]) ?? null;
 
   const chapterStars = (first: number) => {
     let got = 0;
@@ -138,7 +143,7 @@ export function mapScreen(): Screen {
   function stopBody(i: number, first: number): string {
     const c = ROUTE[i];
     const focus = FOCUS_NOTE[year > 0 && c.focus === 'basics' ? 'mix' : c.focus];
-    const stamp = save.journey.stamps[c.id];
+    const stamp = stampOf(c.id, year);
     return `<div class="stop__body">
       <p class="stop__postcard">${esc(c.postcard)}</p>
       <p class="stop__focus"><b>${esc(focus.en)}</b> <span class="muted">${focus.native}</span> · ${esc(focus.note)}</p>
@@ -158,7 +163,7 @@ export function mapScreen(): Screen {
       const done = first + ROUTE_LEVELS_PER_CHAPTER - 1 < unlocked;
       const got = chapterStars(first);
       const max = ROUTE_LEVELS_PER_CHAPTER * 3;
-      const stamp = save.journey.stamps[c.id] ?? null;
+      const stamp = stampOf(c.id, year);
       const season = SEASON_NAMES[c.season];
       const country = COUNTRY_NAMES[c.country];
       const isOpen = open === i && !locked;

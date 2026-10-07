@@ -173,7 +173,7 @@ export function luckyMoment(stage: HTMLElement, x: number, y: number): void {
  * The stamp thunks onto a passport page: it drops in large, presses down, and
  * a ring of ink spreads into the paper. `at` = ms after the sheet opens.
  */
-export function stampMoment(id: string, date: string, at: number): HTMLElement {
+export function stampMoment(id: string, date: string, at: number, year = 0): HTMLElement {
   installStampDefs();
   const index = Math.max(0, ROUTE.findIndex((c) => c.id === id));
   const c = ROUTE[index];
@@ -184,7 +184,7 @@ export function stampMoment(id: string, date: string, at: number): HTMLElement {
       <span class="passport__stamp" style="--tilt:${stampTilt(index)}deg">${stampSvg(c, index, date, { label: `Passport stamp: ${c.en}` })}</span>
     </div>
     <div class="passport__text">
-      <div class="reward__label">Passport stamp · ${Object.keys(save.journey.stamps).length}/${ROUTE.length}</div>
+      <div class="reward__label">${year > 0 ? `Wanderer stamp · Year ${year + 1}` : `Passport stamp · ${Object.keys(save.journey.stamps).length}/${ROUTE.length}`}</div>
       <div class="passport__name">${esc(c.en)}</div>
       <div class="passport__native"><span lang="ko">${c.ko}</span> · <span class="ja">${c.ja}</span></div>
       <div class="muted passport__season"><span class="ja">${season.ja}</span> ${esc(season.en)} · ${esc(c.postcard)}</div>
