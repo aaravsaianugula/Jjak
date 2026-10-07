@@ -694,7 +694,7 @@ function spring(b: B): void {
     fl += use(b, 'petal', x, y, 1.1, rot, '#eebcc8', 0.85);
   b.g.push(fl, '</g>');
 
-  grain(b, 0.2);
+  grain(b, 0.14);
 }
 
 function summer(b: B): void {
@@ -878,7 +878,7 @@ function summer(b: B): void {
   }
   b.lights.push(halos + `<path d="${trails}" stroke="#f6e7a6" stroke-width=".45" stroke-linecap="round" fill="none" opacity=".45"/><path d="${bodies}" fill="#fff6c8"/>`);
 
-  grain(b, 0.2);
+  grain(b, 0.14);
 }
 
 function autumn(b: B): void {
@@ -998,7 +998,7 @@ function autumn(b: B): void {
   ld += use(b, 'fl-mp', 262, 104, 0.8, 40, '#d4643c', 0.85) + use(b, 'fl-mp', 238, 120, 0.7, -60, '#e08a4a', 0.75);
   b.g.push(ld, '</g>');
 
-  grain(b, 0.2);
+  grain(b, 0.14);
 }
 
 function winter(b: B): void {
@@ -1178,7 +1178,7 @@ function winter(b: B): void {
   }
   b.g.push(fl, '</g>');
 
-  grain(b, 0.2);
+  grain(b, 0.14);
 }
 
 const PAINT = [spring, summer, autumn, winter];
