@@ -35,7 +35,7 @@ import { choose, openSheet } from '../modal';
 import { showHowToPlay } from './settings';
 import { boardReport, rushReport } from '../../services/meta';
 import { pathResult, rankUpMoment } from './path';
-import { petalBump, reducedMotion, retrigger, untrigger } from '../motion';
+import { petalBump, reducedMotion, restartAnimations, retrigger, untrigger } from '../motion';
 import { nav } from '../nav';
 import { MARKET_PAPER_IDS } from '../../data/market';
 import { activeBrush, activeFx } from '../../services/market';
@@ -969,7 +969,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   let feverTimer: ReturnType<typeof setTimeout> | null = null;
   function startFever(a: number, b: number) {
     el.classList.add('is-fever');
-    retrigger(feverTag, 'is-on');
+    // The tag stays up through a renewed Fever; only its drain line starts over.
+    feverTag.classList.add('is-on');
+    if (!feverTag.classList.contains('is-drain') || !restartAnimations(feverTag, ['combo-drain'])) retrigger(feverTag, 'is-drain');
     sfx.stamp();
     haptic.success();
     banner(
@@ -1010,6 +1012,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   function endFever() {
     el.classList.remove('is-fever');
     feverTag.classList.remove('is-on');
+    untrigger(feverTag, 'is-drain');
     if (!air.querySelector('.drift')) return;
     air.classList.add('is-fading');
     setTimeout(() => {
@@ -1169,9 +1172,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   let comboBarOff: ReturnType<typeof setTimeout> | null = null;
   function restartComboBar() {
-    retrigger(comboBar, 'on');
+    // The bar stays lit; only its drain starts over (no flicker between pairs).
+    comboBar.classList.add('on');
+    if (!comboBar.classList.contains('is-run') || !restartAnimations(comboBar, ['combo-drain', 'g-ember'])) retrigger(comboBar, 'is-run');
     if (comboBarOff) clearTimeout(comboBarOff);
-    comboBarOff = setTimeout(() => comboBar.classList.remove('on'), COMBO_WINDOW_MS + 200);
+    comboBarOff = setTimeout(() => {
+      comboBar.classList.remove('on');
+      untrigger(comboBar, 'is-run');
+    }, COMBO_WINDOW_MS + 200);
   }
 
   // ── Tools ─────────────────────────────────────────────────────────
@@ -1264,7 +1272,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (!coach.hidden && coachText.textContent === text) return;
     coachText.textContent = text;
     coach.hidden = false;
-    retrigger(coach, 'is-new');
+    if (!coach.classList.contains('is-new') || !restartAnimations(coach, ['g-rise'])) retrigger(coach, 'is-new');
   }
   /** After a pair, any caption has done its job. */
   function tutorialStep() {
@@ -1741,6 +1749,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     goalState = '';
     updateGoal();
     comboBar.classList.remove('on');
+    untrigger(comboBar, 'is-run');
     showCombo(0);
     if (feverTimer) clearTimeout(feverTimer);
     endFever();

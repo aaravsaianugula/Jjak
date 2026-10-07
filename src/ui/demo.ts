@@ -19,7 +19,7 @@ import { unlockAudio, sfx } from '../services/audio';
 import { haptic } from '../services/haptics';
 import { type DemoEvent, type DemoScript, type Ghost, DemoRun, ghostPath, pairProblem, turnPairs } from './demo-model';
 import { h } from './dom';
-import { reducedMotion, retrigger } from './motion';
+import { reducedMotion, restartAnimations, retrigger } from './motion';
 import { ICONS } from './icons';
 import { KNOT_SVG } from './journey-fx';
 
@@ -367,7 +367,7 @@ export class DemoPlayer {
     if (this.size === 'tile') return;
     if (this.capEl.textContent === text) return;
     this.capEl.textContent = text;
-    retrigger(this.capEl, 'is-new');
+    if (!this.capEl.classList.contains('is-new') || !restartAnimations(this.capEl, ['demo-cap'])) retrigger(this.capEl, 'is-new');
   }
 
   private mark(cells: number[]) {

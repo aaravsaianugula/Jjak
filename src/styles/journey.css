@@ -338,6 +338,14 @@
     transform: translateY(-8px);
   }
 }
+/* Closing: the levels fold up and fade before the stops below glide back. */
+.stop__body.is-out {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 140ms ease-in,
+    transform 150ms var(--ease-in);
+}
 .stop__postcard {
   margin: 0 2px 10px;
   padding-left: 10px;

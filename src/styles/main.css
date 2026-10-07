@@ -1075,7 +1075,7 @@ button.panel:active {
   transform-origin: left;
   transform: scaleX(0);
 }
-.combo-bar.on i {
+.combo-bar.on.is-run i {
   animation: combo-drain 4s linear forwards;
 }
 @keyframes combo-drain {

@@ -33,6 +33,23 @@ export function retrigger(node: Element | null | undefined, cls: string): void {
   m.set(cls, id);
 }
 
+/**
+ * Start running CSS animations (by keyframes name, on `node` and its subtree,
+ * pseudo-elements included) over from the top, in place: no class toggling,
+ * so nothing blinks for a frame. Returns false if none were running.
+ */
+export function restartAnimations(node: Element | null | undefined, names: string[]): boolean {
+  if (!node || typeof node.getAnimations !== 'function') return false;
+  const anims = node
+    .getAnimations({ subtree: true })
+    .filter((a): a is CSSAnimation => typeof CSSAnimation !== 'undefined' && a instanceof CSSAnimation && names.includes(a.animationName));
+  for (const a of anims) {
+    a.currentTime = 0;
+    a.play();
+  }
+  return anims.length > 0;
+}
+
 /** Drop a pending retrigger and the class itself (e.g. a shake on a card that was just selected). */
 export function untrigger(node: Element | null | undefined, cls: string): void {
   if (!node) return;

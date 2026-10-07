@@ -23,7 +23,7 @@ import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { esc, frag } from '../dom';
 import { ICONS } from '../icons';
-import { flip, measure } from '../motion';
+import { flip, measure, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 /** What each chapter features, for the open chapter's note. */
@@ -190,9 +190,27 @@ export function mapScreen(): Screen {
     list.innerHTML = html;
   }
 
+  let folding = false;
   function toggle(i: number) {
+    if (folding) return;
     const was = open;
     open = open === i ? null : i;
+    // Closing: the levels fade up and out first, then the road closes the gap.
+    const closing = was != null ? list.querySelector<HTMLElement>(`.stop[data-ch="${was}"] .stop__body`) : null;
+    if (closing && !reducedMotion()) {
+      folding = true;
+      closing.classList.remove('is-in');
+      closing.classList.add('is-out');
+      setTimeout(() => {
+        folding = false;
+        relayout(was);
+      }, 150);
+      return;
+    }
+    relayout(was);
+  }
+
+  function relayout(was: number | null) {
     // FLIP: the stops below the change glide to their new places (transforms
     // only) while the opened chapter's levels fade in under them.
     const from = Math.min(...[was, open].filter((k): k is number => k != null));

@@ -435,7 +435,7 @@
   background: var(--gold);
 }
 /* The window drains; near the end it cools from gold to ash — keep the rhythm. */
-.game .combo-bar.on i {
+.game .combo-bar.on.is-run i {
   animation:
     combo-drain var(--combo-ms, 4s) linear forwards,
     g-ember var(--combo-ms, 4s) linear forwards;
@@ -508,7 +508,7 @@
     max-width 0s,
     padding 0s;
 }
-.fever-tag.is-on::after {
+.fever-tag.is-on.is-drain::after {
   animation: combo-drain var(--fever-ms, 6s) linear forwards;
 }
 
