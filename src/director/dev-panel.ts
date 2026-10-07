@@ -48,7 +48,9 @@ function render(root: HTMLElement): void {
     parts.push(`<h3>Director · level ${last.n}</h3>`);
     parts.push(row('tier · reason', `${last.tier} · ${last.reason}`));
     parts.push(row('target · board d', `${f2(last.target)} · ${f2(last.d)}`));
-    parts.push(row('base+skill+pace+flow', `${f2(t.base)} ${t.skill >= 0 ? '+' : ''}${f2(t.skill)} ${t.pacing >= 0 ? '+' : ''}${f2(t.pacing)} ${t.flow >= 0 ? '+' : ''}${f2(t.flow)}`));
+    const sgn = (v: number) => `${v >= 0 ? '+' : '−'}${f2(Math.abs(v))}`;
+    // what the policy would say now (after the latest record), split into its parts
+    parts.push(row('now b·s·p·f', `${f2(t.base)} ${sgn(t.skill)} ${sgn(t.pacing)} ${sgn(t.flow)}`));
     if (a.tries.count) parts.push(row('failed tries', `${a.tries.count} at ${a.tries.n}`));
   }
 
