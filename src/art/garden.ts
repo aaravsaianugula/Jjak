@@ -2256,7 +2256,7 @@ const VIGNETTE: Record<string, [number, number, number, number, Ground]> = {
   stones: [140, 240, 112, 206, 'earth'],
   lantern: [77, 229, 64, 236, 'earth'],
   pond: [196, 200, 196, 166, 'earth'],
-  koi: [240, 206, 92, 0, 'water'],
+  koi: [236, 204, 96, 168, 'earth'],
   bridge: [136, 202, 84, 168, 'earth'],
   bamboo: [27, 84, 156, 138, 'earth'],
   plum: [136, 100, 124, 140, 'earth'],
