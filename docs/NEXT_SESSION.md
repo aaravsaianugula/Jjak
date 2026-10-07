@@ -328,6 +328,61 @@ showing the player rating, the target and the chosen board's metrics.
 **Migration:** existing saves keep their level number and stars. A level's place, role and
 mechanic identity stay stable; only the board within that identity adapts.
 
+### C5. Beyond 600: the endless, personal road (hidden until it's earned)
+**Owner's request:** once a player reaches level 600, the game auto-generates new levels forever.
+This is **only revealed after they reach 600**. Generated levels must be good and fun, and must
+take in everything the game knows about how *this* player thinks and plays.
+
+- **Hidden until earned:**
+  - Before level 600 is cleared, nothing mentions levels past 600: no "601", no Wanderer year
+    tabs on the Map, no counter that implies more. Today the Map shows Wanderer tabs and
+    `journeyLevel` already supports 601+, so gate the UI on `save.level > 600`.
+  - The Flower Road reads as a finished journey of 50 places.
+  - Clearing level 600 triggers a **reveal moment**: a short shown (not told) sequence, like the
+    road extending past the last stamp into new country, with a title such as "The road goes on ·
+    길은 계속된다 · 道は続く". A new passport page opens.
+  - After the reveal, Home and the Map show the endless road (e.g. "Wanderer · Year 2"), with
+    rotating places and seasons, and stamps for each new place-year.
+- **Personal generation** (the Level Director's on-device path, in a Web Worker):
+  - Every endless level is generated live, using the same validators as the 600-level bank:
+    proven solvable, not trivial, dead-end risk inside the band, fits the screen, within the
+    time budget.
+  - Each level is deterministic once generated. Store its seed in the save so a retry or a
+    restored save gives the same board.
+- **Use how this player thinks, not just how fast they are.** Build a *play-style profile* from the
+  analytics slice:
+  - **scan pattern:** where their first taps land (edges vs centre, top-down vs bottom-up)
+  - **path preferences:** how often they find 2-turn vs 0/1-turn pairs, and how long each takes
+  - **speed profile:** fast-and-loose (more mismatches) vs slow-and-careful
+  - **per-mechanic proficiency and enjoyment:** results, plus signals like replays, quick
+    retries, or quitting mid-board
+  - **assists:** when they reach for hints, and how much pause comes first
+  - **session rhythm:** short or long sessions, time of day
+
+  Use it to **tailor, not to trap**:
+  - **Stretch blind spots gently:** if they always scan edges first, place some key pairs in the
+    centre; if 2-turn paths slow them, raise their share a little at a time.
+  - **Lean towards what they enjoy:** favourite mechanics appear more often, but the bag
+    randomiser still guarantees variety.
+  - **Match the session:** shorter boards for short-session players, and a festival-style peak
+    at a natural session end.
+  - **Keep the flow target** (~75–85% clear without assists, with real peaks and relief boards).
+- **Freshness guarantee:** a novelty check against the player's recent levels (feature-vector
+  distance across shape, mechanics, goal, stone layout and difficulty). Never the same feel twice
+  in a row. Rotate goals and mechanic combinations, and use the C3 mechanics more as they unlock.
+- **Rewards keep flowing:**
+  - endless levels still pay blossoms, lanterns and missions, and feed Flower Path XP
+  - **no farming:** keep first-clear-only petals, as today
+  - **periodic milestone stamps** every 12 endless levels
+- **Tests:**
+  - the reveal stays hidden until level 600 is cleared
+  - every endless level validates
+  - determinism from the stored seed
+  - persona simulations show tailoring moves the measured metrics in the intended direction
+    without dropping the clear rate out of band
+  - a 1,000-level endless fuzz has no repeats within a window and never an unsolvable board
+  - worker generation stays within budget on a throttled CPU (e.g. 4× slowdown)
+
 ### C3. New mechanics and level goals that deepen the core
 The core is **finding a same-flower pair joined by a path with at most two turns**. New ideas must
 make that reading richer, not distract from it. Brainstorm 8–10, pick the best **3–4**, and
@@ -372,6 +427,7 @@ solvability fuzz for each, and follow the knots/wind pattern in `journey-fx.ts`.
    - offline level-bank builder + audit + chart
    - new mechanics as library modules (C3)
    - the demo player + intro + mechanic demos (C4)
+   - the endless road: the 600 gate, the reveal moment, the play-style profile and live worker generation (C5)
 
    Freeze the mechanic-module interface first, so C3 and C4 plug into the Director.
 3. Verify by actually playing the first 30 levels, plus sampled later ones, in the browser.
