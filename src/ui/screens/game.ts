@@ -190,7 +190,6 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     margin = Math.round(cw * MARGIN);
     board.style.width = `${spec.cols * cw + 2 * margin}px`;
     board.style.height = `${spec.rows * ch + 2 * margin}px`;
-    board.style.setProperty('--cw', `${cw}px`);
     const gap = Math.max(2, Math.round(cw * GAP));
     for (const [i, cel] of cardEls) {
       const r = Math.floor(i / spec.cols);
@@ -464,33 +463,44 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     comboHide = setTimeout(() => comboEl.classList.remove('is-on'), COMBO_WINDOW_MS);
   }
 
-  /** Named banners (Fever, card sets) take the title's place in the top bar, one at a time. */
+  /**
+   * Named banners (Fever, card sets) take the title's place in the top bar, one at
+   * a time. A newer banner cuts the current one short once it has been readable.
+   */
+  const BANNER_MIN_MS = 750;
   const bannerQ: { node: HTMLElement; ms: number }[] = [];
-  let bannerOn = false;
+  let bannerNow: { node: HTMLElement; at: number; timer: ReturnType<typeof setTimeout>; ending?: boolean } | null = null;
   function banner(node: HTMLElement, ms: number, first = false) {
     if (first) bannerQ.unshift({ node, ms });
     else bannerQ.push({ node, ms });
-    if (!bannerOn) nextBanner();
+    if (!bannerNow) nextBanner();
+    else if (!bannerNow.ending) {
+      clearTimeout(bannerNow.timer);
+      bannerNow.timer = setTimeout(endBanner, Math.max(0, BANNER_MIN_MS - (performance.now() - bannerNow.at)));
+    }
+  }
+  function endBanner() {
+    const cur = bannerNow;
+    if (!cur || cur.ending) return;
+    cur.ending = true;
+    cur.node.classList.add('is-out');
+    setTimeout(() => {
+      cur.node.remove();
+      bannerNow = null;
+      nextBanner();
+    }, 260);
   }
   function nextBanner() {
     const it = bannerQ.shift();
     if (!it) {
-      bannerOn = false;
       topbar.classList.remove('is-announcing');
       return;
     }
-    bannerOn = true;
     topbar.classList.add('is-announcing');
     it.node.classList.add('banner');
     it.node.setAttribute('aria-hidden', 'true');
     topbar.append(it.node);
-    setTimeout(() => {
-      it.node.classList.add('is-out');
-      setTimeout(() => {
-        it.node.remove();
-        nextBanner();
-      }, 280);
-    }, it.ms);
+    bannerNow = { node: it.node, at: performance.now(), timer: setTimeout(endBanner, bannerQ.length ? BANNER_MIN_MS : it.ms) };
   }
 
   // ── HUD ───────────────────────────────────────────────────────────
@@ -798,7 +808,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     sfx.reveal();
     haptic.success();
     banner(
-      h('div', { class: 'yaku' }, h('b', {}, y.native), h('span', { class: 'yaku__k' }, `Card set · ${y.en} · +${fmt(bonus)}`)),
+      h('div', { class: 'yaku' }, h('b', {}, y.native), h('span', { class: 'yaku__k' }, `Card set +${fmt(bonus)} · ${y.en}`)),
       2000,
     );
     live(`Card set: ${y.en}. Bonus ${bonus}.`);

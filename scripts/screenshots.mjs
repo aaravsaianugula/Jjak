@@ -107,7 +107,7 @@ await page.waitForSelector('.card');
 await page.waitForTimeout(1400);
 await playPairs(40, 380);
 await page.waitForSelector('.sheet', { timeout: 6000 });
-await page.waitForTimeout(1000);
+await page.waitForTimeout(3200); // let the blossoms bloom and the new card turn over
 await shot('06-result');
 
 // 4. Journey map, seals, album
@@ -116,6 +116,7 @@ await page.click('[data-go="map"]');
 await shot('07-map');
 await open(base17);
 await page.click('[data-go="seals"]');
+await page.waitForTimeout(3600); // let the 'seal earned' toast clear
 await shot('08-seals');
 await open(base17);
 await page.click('[data-go="album"]');
@@ -124,7 +125,7 @@ await page.click('.month__cards button[data-id="31"]');
 await shot('10-card-detail');
 
 // 5. New mechanics (tips dismissed), with a board paper
-await open({ ...base17, level: 30, seenTips: ['variants', 'stones', 'gravity', 'snow'], paper: '7', hints: 99 });
+await open({ ...base17, level: 29, seenTips: ['variants', 'stones', 'gravity', 'snow'], paper: '7', hints: 99 });
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
 await page.waitForTimeout(1400);
