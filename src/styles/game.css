@@ -523,6 +523,8 @@
 }
 .game .board {
   z-index: 1;
+  /* Pause blur eases both ways (the transition lives on the base, not only the paused state). */
+  transition: filter 300ms ease;
 }
 .game .board.is-swap {
   animation: g-swap 420ms var(--g-ease-out);

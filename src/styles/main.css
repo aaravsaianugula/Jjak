@@ -3249,6 +3249,16 @@ a.row:active {
   outline: 1.5px dashed color-mix(in srgb, var(--muted) 45%, transparent);
   outline-offset: -1.5px;
 }
+/* Progress meters in the seal book fill in once as the page arrives. */
+.seals .sealrow__prog .meter i {
+  transform-origin: left center;
+  animation: meter-fill 640ms var(--ease-out) 220ms backwards;
+}
+@keyframes meter-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
 .sealrow.is-done .sealmark {
   outline: 0;
   background: var(--accent);

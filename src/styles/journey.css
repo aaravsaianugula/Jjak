@@ -769,20 +769,24 @@
   width: 84px;
   height: 84px;
   transform: rotate(var(--tilt, 0deg));
-  animation: stamp-thunk 560ms cubic-bezier(0.3, 1.5, 0.45, 1) var(--stamp-at, 600ms) both;
+  animation: stamp-thunk 520ms linear var(--stamp-at, 600ms) both;
 }
 .passport__stamp .stamp-art {
   width: 100%;
   height: 100%;
 }
+/* Thunk: the stamp drops (accelerating), meets the page a hair small, and settles;
+   the ink bleed below starts at the moment of contact (half-way). */
 @keyframes stamp-thunk {
   0% {
     opacity: 0;
-    transform: translateY(-14px) scale(1.9) rotate(calc(var(--tilt, 0deg) - 10deg));
+    transform: translateY(-12px) scale(1.6) rotate(calc(var(--tilt, 0deg) - 8deg));
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
   }
-  55% {
+  50% {
     opacity: 1;
-    transform: scale(0.94) rotate(var(--tilt, 0deg));
+    transform: scale(0.95) rotate(var(--tilt, 0deg));
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   100% {
     opacity: 1;
