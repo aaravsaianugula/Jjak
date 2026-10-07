@@ -96,7 +96,7 @@ export function homeScreen(): Screen {
     <div class="panel journey">
       <span class="journey__season ja" aria-hidden="true">${chapter.ja}</span>
       <div class="journey__top">
-        <span class="eyebrow">Journey · ${esc(chapter.name)} · ${road.year > 0 ? `Wanderer ${road.year}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
+        <span class="eyebrow"><span class="journey__kicker">Journey · </span>${esc(chapter.name)} · ${road.year > 0 ? `Wanderer ${road.year}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
         <button class="chip-btn journey__map" data-go="map" aria-label="Journey map">${ICONS.map}<span>Map</span></button>
       </div>
       ${roadPlace}

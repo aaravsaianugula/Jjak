@@ -1472,6 +1472,18 @@ button.panel:active {
 .home {
   gap: 12px;
   padding-top: 0;
+  /* On short phones the tiles may sit below the fold: scroll rather than squash the cards. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.home::-webkit-scrollbar {
+  display: none;
+}
+.home > .panel,
+.home > .tiles {
+  flex-shrink: 0;
 }
 .home .home__head {
   position: absolute;
@@ -1945,11 +1957,56 @@ button.panel:active {
     gap: 8px;
   }
 }
+/* Small phones (360×640 and similar): Continue and Daily stay above the fold. */
+@media (max-height: 700px) {
+  .home {
+    gap: 10px;
+  }
+  .scene {
+    min-height: calc(128px + var(--safe-top));
+  }
+  .scene__brand {
+    bottom: 8px;
+  }
+  .journey {
+    gap: 8px;
+    padding: 12px 14px 14px;
+  }
+  .journey__top {
+    min-height: 30px;
+  }
+  .journey__title {
+    font-size: var(--fs-xl);
+  }
+  .journey__progress {
+    gap: 6px;
+  }
+  .journey .btn {
+    margin-top: 2px;
+    min-height: 48px;
+  }
+  .daily {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .daily__cal {
+    height: 50px;
+  }
+  .daily__week {
+    padding-top: 10px;
+  }
+}
 @media (max-height: 680px) {
   .brand__tag {
     display: none;
   }
   .journey__season {
+    display: none;
+  }
+}
+/* Narrow phones: the eyebrow keeps to one line beside the Map chip. */
+@media (max-width: 380px) {
+  .journey__kicker {
     display: none;
   }
 }

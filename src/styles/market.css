@@ -150,6 +150,19 @@
     min-height: 64px;
   }
 }
+@media (max-height: 700px) {
+  .home .tiles .tile {
+    min-height: 58px;
+    padding: 8px 10px 8px 12px;
+  }
+  .home .tiles .tile__glyph {
+    top: 7px;
+    right: 7px;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+}
 
 /* ───────────────────────────── Market screen ───────────────────────────── */
 .market {
