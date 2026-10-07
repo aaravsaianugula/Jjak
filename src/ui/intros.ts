@@ -70,6 +70,13 @@ function introText(id: IntroId, ctx: IntroContext): IntroText {
   return { kicker: 'New on the road', title: m.name, native: m.native, line: m.rule };
 }
 
+/** "한글 · 漢字" with the Japanese half in the Japanese face. */
+const nativeHtml = (native: string) =>
+  native
+    .split(' · ')
+    .map((part, i) => (i === 0 ? `<span lang="ko">${esc(part)}</span>` : `<span class="ja" lang="ja">${esc(part)}</span>`))
+    .join(' · ');
+
 /**
  * Open an intro sheet. Plays the demo twice, then "your turn" on the same mini
  * board; the button turns primary once the player has done it (it always works,
@@ -80,7 +87,7 @@ export function openIntro(id: IntroId, ctx: IntroContext = {}, cta = 'Play'): Sh
   const player = new DemoPlayer(introScript(id, ctx), { size: 'sheet' });
   const content = frag(`<div class="intro-sheet">
     <div class="tip__kicker">${esc(t.kicker)}</div>
-    <h2>${esc(t.title)} <span class="tip__native">${esc(t.native)}</span></h2>
+    <h2>${esc(t.title)} <span class="tip__native">${nativeHtml(t.native)}</span></h2>
     <div class="intro-sheet__demo"></div>
     <p class="intro-sheet__line">${esc(t.line)}</p>
   </div>`);

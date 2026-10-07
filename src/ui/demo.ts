@@ -521,7 +521,7 @@ export class DemoPlayer {
     const lost = g === 'clean' && this.run.blockedTaps > 0;
     this.goalEl.hidden = false;
     this.goalEl.className = `demo__goal${met ? ' is-met' : ''}${lost ? ' is-lost' : ''}`;
-    const prog = g === 'clean' ? (lost ? '✗' : '✓') : g === 'combo' || g === 'bloom' ? `×${have}/${need}` : `${have}/${need}`;
+    const prog = g === 'clean' ? (lost ? '×' : '✓') : g === 'combo' || g === 'bloom' ? `×${have}/${need}` : `${have}/${need}`;
     this.goalEl.innerHTML = `<span class="demo__goal-ico" aria-hidden="true">${ICONS.blossom}</span><b>${def.name}</b><span class="demo__goal-n">${prog}</span>`;
     this.goalEl.setAttribute('aria-label', `Goal: ${def.text}. ${met ? 'Met.' : `${have} of ${need}.`}`);
   }
@@ -780,7 +780,7 @@ export class DemoPlayer {
       this.updateGoal();
       sfx.miss();
       haptic.warn();
-      this.setCaption(ghostPath(st.board, a, cell)?.why === 'bends' ? 'Too many bends' : 'The way is blocked');
+      this.setCaption(ghostPath(st.board, a, cell)?.why === 'bends' ? 'Too many bends' : 'Path blocked');
       t.busy = true;
       try {
         await this.blockedFx(a, cell, ghostPath(st.board, a, cell), this.tok);

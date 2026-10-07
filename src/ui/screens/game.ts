@@ -1463,9 +1463,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         <button class="btn btn--primary btn--block" data-p="resume">Resume ${ICONS.play}</button>
         <div class="sheet__row">
           <button class="btn btn--ghost" data-p="restart">${ICONS.restart}<span>Restart</span></button>
-          <button class="btn btn--ghost" data-p="intro">${ICONS.play}<span>Intro</span></button>
           <button class="btn btn--ghost" data-p="how">${ICONS.hint}<span>Rules</span></button>
         </div>
+        <button class="btn btn--quiet btn--block" data-p="intro">${ICONS.play}<span>Replay intro</span></button>
         <button class="btn btn--quiet btn--block" data-p="home">Leave to Home</button>
       </div>
     </div>`);
