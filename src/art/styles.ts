@@ -130,6 +130,9 @@ const LOOKS: Record<string, DeckLook> = {
     color: (hex, [L, C, h], ground) => {
       if (hex === CARD_PAPER) return '#1b2140';
       if (ground) return lchToHex(0.285 + (L - 0.93) * 0.8, 0.034 + C * 0.45, mixHue(h, 274, 0.72));
+      // Near-black ink (the hills of Silver grass, a magpie's coat) stays a night
+      // silhouette, a shade deeper than the paper; everything else lifts to silver.
+      if (L < 0.34 && C < 0.04) return lchToHex(0.1 + L * 0.2, 0.03, 272);
       return lchToHex(clamp(0.47 + L * 0.51, 0, 0.985), C * 0.4, mixHue(h, 258, 0.14));
     },
     defs: () =>
