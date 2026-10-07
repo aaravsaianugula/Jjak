@@ -1,7 +1,8 @@
 import { ECONOMY, GIFTS } from '../config';
 import { ALL_CARD_IDS } from '../data/deck';
+import { ROUTE, ROUTE_LEVELS_PER_CHAPTER, routeOf } from '../data/route';
 import { localDateKey } from '../engine/levels';
-import { type Session, starCount } from '../engine/session';
+import { LUCKY_PETALS, type Session, starCount } from '../engine/session';
 import { persist, save } from './storage';
 
 export interface ClearSummary {
@@ -14,6 +15,10 @@ export interface ClearSummary {
   daily?: { counted: boolean; streak: number; number: number };
   /** lantern gift for every 4th Journey level */
   lantern?: { petals: number; hints: number; shuffles: number };
+  /** petals from lucky bonus pairs on this board (already added to the balance; not part of `petals`) */
+  lucky?: number;
+  /** passport stamp earned by first clearing a chapter's festival board */
+  stamp?: { id: string; date: string };
 }
 
 const yesterdayKey = (today: string) => {
@@ -66,6 +71,14 @@ export function recordClear(s: Session): ClearSummary {
       save.hints++;
       save.shuffles++;
     }
+    // The place's passport stamp, the first time its festival board is cleared.
+    if (n % ROUTE_LEVELS_PER_CHAPTER === 0) {
+      const id = routeOf(n).chapter.id;
+      if (!save.journey.stamps[id]) {
+        save.journey.stamps[id] = localDateKey();
+        out.stamp = { id, date: save.journey.stamps[id] };
+      }
+    }
   } else if (s.spec.mode === 'daily') {
     const today = localDateKey();
     const key = s.spec.seed.replace('daily-', '');
@@ -86,9 +99,34 @@ export function recordClear(s: Session): ClearSummary {
     out.petals = ECONOMY.zenPetals;
   }
 
+  // Lucky bonus pairs: a small gift of petals on top of the board's own.
+  if (s.luckyPairs > 0) {
+    out.lucky = s.luckyPairs * LUCKY_PETALS;
+    save.petals += out.lucky;
+    save.journey.luckyPairs += s.luckyPairs;
+    save.journey.luckyPetals += out.lucky;
+  }
+
   save.petals += out.petals;
   persist();
   return out;
+}
+
+/**
+ * Stamps for festival boards cleared before stamps existed (older saves), dated
+ * today. Returns how many were added.
+ */
+export function syncStamps(): number {
+  let added = 0;
+  ROUTE.forEach((c, i) => {
+    if (save.journey.stamps[c.id]) return;
+    if ((save.stars[(i + 1) * ROUTE_LEVELS_PER_CHAPTER] ?? 0) > 0) {
+      save.journey.stamps[c.id] = localDateKey();
+      added++;
+    }
+  });
+  if (added) persist();
+  return added;
 }
 
 /** Streak to display: still alive if the last daily was today or yesterday. */

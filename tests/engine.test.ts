@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY, STONE, type Board, cardsLeft, isCard, monthOf } from '../src/engine/board';
 import { generateBoard, reshuffle } from '../src/engine/generate';
-import { buildBoard, dailyLevel, dailyNumber, dailyTheme, journeyLevel, pickSnow, rushLevel, zenLevel } from '../src/engine/levels';
+import { buildBoard, dailyLevel, dailyNumber, dailyTheme, journeyLevel, pickSnow, rushLevel, windOf, zenLevel } from '../src/engine/levels';
 import { applyGravity, countMoves, findMove } from '../src/engine/moves';
 import { findPath, reachable } from '../src/engine/path';
 import { createRng } from '../src/engine/rng';
@@ -256,12 +256,12 @@ describe('falling leaves & snow', () => {
   });
 
   it('every season mechanic appears where the design says', () => {
-    expect(journeyLevel(27).gravity).toBe(true); // first Autumn leaf-fall level
+    expect(windOf(journeyLevel(26))).toBe('down'); // first falling-leaves level (Seoraksan, chapter 3)
     expect(journeyLevel(25).gravity).toBe(false);
     expect(journeyLevel(38).snow).toBeGreaterThan(0); // first Winter snow level
     for (let n = 1; n <= 120; n++) {
       const sp = journeyLevel(n);
-      expect(sp.gravity && sp.snow > 0).toBe(false); // never both at once
+      expect(!!windOf(sp) && sp.snow > 0).toBe(false); // never sliding and snow at once
     }
   });
 
@@ -275,7 +275,7 @@ describe('falling leaves & snow', () => {
       let t = 0;
       let guard = 0;
       while (!s.done && guard++ < 400) {
-        const m = findMove(s.board, s.hidden);
+        const m = s.findMove(); // respects snow and knots
         expect(m, `stuck on ${spec.mode} ${spec.number}`).not.toBeNull();
         s.tap(m![0], (t += 700));
         const r = s.tap(m![1], (t += 700));

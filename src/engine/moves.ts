@@ -3,7 +3,7 @@ import { reachable } from './path';
 
 /**
  * First available jjak on the board, or null if the position is stuck.
- * `hidden` cells (snow-covered) still block paths but can't be picked.
+ * `hidden` cells (snow-covered or knotted) still block paths but can't be picked.
  */
 export function findMove(b: Board, hidden?: ReadonlySet<number>): [number, number] | null {
   for (let i = 0; i < b.cells.length; i++) {
@@ -29,28 +29,41 @@ export function countMoves(b: Board): number {
   return n;
 }
 
+/** Which way cards slide after each pair: falling leaves are 'down', wind blows the other three ways. */
+export type Wind = 'down' | 'left' | 'right' | 'up';
+export const WINDS: readonly Wind[] = ['down', 'left', 'right', 'up'];
+
 /**
- * "Falling leaves": cards drop straight down to fill gaps. Stones act as
- * floors, so each column is compacted segment by segment.
+ * "Falling leaves" and "Wind": cards slide in `dir` to fill gaps. Stones act as
+ * floors (or walls), so each line is compacted segment by segment.
  * Returns the moves as [fromCell, toCell] pairs.
  */
-export function applyGravity(b: Board): [number, number][] {
+export function applyGravity(b: Board, dir: Wind = 'down'): [number, number][] {
   const moves: [number, number][] = [];
-  for (let c = 0; c < b.cols; c++) {
-    let write = b.rows - 1;
-    for (let r = b.rows - 1; r >= 0; r--) {
-      const i = r * b.cols + c;
+  const vertical = dir === 'down' || dir === 'up';
+  const lines = vertical ? b.cols : b.rows;
+  const len = vertical ? b.rows : b.cols;
+  // Walk each line starting from the side the cards slide towards.
+  const towardStart = dir === 'up' || dir === 'left';
+  for (let line = 0; line < lines; line++) {
+    const cellAt = (k: number) => {
+      const p = towardStart ? k : len - 1 - k;
+      return vertical ? p * b.cols + line : line * b.cols + p;
+    };
+    let write = 0;
+    for (let k = 0; k < len; k++) {
+      const i = cellAt(k);
       const v = b.cells[i];
       if (v === STONE) {
-        write = r - 1;
+        write = k + 1;
       } else if (isCard(v)) {
-        if (r !== write) {
-          const to = write * b.cols + c;
+        if (k !== write) {
+          const to = cellAt(write);
           b.cells[to] = v;
           b.cells[i] = EMPTY;
           moves.push([i, to]);
         }
-        write--;
+        write++;
       }
     }
   }
