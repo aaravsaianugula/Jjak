@@ -11,7 +11,8 @@ import { levelPlan } from '../../director';
 import { isBonus } from '../../data/deck';
 import { SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
-import { breeze, knotTip, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windTip, windVane } from '../journey-fx';
+import { breeze, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windVane } from '../journey-fx';
+import { type IntroId, contextOf, introFor, openIntro, replayIntroFor, tipKey } from '../intros';
 import { COMBO_WINDOW_MS, FEVER_MS, LUCKY_PETALS, Session, formatTime, thirdStar } from '../../engine/session';
 import { type Yaku, possibleYaku } from '../../engine/yaku';
 import { checkSeals, type Seal } from '../../services/achievements';
@@ -743,7 +744,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         haptic.warn();
         live(`No path between those two — the way is blocked.${goal?.id === 'clean' && session.blockedTaps === 1 ? ' The clean-read blossom slips away this time.' : ''}`);
         updateGoal(true);
-        if (spec.mode === 'journey' && spec.number <= 3) setCoach('Same flower — but the path between them needs more than two turns. Clear what’s in the way first.');
+        if (spec.mode === 'journey' && spec.number <= 3) setCoach('Too many bends');
         break;
       case 'match':
         onMatch(res);
@@ -751,14 +752,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       case 'hidden':
         retrigger(target, 'is-shake');
         sfx.deselect();
-        setCoach('This card is under snow. Clear a card next to it to reveal it.');
+        setCoach('Clear a neighbour');
         break;
       case 'knotted':
         retrigger(target, 'is-shake');
         tugKnot(target);
         sfx.deselect();
         live('This card is tied with a cord. Clear a card next to it first.');
-        setCoach('This card is tied with a silk cord (매듭). Clear a card next to it to untie it.');
+        setCoach('Clear a neighbour');
         break;
     }
   }
@@ -773,7 +774,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       sfx.deselect();
       const text = `This gate (門) opens when you pair ${MONTHS[m].en} (${m + 1}). Until then, paths can’t pass it.`;
       live(text);
-      setCoach(text);
+      setCoach(`Pair ${MONTHS[m].en} (${m + 1}) to open`);
       return;
     }
     const target = (e.target as HTMLElement).closest<HTMLElement>('.card');
@@ -1204,7 +1205,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     restartBoard();
   });
 
-  // ── Tutorial coach marks ──────────────────────────────────────────
+  // ── Tutorial: short captions, the Level 1 glow, and animated intros ──
+  /** A two- or three-word caption over the board (null hides it). */
   function setCoach(text: string | null) {
     if (!text) {
       coach.hidden = true;
@@ -1215,152 +1217,41 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     coach.hidden = false;
     retrigger(coach, 'is-new');
   }
-  let coachStep = 0;
+  /** After a pair, any caption has done its job. */
   function tutorialStep() {
-    if (spec.mode !== 'journey' || spec.number > 2) return;
-    coachStep++;
-    if (spec.number === 1 && coachStep === 1) setCoach('A path can bend up to twice, and may run around the outside of the board.');
-    else if (coachStep >= 3) setCoach(null);
+    if (!coach.hidden) setCoach(null);
   }
   function startTutorial() {
     if (spec.mode !== 'journey') return;
     if (spec.number === 1) {
-      setCoach('Tap two cards with the same flower to make a jjak (짝) — a pair.');
+      // The first-minute intro taught the rule; Level 1 just glows the first pair (free).
       const m = session.hint();
-      session.hintsUsed = 0; // the teaching hint is free
+      session.hintsUsed = 0;
       if (m) {
         hintCells = m;
         m.forEach((i) => cardEls.get(i)?.classList.add('is-hint'));
       }
     }
-    if (spec.number === 6 && !save.seenTips.includes('variants')) showVariantTip();
-    if (wind === 'down' && !save.seenTips.includes('gravity'))
-      showMechanicTip('gravity', 'Falling leaves', '낙엽 · 落葉', 'From now on, cards drop down to fill the gaps after every pair — like leaves settling. Plan from the bottom up, and watch new pairs line up as things fall.', [36, 37, 38, 39]);
-    else if (spec.snow > 0 && !save.seenTips.includes('snow'))
-      showMechanicTip('snow', 'First snow', '첫눈 · 初雪', 'Some cards start under snow. They can’t be picked until a card next to them is cleared. Snowy cards still block paths.', ['snow', 44, 'snow', 45]);
-    else if (wind && wind !== 'down' && !save.seenTips.includes('wind')) showRuleTip('wind');
-    else if (spec.knots && !save.seenTips.includes('knots')) showRuleTip('knots');
-    else if (spec.lucky && !save.seenTips.includes('lucky'))
-      showMechanicTip('lucky', 'Lucky cards', '보너스패 · おまけ札', `This board hides a pair of lucky bonus cards. They pair with each other like any flower. Make that pair for +${LUCKY_PETALS} petals and bonus points.`, [48, 49]);
     if (wind && wind !== 'down') setTimeout(() => breeze(stage, wind, true), 250);
-    if (spec.stones > 0 && !save.seenTips.includes('stones')) {
-      save.seenTips.push('stones');
+    const id = introFor(spec, save.seenTips);
+    if (id) {
+      save.seenTips.push(tipKey(id, spec.goal));
       persist();
-      setCoach('Stones (돌 · 石) block paths. Route around them.');
+      showIntro(id, spec.mode === 'journey' ? `Play Level ${spec.number}` : 'Play');
     }
   }
 
-  const tipCards = (cards: (number | 'snow')[]) =>
-    `<div class="tip__cards">${cards.map((c, i) => `<div style="--i:${i}">${cardSvg(c)}</div>`).join('')}</div>`;
-
-  /**
-   * Level 6 teaches the one rule that changes: cards of the same flower stop
-   * looking identical. Shown by example (the four Pine cards, corner numbers
-   * circled) and then practised in a three-card mini-quiz.
-   */
-  function showVariantTip() {
-    save.seenTips.push('variants');
-    persist();
-    const m = MONTHS[0];
-    const kinds = [0, 1, 2, 3].map((v) => KIND_LABEL[cardDef(v).kind].en);
-    // Quiz: two different-looking Pine cards (both 1) and a Plum card (2) that looks like the crane.
-    const quiz = [3, 7, 0];
-    const content = frag(`<div class="tip tip--rule">
-      <div class="tip__kicker">New rule · Level 6</div>
-      <h2>Match the flower, not the picture</h2>
-      <p class="tip__lead">From now on, the four cards of each flower look different.<br><b>Same flower + same number in the corner = a pair.</b></p>
-
-      <div class="rule-family">
-        <div class="rule-family__cards">
-          ${[0, 1, 2, 3]
-            .map((id, i) => `<figure class="rule-card" style="--i:${i}">${cardSvg(id)}<span class="num-ring" aria-hidden="true"></span><figcaption>${esc(kinds[i])}</figcaption></figure>`)
-            .join('')}
-        </div>
-        <p class="tip__caption">All four are <b>${esc(m.en)}</b> · <span class="serif">${m.ko}</span> · <span class="ja">${m.ja}</span> — all show <b>1</b>. Any two of them pair.</p>
-      </div>
-
-      <div class="quiz" role="group" aria-label="Practice: tap the two cards that pair">
-        <div class="quiz__title"><span class="quiz__step">Try it</span> Tap the two cards that make a pair</div>
-        <div class="quiz__cards">
-          ${quiz.map((id) => `<button class="quiz__card" data-q="${id}" aria-label="${esc(faceLabel(id))}">${cardSvg(id)}<span class="num-ring" aria-hidden="true"></span></button>`).join('')}
-        </div>
-        <p class="quiz__feedback" aria-live="polite">Hint: look at the number in each corner.</p>
-      </div>
-    </div>`);
-    const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
-    content.append(h('div', { class: 'sheet__actions' }, btn));
-
-    const feedback = content.querySelector<HTMLElement>('.quiz__feedback')!;
-    let picked: HTMLElement[] = [];
-    let solved = false;
-    content.querySelector('.quiz__cards')!.addEventListener('click', (e) => {
-      const card = (e.target as HTMLElement).closest<HTMLElement>('[data-q]');
-      if (!card || solved) return;
-      if (picked.includes(card)) {
-        card.classList.remove('is-picked');
-        picked = picked.filter((p) => p !== card);
-        return;
-      }
-      card.classList.add('is-picked');
-      picked.push(card);
-      sfx.tap();
-      if (picked.length < 2) return;
-      const [x, y] = picked.map((p) => Number(p.dataset.q) >> 2);
-      if (x === y) {
-        solved = true;
-        picked.forEach((p) => p.classList.add('is-right'));
-        content.querySelector('.quiz')!.classList.add('is-solved');
-        feedback.innerHTML = '<b>Yes!</b> Different pictures, but both are Pine with a 1. That’s a jjak.';
-        sfx.match(2);
-        haptic.success();
-        btn.textContent = 'Start Level 6';
-      } else {
-        picked.forEach((p) => {
-          p.classList.add('is-wrong');
-          setTimeout(() => p.classList.remove('is-wrong', 'is-picked'), 650);
-        });
-        feedback.innerHTML = '<b>Not quite.</b> The bird cards look alike, but one is Pine (1) and one is Plum (2). Match the number in the corner.';
-        sfx.miss();
-        haptic.warn();
-        picked = [];
-      }
+  /** An animated intro in a sheet; the clock waits while it is open. */
+  function showIntro(id: IntroId, cta: string) {
+    const wasPaused = paused;
+    if (!paused) {
+      paused = true;
+      pausedAt = performance.now();
+    }
+    const sheet = openIntro(id, contextOf(spec), cta);
+    void sheet.closed.then(() => {
+      if (!wasPaused) resume();
     });
-
-    paused = true;
-    pausedAt = performance.now();
-    const sheet = openSheet(content, { label: 'New rule: match the flower' });
-    btn.addEventListener('click', () => sheet.close());
-    void sheet.closed.then(resume);
-  }
-
-  /** Knots and Wind get a rule tip like Level 6's: one bold line, a picture and a "Try it". */
-  function showRuleTip(id: 'knots' | 'wind') {
-    save.seenTips.push(id);
-    persist();
-    const tip = id === 'wind' ? windTip(wind ?? 'right', spec.number) : knotTip(spec.number);
-    paused = true;
-    pausedAt = performance.now();
-    const sheet = openSheet(tip.content, { label: id === 'wind' ? 'New: wind' : 'New: knots' });
-    tip.button.addEventListener('click', () => sheet.close());
-    void sheet.closed.then(resume);
-  }
-
-  function showMechanicTip(id: string, title: string, native: string, body: string, cards: (number | 'snow')[]) {
-    save.seenTips.push(id);
-    persist();
-    const content = frag(`<div class="tip">
-      <div class="tip__kicker">New this season</div>
-      <h2>${esc(title)} <span class="tip__native">${native}</span></h2>
-      <p class="muted">${esc(body)}</p>
-      ${tipCards(cards)}
-    </div>`);
-    const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
-    content.append(h('div', { class: 'sheet__actions' }, btn));
-    paused = true;
-    pausedAt = performance.now();
-    const sheet = openSheet(content, { label: title });
-    btn.addEventListener('click', () => sheet.close());
-    void sheet.closed.then(resume);
   }
 
   // ── Finish ────────────────────────────────────────────────────────
@@ -1733,6 +1624,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           <button class="btn btn--ghost" data-p="restart">${ICONS.restart}<span>Restart</span></button>
           <button class="btn btn--ghost" data-p="how">${ICONS.hint}<span>Rules</span></button>
         </div>
+        <button class="btn btn--quiet btn--block" data-p="intro">${ICONS.play}<span>Replay intro</span></button>
         <button class="btn btn--quiet btn--block" data-p="home">Leave to Home</button>
       </div>
     </div>`);
@@ -1753,6 +1645,11 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       if (!act) return;
       if (act === 'how') {
         showHowToPlay();
+        return;
+      }
+      if (act === 'intro') {
+        // Over the pause sheet, so the clock stays stopped.
+        openIntro(replayIntroFor(spec), contextOf(spec), 'Back');
         return;
       }
       sheet.close();

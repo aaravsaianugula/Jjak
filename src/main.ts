@@ -7,6 +7,7 @@ import './styles/garden.css';
 import './styles/meta.css';
 import './styles/cards-extra.css';
 import './styles/mechanics.css';
+import './styles/demo.css';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import { installCardSprite } from './art/cards';

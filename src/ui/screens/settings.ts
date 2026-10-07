@@ -10,6 +10,10 @@ import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
 import { nav } from '../nav';
+import { MECHANIC_IDS, MECHANICS } from '../../engine/mechanics';
+import { DemoPlayer } from '../demo';
+import { type DemoScript, BASIC_DEMOS, GOAL_DEMOS, MECHANIC_DEMOS, VARIANTS_DEMO } from '../demos';
+import { replayIntro } from './welcome';
 
 export function settingsScreen(): Screen {
   const row = (icon: string, title: string, sub = '') => `<span class="row__icon" aria-hidden="true">${icon}</span><span class="row__text">${title}${sub ? `<small>${sub}</small>` : ''}</span>`;
@@ -139,23 +143,68 @@ export function settingsScreen(): Screen {
   return { name: 'settings', el };
 }
 
+/**
+ * How to play: short and visual. Small looping demo tiles (the pair rule,
+ * bends, combos, every mechanic, goals), one line each for the Market, Garden
+ * and Flower Path, and Replay intro.
+ */
 export function showHowToPlay(): void {
-  const content = frag(`<div>
+  const tiles: { label: string; script: DemoScript; wide?: boolean }[] = [
+    { label: 'Same flower', script: VARIANTS_DEMO },
+    { label: 'Up to two bends', script: BASIC_DEMOS.bends },
+    { label: 'Never three', script: BASIC_DEMOS.blocked },
+    { label: 'Combos · Fever', script: BASIC_DEMOS.fever },
+    ...MECHANIC_IDS.map((m) => ({ label: MECHANICS[m].name, script: MECHANIC_DEMOS[m] })),
+    { label: 'Level goals', script: GOAL_DEMOS.straight, wide: true },
+  ];
+  const players = tiles.map((t) => new DemoPlayer(t.script, { size: 'tile' }));
+  const content = frag(`<div class="howto">
     <div class="sheet__head">
       <div class="detail__kind">How to play · <span lang="ko">방법</span></div>
       <h2>Make a jjak</h2>
     </div>
-    <ol class="howto">
-      <li><span><b>Tap two cards of the same flower.</b>Every card shows its month number in the corner. Matching numbers always pair.</span></li>
-      <li><span><b>Mind the path.</b>The two cards must connect with a line of up to three straight strokes (two turns) that crosses only empty space. The line may travel around the outside of the board.</span></li>
-      <li><span><b>Chain combos.</b>Make your next pair within four seconds to build a combo: 짝짝, 짝짝짝…</span></li>
-      <li><span><b>Three blossoms per board.</b>Clear it, use no hints or shuffles, and beat the par time.</span></li>
-      <li><span><b>Stuck?</b>If no pairs are possible the board reshuffles itself. Hints and shuffles are there when you want them.</span></li>
-    </ol>
-    <p class="howto__foot">Daily Jjak gives everyone in the world the same board each day. Zen has no clock at all.</p>
+    <div class="howto__tiles"></div>
+    <ul class="howto__more">
+      <li><span class="howto__glyph ja" aria-hidden="true">市</span><span><b>Market</b>Petals buy papers, brushes and garden pieces.</span></li>
+      <li><span class="howto__glyph ja" aria-hidden="true">庭</span><span><b>Garden</b>Place your pieces; a visitor calls each day.</span></li>
+      <li><span class="howto__glyph ja" aria-hidden="true">道</span><span><b>Flower Path</b>Every board earns rank, missions and chests.</span></li>
+    </ul>
   </div>`);
-  const btn = h('button', { class: 'btn btn--primary btn--block', style: 'margin-top:16px' }, 'Got it');
-  content.append(btn);
+  const grid = content.querySelector('.howto__tiles')!;
+  tiles.forEach((t, i) => {
+    const fig = h('figure', { class: `howto__tile${t.wide ? ' howto__tile--wide' : ''}` }, players[i].el, h('figcaption', {}, t.label));
+    grid.append(fig);
+  });
+  const replay = h('button', { class: 'btn btn--ghost btn--block', html: `${ICONS.play}<span>Replay intro</span>` });
+  const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
+  content.append(h('div', { class: 'sheet__actions' }, replay, btn));
   const s = openSheet(content, { label: 'How to play', close: true });
   btn.addEventListener('click', () => s.close());
+  replay.addEventListener('click', () => replayIntro());
+
+  // Loop only the tiles on screen.
+  const running = new Set<number>();
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const i = Number((e.target as HTMLElement).dataset.tile);
+        if (e.isIntersecting && !running.has(i)) {
+          running.add(i);
+          void players[i].play(Infinity, { fresh: true });
+        } else if (!e.isIntersecting && running.has(i)) {
+          running.delete(i);
+          players[i].load(tiles[i].script);
+        }
+      }
+    },
+    { root: s.el, threshold: 0.4 },
+  );
+  players.forEach((p, i) => {
+    p.el.dataset.tile = String(i);
+    io.observe(p.el);
+  });
+  void s.closed.then(() => {
+    io.disconnect();
+    players.forEach((p) => p.destroy());
+  });
 }
