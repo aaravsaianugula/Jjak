@@ -30,6 +30,9 @@ function ac(): AudioContext | null {
 /** Call from the first user gesture so iOS/Android webviews unlock audio. */
 export const unlockAudio = () => void audioContext();
 
+/** True once audio has been unlocked by a gesture (ambient sounds wait for this). */
+export const audioReady = () => ctx?.state === 'running';
+
 function tone(freq: number, start: number, dur: number, type: OscillatorType, vol: number, glideTo?: number) {
   const c = ctx!;
   const o = c.createOscillator();
@@ -135,13 +138,13 @@ export const sfx = {
     tone(f * 5.4, t, 0.4, 'sine', 0.01);
     tone(f * 1.5, t + 0.32, 1.6, 'sine', 0.03);
   },
-  /** Bamboo fountain: a hollow wooden clack. */
-  clack() {
+  /** Bamboo fountain: a hollow wooden clack (`vol` < 1 for the distant, ambient one). */
+  clack(vol = 1) {
     const c = ac();
     if (!c) return;
     const t = c.currentTime;
-    noise(t, 0.04, 900, 0.5);
-    tone(420, t, 0.09, 'triangle', 0.18, 300);
-    tone(840, t, 0.05, 'sine', 0.06);
+    noise(t, 0.04, 900, 0.5 * vol);
+    tone(420, t, 0.09, 'triangle', 0.18 * vol, 300);
+    tone(840, t, 0.05, 'sine', 0.06 * vol);
   },
 };

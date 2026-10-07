@@ -20,12 +20,15 @@ import { esc, frag, h, toast } from '../dom';
 import { openSheet } from '../modal';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
-import { pathStrip } from './path';
+import { fillStrip, pathStrip } from './path';
+import { petalBump } from '../motion';
 import { GARDEN_ITEMS } from '../../art/garden';
 import { hasAffordableNew, isOwned } from '../../services/market';
 
 /** Last petal total shown on Home, to animate gains. */
 let shownPetals: number | null = null;
+/** Flower Path XP the Home strip last showed (the strip fills from there). */
+let shownXp: number | null = null;
 /** Auto-open the gift once per app session. */
 let giftShownThisSession = false;
 
@@ -160,25 +163,14 @@ export function homeScreen(): Screen {
     setTimeout(() => openGift(el), 650);
   }
 
-  // Count up petals earned since the last visit.
-  const pet = el.querySelector<HTMLElement>('.petals')!;
-  const num = pet.querySelector<HTMLElement>('.petals__n')!;
+  // Count the petals earned (or spent) since the last visit.
   const from = shownPetals ?? save.petals;
-  const to = save.petals;
-  shownPetals = to;
-  if (to > from) {
-    const t0 = performance.now() + 350;
-    const step = (now: number) => {
-      const k = Math.max(0, Math.min(1, (now - t0) / 700));
-      num.textContent = String(Math.round(from + (to - from) * (1 - (1 - k) ** 3)));
-      if (k < 1) requestAnimationFrame(step);
-    };
-    num.textContent = String(from);
-    setTimeout(() => {
-      pet.classList.add('is-bump');
-      requestAnimationFrame(step);
-    }, 350);
-  }
+  shownPetals = save.petals;
+  petalBump(el.querySelector<HTMLElement>('.petals'), from, save.petals, { delay: 350, ms: 700 });
+  // The Flower Path strip fills with the XP gained since the last visit.
+  const xpFrom = shownXp ?? save.meta.xp;
+  shownXp = save.meta.xp;
+  fillStrip(el.querySelector<HTMLElement>('.fp-strip'), xpFrom, 420);
   return { name: 'home', el };
 }
 
@@ -206,6 +198,7 @@ function openGift(home: HTMLElement): void {
   const actions = h('div', { class: 'sheet__actions' });
   content.append(actions);
   const sheet = openSheet(content, { label: 'Daily gift' });
+  const before = save.petals;
   const done = (card: number | null, times: number) => {
     sheet.close();
     const won = checkSeals();
@@ -218,12 +211,7 @@ function openGift(home: HTMLElement): void {
         <p class="muted"><span class="serif" lang="ko">${m.ko}</span> ${esc(m.koRoman)} · <span class="ja" lang="ja">${m.ja}</span> ${esc(m.jaRoman)}</p></div>`);
       openSheet(c, { center: true, label: 'New card' });
     }
-    const pet = home.querySelector('.petals');
-    if (pet) {
-      pet.setAttribute('aria-label', `${save.petals} petals`);
-      const n = pet.querySelector('.petals__n');
-      if (n) n.textContent = String(save.petals);
-    }
+    petalBump(home.querySelector<HTMLElement>('.petals'), shownPetals ?? before, save.petals, { delay: 200 });
     shownPetals = save.petals;
   };
   actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => done(claimGift(1), 1) }, 'Claim'));

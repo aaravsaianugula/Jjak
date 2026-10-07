@@ -22,6 +22,7 @@ import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { esc, frag } from '../dom';
 import { ICONS } from '../icons';
+import { flip, measure } from '../motion';
 import { nav } from '../nav';
 
 /** What each chapter features, for the open chapter's note. */
@@ -187,6 +188,17 @@ export function mapScreen(): Screen {
   function toggle(i: number) {
     const was = open;
     open = open === i ? null : i;
+    // FLIP: the stops below the change glide to their new places (transforms
+    // only) while the opened chapter's levels fade in under them.
+    const from = Math.min(...[was, open].filter((k): k is number => k != null));
+    const sc = el.querySelector<HTMLElement>('.road__list')!;
+    const view = sc.getBoundingClientRect();
+    const below = [...list.querySelectorAll<HTMLElement>('.stop')].filter((li) => {
+      if (Number(li.dataset.ch) <= from) return false;
+      const r = li.getBoundingClientRect();
+      return r.top < view.bottom + 400 && r.bottom > view.top - 400;
+    });
+    const before = measure(below);
     for (const k of [was, open]) {
       if (k == null) continue;
       const li = list.querySelector<HTMLElement>(`.stop[data-ch="${k}"]`);
@@ -200,14 +212,12 @@ export function mapScreen(): Screen {
         const body = li.querySelector<HTMLElement>('.stop__body')!;
         body.classList.add('is-in');
         // Keep the opened stop in view without jumping the page around.
-        requestAnimationFrame(() => {
-          const sc = el.querySelector<HTMLElement>('.road__list')!;
-          const r = li.getBoundingClientRect();
-          const box = sc.getBoundingClientRect();
-          if (r.bottom > box.bottom - 8) sc.scrollBy({ top: Math.min(r.bottom - box.bottom + 16, r.top - box.top - 8), behavior: 'smooth' });
-        });
+        const r = li.getBoundingClientRect();
+        const box = sc.getBoundingClientRect();
+        if (r.bottom > box.bottom - 8) requestAnimationFrame(() => sc.scrollBy({ top: Math.min(r.bottom - box.bottom + 16, r.top - box.top - 8), behavior: 'smooth' }));
       }
     }
+    flip(before);
   }
 
   render();

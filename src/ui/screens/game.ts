@@ -21,7 +21,7 @@ import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { music } from '../../services/music';
 import { REMINDER_TIMES, disableReminder, enableReminder, planReminders } from '../../services/reminders';
-import { type ClearSummary, completedMonths, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, shareTextFor } from '../../services/progress';
+import { type ClearSummary, completedMonths, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, type RushRecorded, shareTextFor } from '../../services/progress';
 import { store } from '../../services/store';
 import { AD_POLICY } from '../../config';
 import { shareText } from '../../services/share';
@@ -31,8 +31,9 @@ import { esc, frag, h, toast, wait } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
 import { showHowToPlay } from './settings';
-import { boardReport } from '../../services/meta';
+import { boardReport, rushReport } from '../../services/meta';
 import { pathResult, rankUpMoment } from './path';
+import { petalBump } from '../motion';
 import { nav } from '../nav';
 import { MARKET_PAPER_IDS } from '../../data/market';
 import { activeBrush, activeFx } from '../../services/market';
@@ -1021,6 +1022,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     busy = false;
   }
 
+  /** What this Rush run has recorded so far (a "Keep going" continuation records only the rest). */
+  let rushRecorded: (RushRecorded & { petals: number }) | null = null;
+  let rushRankShown = 0;
+
   async function endRush() {
     if (!rush || rush.over) return;
     rush.over = true;
@@ -1029,28 +1034,61 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     sfx.miss();
     haptic.warn();
     const score = rush.banked + session.score;
-    const best = score > save.rush.best && save.rush.best > 0;
+    const rounds = rush.round + 1;
+    // Record the run now (so the sheet can show what it earned); a later
+    // "Keep going" ending tops it up instead of counting a second run.
+    const prev = rushRecorded;
+    const bestBefore = prev ? prev.bestBefore : save.rush.best;
+    const sum = recordRush(score, rounds, rush.pairs, rush.bestCombo, prev ?? undefined);
+    emit('rush', { score, rounds, pairs: rush.pairs, bestCombo: rush.bestCombo, extends: prev?.score });
+    rushRecorded = { score, pairs: rush.pairs, bestBefore, petals: (prev?.petals ?? 0) + sum.petals };
+    const seals = checkSeals();
+    const fp = rushReport();
+    const runPetals = rushRecorded.petals;
+    const best = sum.newBest;
+    const rm = reducedMotion();
     const content = frag(`<div class="result result--rush">
-      <div class="result__head"><div class="seal result__seal">짝</div><div><div class="result__kicker">Rush · time’s up</div><h2>Time!</h2><div class="muted">Rush · ${rush.round + 1} boards · ${rush.pairs} pairs</div></div></div>
-      <div class="rush-score${best ? ' is-best' : ''}"><b>${fmt(score)}</b><span>${best ? 'New best!' : `Best ${fmt(Math.max(save.rush.best, score))}`}</span></div>
+      <div class="result__head"><div class="seal result__seal">짝</div><div><div class="result__kicker">Rush · time’s up</div><h2>Time!</h2><div class="muted">Rush · ${rounds} board${rounds === 1 ? '' : 's'} · ${rush.pairs} pair${rush.pairs === 1 ? '' : 's'}</div></div></div>
+      <div class="rush-score${best ? ' is-best' : ''}"><b>${fmt(score)}</b><span>${best ? 'New best!' : `Best ${fmt(sum.best)}`}</span></div>
       <div class="statline">
-        <div><b>${rush.round + 1}</b><span>Boards</span></div>
+        <div><b>${rounds}</b><span>Boards</span></div>
         <div><b>${rush.pairs}</b><span>Pairs</span></div>
         <div><b>×${rush.bestCombo}</b><span>Best combo</span></div>
       </div>
     </div>`);
+    // Rewards: petals, the Flower Path row (XP, rank bar, missions) and seals.
+    const rewards = h('div', { class: 'rewards' });
+    let rewardAt = rm ? 0 : 520;
+    const stagger = (node: HTMLElement) => {
+      node.classList.add('reward');
+      node.style.setProperty('--at', `${rewardAt}ms`);
+      rewardAt += 140;
+      rewards.append(node);
+    };
+    if (runPetals > 0) {
+      const pill = h('span', { class: 'petals', html: `${ICONS.petal}<b>+${runPetals}</b>` });
+      stagger(h('div', { class: 'earned' }, h('div', { class: 'earned__k' }, h('span', { class: 'reward__label' }, 'Petals'), pill)));
+      petalBump(pill, 0, runPetals, { delay: rewardAt + 100, format: (n) => `+${n}` });
+    }
+    if (fp && (fp.xp > 0 || fp.missions.length)) stagger(pathResult(fp, rewardAt));
+    if (seals.length) stagger(sealRow(seals));
+    if (rewards.childElementCount) content.append(rewards);
     const actions = h('div', { class: 'sheet__actions result__actions' });
     content.append(actions);
     const sheet = openSheet(content, { dismissible: false, label: 'Rush over' });
-    live(`Time! Score ${score}.`);
+    live(`Time! Score ${score}.${runPetals ? ` Plus ${runPetals} petals.` : ''}${fp?.xp ? ` Plus ${fp.xp} XP.` : ''}`);
+    // A rank reached in this run gets its moment once (a continued run doesn't repeat it).
+    const rankUp =
+      fp && fp.after.rank > Math.max(fp.before.rank, rushRankShown)
+        ? setTimeout(() => {
+            if (!content.isConnected) return;
+            rushRankShown = fp.after.rank;
+            rankUpMoment(fp);
+          }, (rm ? 0 : rewardAt) + 2400)
+        : null;
 
     const finishRun = async (again: boolean) => {
       sheet.close();
-      const sum = recordRush(score, rush.round + 1, rush.pairs, rush.bestCombo);
-      emit('rush', { score, rounds: rush.round + 1, pairs: rush.pairs, bestCombo: rush.bestCombo });
-      const won = checkSeals();
-      if (sum.petals) toast(`+${sum.petals} petals${won.length ? ` · Seal earned: ${won.map((w) => w.title).join(', ')}` : ''}`);
-      else if (won.length) toast(`Seal earned: ${won.map((w) => w.title).join(', ')}`);
       await ads.betweenBoards(null);
       if (again) nav.game(rushLevel(`rush-${Date.now()}`, 0));
       else nav.home();
@@ -1064,6 +1102,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           onclick: async () => {
             const ok = await ads.rewarded();
             if (!ok) return toast('The ad didn’t finish, so no extra time this round.');
+            if (rankUp) clearTimeout(rankUp);
             sheet.close();
             rush.continued = true;
             rush.over = false;
