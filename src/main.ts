@@ -1,6 +1,11 @@
 import './styles/fonts.css';
 import './styles/main.css';
 import './styles/game.css';
+import './styles/journey.css';
+import './styles/market.css';
+import './styles/garden.css';
+import './styles/meta.css';
+import './styles/cards-extra.css';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import { installCardSprite } from './art/cards';
@@ -15,7 +20,10 @@ import { nav } from './ui/nav';
 import { albumScreen } from './ui/screens/album';
 import { gameScreen } from './ui/screens/game';
 import { homeScreen } from './ui/screens/home';
+import { gardenScreen } from './ui/screens/garden';
 import { mapScreen } from './ui/screens/map';
+import { marketScreen } from './ui/screens/market';
+import { pathScreen } from './ui/screens/path';
 import { sealsScreen } from './ui/screens/seals';
 import { settingsScreen } from './ui/screens/settings';
 import { welcomeScreen } from './ui/screens/welcome';
@@ -27,6 +35,9 @@ nav.settings = () => show(settingsScreen());
 nav.welcome = () => show(welcomeScreen());
 nav.map = () => show(mapScreen());
 nav.seals = () => show(sealsScreen());
+nav.market = () => show(marketScreen());
+nav.garden = () => show(gardenScreen());
+nav.path = () => show(pathScreen());
 
 async function boot() {
   await loadSave();

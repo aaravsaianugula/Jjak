@@ -9,4 +9,7 @@ export const nav = {
   welcome: (): void => {},
   map: (): void => {},
   seals: (): void => {},
+  market: (_tab?: string): void => {},
+  garden: (): void => {},
+  path: (): void => {},
 };

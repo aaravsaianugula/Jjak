@@ -6,6 +6,7 @@ import { type LevelSpec, RUSH, chapterOf, dailyTheme, journeyLevel, rushLevel, z
 import { COMBO_WINDOW_MS, FEVER_MS, Session, formatTime } from '../../engine/session';
 import { type Yaku, possibleYaku } from '../../engine/yaku';
 import { checkSeals, type Seal } from '../../services/achievements';
+import { emit } from '../../services/events';
 import { ads } from '../../services/ads';
 import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
@@ -718,6 +719,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
     sfx.match(res.combo);
     haptic.medium();
+    emit('pair', { mode: spec.mode, cards: res.cards, combo: res.combo, fever: res.fever, yaku: res.yaku.map((y) => y.id), session });
     showCombo(res.combo);
     if (res.feverStarted) startFever(res.a, res.b);
     if (res.yaku.length) showYaku(res.yaku);
@@ -878,6 +880,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const finishRun = async (again: boolean) => {
       sheet.close();
       const sum = recordRush(score, rush.round + 1, rush.pairs, rush.bestCombo);
+      emit('rush', { score, rounds: rush.round + 1, pairs: rush.pairs, bestCombo: rush.bestCombo });
       const won = checkSeals();
       if (sum.petals) toast(`+${sum.petals} petals${won.length ? ` · Seal earned: ${won.map((w) => w.title).join(', ')}` : ''}`);
       else if (won.length) toast(`Seal earned: ${won.map((w) => w.title).join(', ')}`);
@@ -961,6 +964,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (!m) return;
     save.hints--;
     persist();
+    emit('tool', { kind: 'hint', mode: spec.mode });
     hintCells = m;
     m.forEach((i) => cardEls.get(i)?.classList.add('is-hint'));
     sfx.hint();
@@ -973,6 +977,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (!(await acquire('shuffle'))) return;
     save.shuffles--;
     persist();
+    emit('tool', { kind: 'shuffle', mode: spec.mode });
     clearHint();
     select(cardEls.get(session.selected), false);
     session.shuffle();
@@ -1151,6 +1156,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     await wait(900);
     const papersBefore = completedMonths().length;
     const summary = recordClear(session);
+    emit('clear', { session, summary });
     const seals = checkSeals();
     showResult(summary, seals, completedMonths().length > papersBefore);
   }
@@ -1580,6 +1586,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     void intro(introMs).then(() => {
       session.startedAt = performance.now();
       paused = false;
+      emit('start', { session });
       startTutorial();
     });
   });

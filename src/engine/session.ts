@@ -22,6 +22,8 @@ export type TapResult =
       kind: 'match';
       a: number;
       b: number;
+      /** the two card ids that were paired */
+      cards: [number, number];
       path: Point[];
       combo: number;
       gained: number;
@@ -120,6 +122,7 @@ export class Session {
   }
 
   private applyMatch(a: number, b: number, path: Point[], now: number): TapResult {
+    const cards: [number, number] = [this.board.cells[a], this.board.cells[b]];
     this.cleared.add(this.board.cells[a]);
     this.cleared.add(this.board.cells[b]);
     this.board.cells[a] = EMPTY;
@@ -168,7 +171,7 @@ export class Session {
         reshuffled = true;
       }
     }
-    return { kind: 'match', a, b, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, fever, feverStarted, yaku };
+    return { kind: 'match', a, b, cards, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, fever, feverStarted, yaku };
   }
 
   /** Uncover snowy cards that now touch an empty cell (or the board edge). */

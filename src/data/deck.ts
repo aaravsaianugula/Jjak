@@ -101,8 +101,27 @@ export const MONTHS: MonthDef[] = [
   },
 ];
 
-export const cardDef = (id: number): CardDef => MONTHS[id >> 2].cards[id & 3];
-export const monthDef = (id: number): MonthDef => MONTHS[id >> 2];
+/**
+ * Bonus cards (보너스패). Modern Korean Hwatu decks add a couple of bonus cards;
+ * here they are a 13th "suit" of two lucky cards that pair with each other
+ * (month index 12, so `id >> 2 === 12` and the normal same-month rule applies).
+ * They are not part of the 48-card album total.
+ */
+export const BONUS_IDS = [48, 49] as const;
+export const isBonus = (id: number): boolean => id >= 48;
+export const BONUS_MONTH: MonthDef = {
+  index: 12, key: 'bonus', en: 'Bonus', ko: '보너스', koRoman: 'boneoseu', ja: 'おまけ', jaKana: 'おまけ', jaRoman: 'omake', koMonth: 0,
+  note: 'Korean Hwatu decks usually come with a few extra bonus cards. They aren\'t tied to a month. Here, the two lucky cards pair with each other and bring a small gift.',
+  cards: [
+    { kind: 'plain', en: 'Lucky double', ko: '쌍피', ja: 'ふだ' },
+    { kind: 'plain', en: 'Lucky triple', ko: '쓰리피', ja: 'ふだ' },
+    { kind: 'plain', en: 'Lucky double', ko: '쌍피', ja: 'ふだ' },
+    { kind: 'plain', en: 'Lucky triple', ko: '쓰리피', ja: 'ふだ' },
+  ],
+};
+
+export const cardDef = (id: number): CardDef => (isBonus(id) ? BONUS_MONTH.cards[id & 3] : MONTHS[id >> 2].cards[id & 3]);
+export const monthDef = (id: number): MonthDef => (isBonus(id) ? BONUS_MONTH : MONTHS[id >> 2]);
 export const ALL_CARD_IDS = Array.from({ length: 48 }, (_, i) => i);
 
 export const KIND_LABEL: Record<CardKind, { en: string; ko: string; ja: string }> = {

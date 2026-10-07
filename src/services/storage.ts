@@ -1,5 +1,8 @@
 import { Preferences } from '@capacitor/preferences';
 import { ECONOMY } from '../config';
+import { type JourneySave, defaultJourney, hydrateJourney } from './save-journey';
+import { type MarketSave, defaultMarket, hydrateMarket } from './save-market';
+import { type MetaSave, defaultMeta, hydrateMeta } from './save-meta';
 
 export type Theme = 'auto' | 'paper' | 'ink';
 
@@ -61,6 +64,10 @@ export interface SaveData {
   /** 7-day gift calendar: next day index (0–6) and the date it was last claimed */
   gift: { day: number; lastClaim: string | null };
   seenTips: string[];
+  /** feature slices — each owns its own file (save-*.ts) */
+  journey: JourneySave;
+  market: MarketSave;
+  meta: MetaSave;
 }
 
 const KEY = 'jjak.save.v1';
@@ -87,6 +94,9 @@ export const defaultSave = (): SaveData => ({
   rush: { best: 0, runs: 0, bestRound: 0 },
   gift: { day: 0, lastClaim: null },
   seenTips: [],
+  journey: defaultJourney(),
+  market: defaultMarket(),
+  meta: defaultMeta(),
 });
 
 /** Merge stored data over defaults so new fields appear after app updates. */
@@ -105,6 +115,9 @@ function hydrate(raw: unknown): SaveData {
     rush: { ...base.rush, ...(r.rush ?? {}) },
     gift: { ...base.gift, ...(r.gift ?? {}) },
     reminder: { ...base.reminder, ...(r.reminder ?? {}) },
+    journey: hydrateJourney(r.journey),
+    market: hydrateMarket(r.market),
+    meta: hydrateMeta(r.meta),
   };
 }
 

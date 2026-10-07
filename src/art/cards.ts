@@ -6,6 +6,7 @@
  * Each month's flower motif is its own symbol (`motif-${m}`); the card symbols
  * reference it with <use>, so the detailed motif markup exists only once.
  */
+import { foilOverlay } from './styles';
 import { MONTHS, cardDef, type CardDef } from '../data/deck';
 import { SPECIALS, renderParts, CURTAIN_D, taper, smooth, curve, lin, blade, rng, type Pt } from './specials';
 
@@ -880,7 +881,12 @@ export function installCardSprite(): void {
   document.body.prepend(svg);
 }
 
-export const cardSvg = (id: number | 'back' | 'snow', cls = 'card-art') =>
-  `<svg class="${cls}" viewBox="0 0 100 140" aria-hidden="true"><use href="#card-${id}"/></svg>`;
+export interface CardSvgOptions {
+  /** gold-leaf (foil) edition: adds the gilding overlay (see src/art/styles.ts) */
+  foil?: boolean;
+}
 
-export const monthName = (id: number) => MONTHS[id >> 2].en;
+export const cardSvg = (id: number | 'back' | 'snow', cls = 'card-art', opts: CardSvgOptions = {}) =>
+  `<svg class="${cls}${opts.foil ? ' is-foil' : ''}" viewBox="0 0 100 140" aria-hidden="true"><use href="#card-${id}"/>${opts.foil ? foilOverlay() : ''}</svg>`;
+
+export const monthName = (id: number) => (id >= 48 ? 'Bonus' : MONTHS[id >> 2].en);
