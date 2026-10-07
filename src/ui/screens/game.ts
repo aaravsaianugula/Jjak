@@ -25,6 +25,9 @@ import { showHowToPlay } from './settings';
 import { boardReport } from '../../services/meta';
 import { pathResult, rankUpMoment } from './path';
 import { nav } from '../nav';
+import { MARKET_PAPER_IDS } from '../../data/market';
+import { activeBrush, activeFx } from '../../services/market';
+import { brushStroke, burstFx } from '../brush-fx';
 
 const MARGIN = 0.32; // outer lane for paths, in card widths
 const ASPECT = 1.4; // card height / width
@@ -173,6 +176,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     html: paperMonth >= 0 ? `<svg viewBox="0 0 100 140"><use href="#motif-${paperMonth}"/></svg>` : '',
   });
   if (paperMonth >= 0) paper.style.setProperty('--paper-tint', MONTH_TINTS[paperMonth]);
+  if (MARKET_PAPER_IDS.includes(save.paper)) paper.classList.add('paper--market', `paper--${save.paper}`);
   const paths = document.createElementNS(SVG_NS, 'svg');
   paths.classList.add('paths');
   paths.setAttribute('aria-hidden', 'true');
@@ -287,6 +291,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const P = pts.map((p) => ({ x: xOf(p.c), y: yOf(p.r) }));
     const n = P.length;
     if (n < 2) return;
+    // Market brushes (the default ink below is unchanged).
+    if (activeBrush() !== 'ink') return brushStroke(paths, P, activeBrush(), { cw, uid: `ink-${gid}-${++strokeSeq}`, width: board.clientWidth, height: board.clientHeight, still: reducedMotion() });
     const dirs: { x: number; y: number }[] = [];
     const lens: number[] = [];
     let L = 0;
@@ -434,6 +440,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   function petals(cell: number) {
     if (reducedMotion()) return;
     const { x, y } = cellXY(cell);
+    // Market effects (the default blossom below is unchanged).
+    if (activeFx() !== 'blossom') return void burstFx(board, x, y, activeFx(), { cw });
     const colors = ['#e3a5b0', '#d98a98', '#c4472f', '#e6c27a', '#f2d4da'];
     for (let k = 0; k < 7; k++) {
       const ink = k >= 5;
@@ -1284,7 +1292,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       const l = summary.lantern;
       stagger(frag(`<div class="lantern"><span class="lantern__icon" aria-hidden="true">${ICONS.lantern}</span><span><b>Lantern gift</b><br><span class="muted">+${l.petals} petals${l.hints ? ' · +1 hint' : ''}${l.shuffles ? ' · +1 shuffle' : ''}</span></span></div>`));
     }
-    if (newPaper) stagger(frag(`<p class="unlock">A flower is complete — a new board paper is ready in Settings.</p>`));
+    if (newPaper) stagger(frag(`<p class="unlock">A flower is complete — a new board paper is ready in the Market.</p>`));
     // Flower Path: XP, the rank bar and any missions this board completed.
     const fp = boardReport(session);
     if (fp && (fp.xp > 0 || fp.missions.length || fp.tea || fp.foil != null)) stagger(pathResult(fp, rewardAt));

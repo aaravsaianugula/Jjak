@@ -329,7 +329,7 @@ let currentBack = 'classic';
  */
 export function applyCardBack(id: string): void {
   const key = BACK_ART[id] ? id : 'classic';
-  document.documentElement.dataset.back = key;
+  document.documentElement.dataset.cardBack = key;
   if (!document.getElementById('card-sprite')) installCardSprite();
   if (key === currentBack) return;
   const sym = document.getElementById('card-back');

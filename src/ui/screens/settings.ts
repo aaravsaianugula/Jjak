@@ -1,7 +1,5 @@
-import { MONTH_TINTS } from '../../art/cards';
-import { MONTHS } from '../../data/deck';
-import { completedMonths } from '../../services/progress';
 import { APP_VERSION, LINKS } from '../../config';
+import { applyCosmetics, paperName } from '../../services/market';
 import { ads } from '../../services/ads';
 import { store } from '../../services/store';
 import { music } from '../../services/music';
@@ -68,12 +66,11 @@ export function settingsScreen(): Screen {
     </div>
   </section>`);
 
-  const paperName = () => (save.paper === 'plain' ? 'Plain hanji' : `${MONTHS[Number(save.paper)].en} paper`);
   const sync = () => {
     el.querySelectorAll<HTMLElement>('[data-remind]').forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.remind === (save.reminder.hour == null ? 'off' : String(save.reminder.hour)))),
     );
-    el.querySelector('[data-paper-name]')!.textContent = paperName();
+    el.querySelector('[data-paper-name]')!.textContent = `${paperName()} · choose in the Market`;
     el.querySelectorAll<HTMLElement>('[data-toggle]').forEach((b) => {
       const k = b.dataset.toggle as 'sound' | 'music' | 'haptics';
       b.setAttribute('aria-checked', String(save.settings[k]));
@@ -84,7 +81,7 @@ export function settingsScreen(): Screen {
 
   el.addEventListener('click', async (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest('[data-back]')) return nav.home();
+    if (t.closest('button[data-back]')) return nav.home();
     const tog = t.closest<HTMLElement>('[data-toggle]');
     if (tog) {
       const k = tog.dataset.toggle as 'sound' | 'music' | 'haptics';
@@ -123,10 +120,8 @@ export function settingsScreen(): Screen {
       toast(owned ? 'Purchase restored. Ads are off.' : 'No purchase found for this Google account.');
       if (owned) nav.settings();
     }
-    if (act === 'paper') {
-      await pickPaper();
-      sync();
-    }
+    // The paper picker lives in the Market now.
+    if (act === 'paper') return nav.market('papers');
     if (act === 'consent') await ads.showPrivacyOptions();
     if (act === 'reset') {
       const ok = await choose('Reset all progress?', 'Levels, stars, petals, streaks and your album will be erased. This can’t be undone.', [
@@ -135,6 +130,7 @@ export function settingsScreen(): Screen {
       ]);
       if (ok === 'yes') {
         await resetSave();
+        applyCosmetics();
         toast('Progress reset');
         nav.home();
       }
@@ -162,35 +158,4 @@ export function showHowToPlay(): void {
   content.append(btn);
   const s = openSheet(content, { label: 'How to play', close: true });
   btn.addEventListener('click', () => s.close());
-}
-
-/** Board papers: one per flower, unlocked by collecting all four of its cards. */
-function pickPaper(): Promise<void> {
-  const done = new Set(completedMonths());
-  const swatch = (key: string, name: string, tint: string, motif: number, locked: boolean) => `
-    <button class="swatch ${save.paper === key ? 'is-on' : ''}" data-paper="${key}" ${locked ? 'disabled' : ''} aria-pressed="${save.paper === key}" aria-label="${esc(name)}${locked ? ', locked. Collect all four cards of this flower' : ''}">
-      <span class="swatch__face" style="--paper-tint:${tint}">${motif >= 0 ? `<svg class="swatch__motif" viewBox="0 0 100 140" aria-hidden="true"><use href="#motif-${motif}"/></svg>` : ''}${save.paper === key ? `<span class="swatch__check" aria-hidden="true">${ICONS.check}</span>` : ''}</span>
-      <span class="swatch__name">${esc(name)}</span>
-      ${locked ? '<span class="swatch__lock" aria-hidden="true">Collect all 4</span>' : ''}
-    </button>`;
-  const content = frag(`<div>
-    <div class="sheet__head">
-      <div class="detail__kind">Board paper · ${done.size + 1} of 13 unlocked</div>
-      <h2>Choose a paper</h2>
-      <p class="muted">Collect all four cards of a flower in the Album to unlock its paper.</p>
-    </div>
-    <div class="swatches">
-      ${swatch('plain', 'Plain hanji', 'transparent', -1, false)}
-      ${MONTHS.map((m) => swatch(String(m.index), m.en, MONTH_TINTS[m.index], m.index, !done.has(m.index))).join('')}
-    </div>
-  </div>`);
-  const sheet = openSheet(content, { label: 'Board paper', close: true });
-  content.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-paper]');
-    if (!b || b.disabled) return;
-    save.paper = b.dataset.paper!;
-    persist();
-    sheet.close();
-  });
-  return sheet.closed;
 }
