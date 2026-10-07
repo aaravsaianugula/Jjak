@@ -1,0 +1,971 @@
+/* ───────────────────────────── Demo player ─────────────────────────────
+   A mini board in the real card art, played by a soft ink brush (src/ui/demo.ts).
+   Used by the first-minute intro, the mechanic intros and How to Play. */
+.demo {
+  --demo-h: min(46vh, 320px);
+  --demo-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --demo-miss: #a4553f;
+  --bamboo: #6f7f3c;
+  --bamboo-dark: #46521f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+:root[data-theme='ink'] .demo,
+:root[data-theme='dark'] .demo {
+  --demo-miss: #d48c74;
+  --bamboo: #8fa257;
+  --bamboo-dark: #5c6a2c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .demo {
+    --demo-miss: #d48c74;
+    --bamboo: #8fa257;
+    --bamboo-dark: #5c6a2c;
+  }
+}
+.demo--stage {
+  --demo-h: min(54vh, 440px);
+  gap: 14px;
+}
+.demo--tile {
+  --demo-h: 112px;
+  gap: 6px;
+}
+.demo__frame {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.demo__board {
+  position: relative;
+  width: min(100%, calc(var(--demo-h) * var(--ar, 1)));
+  aspect-ratio: var(--ar, 1);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line-soft);
+  transition: opacity 260ms ease;
+  touch-action: manipulation;
+}
+.demo--tile .demo__board {
+  border-radius: 10px;
+}
+.demo__board.is-fading {
+  opacity: 0;
+}
+
+/* Cards */
+.demo__card {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  border-radius: 7%/5%;
+  box-shadow: var(--card-shadow);
+  transition:
+    left 440ms cubic-bezier(0.3, 0.7, 0.35, 1.12),
+    top 440ms cubic-bezier(0.3, 0.7, 0.35, 1.12),
+    transform 220ms cubic-bezier(0.3, 1.4, 0.5, 1),
+    opacity 200ms ease;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+.demo.is-turn .demo__card {
+  cursor: pointer;
+}
+.demo__card svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.demo__card::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 10%/7%;
+  border: 2.5px solid transparent;
+  pointer-events: none;
+  transition: border-color 140ms;
+}
+.demo--tile .demo__card::after {
+  inset: -2px;
+  border-width: 1.5px;
+}
+.demo__card:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  z-index: 4;
+}
+.demo__card.is-selected {
+  z-index: 3;
+  transform: translateY(-5%) scale(1.06);
+}
+.demo__card.is-selected::after {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.demo__card.is-mark::after,
+.demo__card.is-hint::after {
+  border-color: var(--gold);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--gold) 40%, transparent);
+  animation: demo-breathe 1.5s ease-in-out infinite;
+}
+.demo__card.is-hint:not(.is-selected) {
+  animation: demo-bob 1.5s ease-in-out infinite;
+}
+@keyframes demo-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes demo-bob {
+  50% {
+    transform: translateY(-4%);
+  }
+}
+.demo__card.is-shake {
+  animation: demo-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+.demo__card.is-shake::after {
+  animation: demo-miss 700ms ease-out;
+}
+@keyframes demo-shake {
+  15% {
+    transform: translateX(-6%) rotate(-1.5deg);
+  }
+  35% {
+    transform: translateX(5%) rotate(1deg);
+  }
+  55% {
+    transform: translateX(-3%);
+  }
+  75% {
+    transform: translateX(1.5%);
+  }
+}
+@keyframes demo-miss {
+  0%,
+  40% {
+    border-color: var(--demo-miss);
+    border-style: dashed;
+  }
+  100% {
+    border-color: transparent;
+  }
+}
+.demo__card.is-nudge {
+  animation: demo-nudge 360ms ease;
+}
+@keyframes demo-nudge {
+  40% {
+    transform: translateY(3%) scale(0.97);
+  }
+}
+.demo__card.is-gone {
+  z-index: 4;
+  pointer-events: none;
+  animation: demo-flutter 460ms cubic-bezier(0.45, 0, 0.7, 1) forwards;
+}
+.demo__card.is-gone::after {
+  border-color: transparent;
+  box-shadow: none;
+}
+@keyframes demo-flutter {
+  0% {
+    opacity: 1;
+    transform: translateY(-5%) scale(1.06);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-9%) rotate(-2deg) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(400px) translate(12%, -26%) rotate(12deg) rotateY(30deg) scale(0.6, 0.5);
+  }
+}
+.demo__card.is-flip {
+  animation: demo-flip 420ms ease-in-out;
+}
+@keyframes demo-flip {
+  50% {
+    transform: perspective(400px) rotateY(90deg) scale(0.96);
+  }
+}
+.demo__card.is-sliding {
+  z-index: 2;
+}
+.demo__card.is-lucky {
+  background: linear-gradient(160deg, #fbf3e2, color-mix(in srgb, var(--luck, #c99a3e) 24%, #fbf3e2));
+  box-shadow: var(--card-shadow), inset 0 0 0 1.5px color-mix(in srgb, var(--luck, #c99a3e) 70%, transparent);
+}
+.demo__card.is-snow {
+  filter: saturate(0.9);
+}
+
+/* Stones, gates, fences */
+.demo__stone {
+  position: absolute;
+  border-radius: 12%;
+  background: radial-gradient(circle at 35% 30%, #8e877d, #5e5850 70%);
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.25), var(--card-shadow);
+}
+.demo__stone::after {
+  content: '';
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+}
+.demo__gate {
+  position: absolute;
+  filter: drop-shadow(0 3px 4px rgba(40, 20, 5, 0.25));
+  transform-origin: 50% 100%;
+}
+.demo__gate svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.demo__gate.is-open {
+  animation: demo-gate-open 640ms cubic-bezier(0.5, 0, 0.6, 1) forwards;
+}
+@keyframes demo-gate-open {
+  35% {
+    transform: scale(1.06, 1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.15, 1.04);
+    opacity: 0;
+  }
+}
+.demo__fences,
+.demo__ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.demo__fences {
+  z-index: 2;
+}
+.demo__ink {
+  z-index: 5;
+}
+.fence__pole {
+  stroke: var(--bamboo);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.fence__shine {
+  stroke: rgba(255, 255, 255, 0.32);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.fence__node {
+  stroke: var(--bamboo-dark);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+/* Ink: the game's brush, slowed a little so it can be read. */
+.demo .ink-reveal {
+  fill: none;
+  stroke: #fff;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: demo-reveal 360ms cubic-bezier(0.5, 0.05, 0.35, 1) both;
+}
+@keyframes demo-reveal {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.demo .ink-wash {
+  fill: none;
+  stroke: var(--path);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.1;
+  animation:
+    demo-reveal 360ms cubic-bezier(0.5, 0.05, 0.35, 1) both,
+    demo-wash 1000ms ease-out forwards;
+}
+@keyframes demo-wash {
+  0%,
+  45% {
+    opacity: 0.1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo .ink-soak {
+  fill: var(--accent);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: demo-soak 820ms ease-out both;
+}
+@keyframes demo-soak {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  22% {
+    opacity: 0.2;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+.demo .ink-body {
+  fill: var(--path);
+}
+.demo .ink-core {
+  animation: demo-ink-fade 1000ms ease-out forwards;
+}
+@keyframes demo-ink-fade {
+  0%,
+  55% {
+    opacity: 0.94;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo .stroke.is-still .ink-reveal,
+.demo .stroke.is-still .ink-wash {
+  animation-name: none, demo-wash;
+  animation-duration: 0ms, 1000ms;
+  stroke-dashoffset: 0;
+}
+.demo .stroke.is-still .ink-reveal {
+  animation: none;
+}
+.demo .stroke.is-still .ink-soak {
+  animation: none;
+}
+.demo .ink-bend {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: demo-bend 1400ms ease-out both;
+}
+.demo .ink-bend circle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.demo .ink-bend.is-over circle {
+  stroke: var(--demo-miss);
+}
+.demo .ink-bend.is-over text {
+  fill: var(--demo-miss);
+}
+.demo .ink-bend text {
+  fill: var(--accent-text);
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 21px;
+}
+@keyframes demo-bend {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  20%,
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo .ghost__line {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
+  animation:
+    demo-reveal 520ms cubic-bezier(0.5, 0.05, 0.35, 1) both,
+    demo-ghost-fade 1700ms ease-out forwards;
+}
+.demo .ghost__x {
+  fill: none;
+  stroke: var(--demo-miss);
+  stroke-width: 9;
+  stroke-linecap: round;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    demo-x 260ms cubic-bezier(0.3, 1.5, 0.5, 1) 520ms both,
+    demo-ghost-fade 1700ms ease-out forwards;
+}
+@keyframes demo-x {
+  from {
+    transform: scale(0.2) rotate(-20deg);
+    opacity: 0;
+  }
+}
+@keyframes demo-ghost-fade {
+  0%,
+  70% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.demo .ghost.is-still .ghost__line,
+.demo .ghost.is-still .ghost__x {
+  animation: demo-ghost-fade 1500ms ease-out forwards;
+}
+
+/* The brush: tip at (left, top), held at a slant. */
+.demo__brush {
+  position: absolute;
+  z-index: 6;
+  aspect-ratio: 40 / 132;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) rotate(24deg);
+  transition:
+    left 320ms cubic-bezier(0.45, 0.05, 0.3, 1),
+    top 320ms cubic-bezier(0.45, 0.05, 0.3, 1),
+    opacity 220ms ease,
+    transform 220ms ease;
+  filter: drop-shadow(-3px 6px 5px rgba(40, 20, 5, 0.28));
+}
+.demo__brush svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.demo__brush.is-on {
+  opacity: 1;
+}
+.demo__brush.is-lift {
+  opacity: 0.55;
+  transform: translate(-50%, -112%) rotate(30deg);
+}
+.demo__brush.is-dab {
+  animation: demo-dab 160ms ease-in-out;
+}
+@keyframes demo-dab {
+  50% {
+    transform: translate(-50%, -94%) rotate(20deg) scale(0.97, 0.93);
+  }
+}
+.brush__handle {
+  fill: #b48a5a;
+  stroke: #6e5232;
+  stroke-width: 1;
+}
+.brush__node {
+  fill: none;
+  stroke: #6e5232;
+  stroke-width: 1.4;
+}
+.brush__ferrule {
+  fill: #a8853f;
+  stroke: #6b5122;
+  stroke-width: 1;
+}
+.brush__hair {
+  fill: #3b342d;
+}
+.brush__ink {
+  fill: var(--path);
+}
+:root[data-theme='ink'] .brush__hair,
+:root[data-theme='dark'] .brush__hair {
+  fill: #5a5047;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .brush__hair {
+    fill: #5a5047;
+  }
+}
+
+/* Caption: two or three words under the board. */
+.demo__cap {
+  margin: 0;
+  min-height: 1.45em;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+  text-align: center;
+}
+.demo--stage .demo__cap {
+  font-size: 23px;
+}
+.demo--tile .demo__cap {
+  display: none;
+}
+.demo__cap.is-new {
+  animation: demo-cap 320ms var(--demo-ease) both;
+}
+@keyframes demo-cap {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+.demo.is-turn .demo__cap {
+  color: var(--accent-text);
+}
+.demo.is-solved .demo__cap {
+  color: var(--good-text);
+}
+
+/* Combo stamp and floats */
+.demo__combo {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 12px 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -60%);
+  opacity: 0;
+  transition: opacity 200ms;
+  white-space: nowrap;
+}
+.demo__combo.is-on {
+  opacity: 1;
+}
+.demo__combo b {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  color: var(--accent-text);
+}
+.demo__combo span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.demo__combo.is-centre {
+  top: 50%;
+  padding: 8px 20px 10px;
+  transform: translate(-50%, -50%) scale(1.5);
+  transition:
+    opacity 200ms,
+    top 420ms var(--demo-ease),
+    transform 420ms var(--demo-ease);
+}
+.demo__combo.is-max b {
+  color: var(--gold-text);
+}
+.demo__combo.is-pop b {
+  animation: demo-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes demo-pop {
+  40% {
+    transform: scale(1.25);
+  }
+}
+.demo--tile .demo__combo {
+  padding: 1px 7px 2px;
+  gap: 3px;
+}
+.demo--tile .demo__combo b {
+  font-size: 11px;
+}
+.demo--tile .demo__combo span {
+  font-size: 9px;
+}
+.demo__float {
+  position: absolute;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 10px 5px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -50%);
+  animation: demo-float 1500ms var(--demo-ease) forwards;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.demo__float b {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--gold-text);
+}
+.demo__float span {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.demo--tile .demo__float {
+  padding: 2px 6px;
+}
+.demo--tile .demo__float b {
+  font-size: 11px;
+}
+.demo--tile .demo__float span {
+  display: none;
+}
+@keyframes demo-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -60%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -110%);
+  }
+}
+.demo__board.is-fever {
+  animation: demo-fever 1600ms ease-out;
+}
+@keyframes demo-fever {
+  0% {
+    box-shadow: inset 0 0 0 1px var(--line-soft);
+  }
+  30% {
+    box-shadow:
+      inset 0 0 0 1.5px color-mix(in srgb, var(--gold) 70%, transparent),
+      0 0 22px 2px color-mix(in srgb, var(--gold) 34%, transparent);
+  }
+  100% {
+    box-shadow: inset 0 0 0 1px var(--line-soft);
+  }
+}
+
+/* Goal chip (the third blossom's goal), filled by the demo's own play */
+.demo__goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--ink-soft);
+  transition: box-shadow 200ms;
+}
+.demo__goal b {
+  color: var(--ink);
+}
+.demo__goal-ico svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  color: var(--line);
+  transition: color 240ms;
+}
+.demo__goal-n {
+  min-width: 2.2em;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.demo__goal.is-met {
+  box-shadow: var(--shadow), inset 0 0 0 1.5px color-mix(in srgb, var(--gold) 70%, transparent);
+}
+.demo__goal.is-met .demo__goal-ico svg {
+  color: var(--accent);
+  animation: demo-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.demo__goal.is-lost .demo__goal-n {
+  color: var(--demo-miss);
+}
+.demo--tile .demo__goal {
+  padding: 2px 8px 2px 5px;
+  gap: 4px;
+  font-size: 10.5px;
+}
+.demo--tile .demo__goal-ico svg {
+  width: 12px;
+  height: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo__card {
+    transition: opacity 200ms ease;
+  }
+  .demo__card.is-selected {
+    transform: none;
+  }
+  .demo__card.is-gone {
+    animation: demo-fade-out 240ms ease forwards;
+  }
+  .demo__card.is-sliding {
+    animation: demo-fade-in 260ms ease;
+  }
+  .demo__card.is-shake,
+  .demo__card.is-nudge,
+  .demo__card.is-flip,
+  .demo__card.is-hint:not(.is-selected) {
+    animation: none;
+  }
+  .demo__card.is-mark::after,
+  .demo__card.is-hint::after {
+    animation: none;
+  }
+  .demo__gate.is-open {
+    animation: demo-fade-out 260ms ease forwards;
+  }
+  .demo__float {
+    animation: demo-fade-out 1500ms steps(1, end) forwards;
+    transform: translate(-50%, -60%);
+  }
+  .demo .ink-bend {
+    animation: demo-fade-out 1400ms steps(1, end) both;
+    opacity: 1;
+  }
+  .demo__cap.is-new,
+  .demo__combo.is-pop b,
+  .demo__board.is-fever,
+  .demo__goal.is-met .demo__goal-ico svg {
+    animation: none;
+  }
+}
+@keyframes demo-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes demo-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ───────────────────────────── First minute (welcome) ───────────────────────────── */
+.welcome {
+  gap: 0;
+}
+.first {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.first__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+}
+.first__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.first__brand .seal {
+  width: 32px;
+  height: 32px;
+  font-size: 17px;
+  transform: rotate(-5deg);
+}
+.first__brand small {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.first__skip {
+  padding: 0 14px;
+}
+.first__demo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.first__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-height: 92px;
+}
+.first__dots {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.first__dots li {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--line);
+  transition:
+    width 260ms var(--ease-out),
+    background 260ms;
+}
+.first__dots li.is-done {
+  background: var(--ink-soft);
+}
+.first__dots li.is-on {
+  width: 22px;
+  background: var(--accent);
+}
+.first__go {
+  max-width: 360px;
+  animation: demo-cap 360ms var(--ease-out) both;
+}
+/* Replayed over another screen: a full-height sheet. */
+.scrim--full {
+  align-items: stretch;
+}
+.sheet.sheet--full {
+  display: flex;
+  max-height: none;
+  height: 100%;
+  border-radius: 0;
+  padding: calc(var(--safe-top) + 8px) 16px calc(var(--safe-bottom) + 16px);
+}
+.scrim--full .sheet--full::before {
+  display: none;
+}
+
+/* ───────────────────────────── Intro sheet ───────────────────────────── */
+.intro-sheet h2 {
+  margin-top: 2px;
+}
+.intro-sheet__demo {
+  margin: 16px 0 4px;
+}
+.intro-sheet__line {
+  margin: 4px 0 0 !important;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-wrap: balance;
+}
+.intro-sheet + .sheet__actions,
+.sheet .intro-sheet ~ .sheet__actions {
+  margin-top: 16px;
+}
+.intro-sheet__again {
+  align-self: center;
+}
+.intro-sheet__again svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ───────────────────────────── How to play ───────────────────────────── */
+.howto__tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 0;
+}
+.howto__tile {
+  margin: 0;
+  padding: 10px 8px 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+.howto__tile--wide {
+  grid-column: 1 / -1;
+}
+.howto__tile .demo {
+  width: 100%;
+}
+.howto__tile .demo__board {
+  background: transparent;
+  box-shadow: none;
+}
+.howto__tile figcaption {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.howto__more {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 4px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.howto__more li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+.howto__more li + li {
+  border-top: 1px solid var(--line-soft);
+}
+.howto__more b {
+  display: block;
+  font-size: 15px;
+  color: var(--ink);
+}
+.howto__glyph {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 18px;
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1.25px color-mix(in srgb, var(--accent) 40%, transparent);
+}
