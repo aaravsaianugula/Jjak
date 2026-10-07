@@ -675,6 +675,9 @@ button.panel:active {
 .paths {
   position: absolute;
   inset: 0;
+  /* An absolutely placed <svg> keeps its 300×150 default unless sized. */
+  width: 100%;
+  height: 100%;
   overflow: visible;
   pointer-events: none;
   z-index: 5;
