@@ -6,9 +6,10 @@
  * Each month's flower motif is its own symbol (`motif-${m}`); the card symbols
  * reference it with <use>, so the detailed motif markup exists only once.
  */
-import { foilOverlay } from './styles';
-import { MONTHS, cardDef, type CardDef } from '../data/deck';
+import { foilOverlay, foilDefs } from './styles';
+import { MONTHS, cardDef, isBonus, type CardDef } from '../data/deck';
 import { SPECIALS, renderParts, CURTAIN_D, taper, smooth, curve, lin, blade, rng, type Pt } from './specials';
+import { BONUS_TINT, bonusArt, bonusChip, bonusFrame, bonusTag } from './bonus';
 
 export const INK = '#2a2724';
 const PAPER = '#f7f1e6';
@@ -596,42 +597,64 @@ const STYLES: MonthStyle[] = [
       );
     },
   },
-  // 12 · Paulownia: three flower spikes rising over three broad heart leaves
+  // 12 · Paulownia: the kiri crest (五七桐) as a plant. Three broad heart-shaped
+  // leaves fan out below; three upright stalks carry 5, 7 and 5 trefoil florets.
   {
     tint: '#efdfb4',
     draw: () => {
-      const bell = (x: number, y: number, side: number, s: number) =>
+      const stalk = '#6b5636';
+      // one floret: a lavender bell with a three-lobed mouth, on a brown calyx
+      const floret = (x: number, y: number, a: number, s: number) =>
         G(
-          `translate(${f(x)} ${f(y)}) scale(${f(side * s)} ${f(s)}) rotate(18)`,
-          P('M0 -1.6C2.4 -2.6 5 -2.6 6.6 -2.8L7.2 .2C7 2.4 5.6 3 4 2.6C2.6 2.2 1 2 0 1.6Z', '#b996c4') +
-            P('M5 -2.6C6.4 -2.8 7.4 -1.6 7.4 .2C7.2 2 6 2.8 4.8 2.6C5.6 1 5.6 -1 5 -2.6Z', '#7d5689') +
-            S('M1.6 -1.2C3 -1.6 4.4 -1.8 5.6 -1.8', '#e8d6ee', 0.4) +
-            C(0, 0, 1.3, '#9b7748'),
+          `translate(${f(x)} ${f(y)}) rotate(${f(a)}) scale(${f(s)})`,
+          P('M-1.5 -1C-2.3 -3.6 -3.9 -5.6 -4.1 -7.7C-4.2 -9.5 -2.8 -10.2 -1.7 -9.4C-1.3 -11 1.3 -11 1.7 -9.4C2.8 -10.2 4.2 -9.5 4.1 -7.7C3.9 -5.6 2.3 -3.6 1.5 -1Z', '#a88bc8') +
+            P('M0 -1.2C1.4 -3.6 2.6 -6 2.8 -8.4C3.4 -9.8 4.3 -9.2 4.1 -7.7C3.9 -5.6 2.3 -3.6 1.5 -1Z', '#7f5f9e') +
+            P('M-1.2 -8.6C-.8 -9.9 .8 -9.9 1.2 -8.6C.9 -7.4 -.9 -7.4 -1.2 -8.6Z', '#f3e8f6', O(0.85)) +
+            S('M0 -2.4V-6.6', '#e9dcf0', 0.4, O(0.6)) +
+            E(0, -0.4, 1.7, 1.5, '#8a6a3c') +
+            E(-0.5, -0.8, 0.7, 0.5, '#b08d58', O(0.8)),
         );
-      const spike = (x: number, top: number, n: number) => {
-        let s = S(`M${x} 108L${x} ${top}`, '#7d5f3c', 1.6);
-        for (let i = 0; i < 3; i++) s += E(x + (i - 1) * 2.2, top - 2 + Math.abs(i - 1) * 1.6, 1.5, 2, '#a88350');
-        for (let i = 0; i < n; i++) {
-          const y = top + 3 + i * 6.6;
-          const sz = 0.82 + (i / n) * 0.3;
-          s += S(`M${x} ${f(y)}l-3 1.4M${x} ${f(y)}l3 1.4`, '#7d5f3c', 0.6);
-          s += bell(x - 2.2, y + 1.2, -1, sz) + bell(x + 2.2, y + 1.2, 1, sz);
-          if (i > 1 && i % 2 === 0) s += bell(x - 0.6, y + 4, 1, sz * 0.8);
+      // a stalk with its florets: one at the tip and pairs below it
+      const raceme = (x: number, base: number, top: number, pairs: number, bend: number, sz: number) => {
+        const pts: Pt[] = [[x + bend, base], [x + bend * 0.35, base - (base - top) * 0.45], [x, top]];
+        let s = P(taper(pts, lin(1.9, 0.9)), stalk);
+        const fl: string[] = [floret(x, top + 1, 0, sz * 1.05)];
+        for (let k = 0; k < pairs; k++) {
+          const y = top + 7.4 + k * 8.4;
+          const side = k % 2 ? 1 : -1;
+          s += S(`M${x} ${f(y + 1.6)}l-3.4 -1.6M${x} ${f(y + 1.6)}l3.4 -1.6`, stalk, 0.7);
+          fl.push(floret(x - 3.6, y, -42 + side * 4, sz), floret(x + 3.6, y, 42 + side * 4, sz));
         }
-        return s;
+        return s + fl.reverse().join('');
       };
-      const heart = (cx: number, cy: number, s: number, rot: number) => {
-        const d = `M${cx} ${cy + 15 * s}C${cx - 24 * s} ${cy + 1 * s} ${cx - 15 * s} ${cy - 17 * s} ${cx} ${cy - 6 * s}C${cx + 15 * s} ${cy - 17 * s} ${cx + 24 * s} ${cy + 1 * s} ${cx} ${cy + 15 * s}Z`;
-        const half = `M${cx} ${cy + 15 * s}C${cx + 24 * s} ${cy + 1 * s} ${cx + 15 * s} ${cy - 17 * s} ${cx} ${cy - 6 * s}Z`;
-        let v = `M${cx} ${f(cy + 13 * s)}L${cx} ${f(cy - 5 * s)}`;
-        for (const k of [-1, 1]) {
-          v += `M${cx} ${f(cy + 8 * s)}q${f(k * 6 * s)} ${f(-1 * s)} ${f(k * 12 * s)} ${f(-6 * s)}`;
-          v += `M${cx} ${f(cy + 3 * s)}q${f(k * 5 * s)} ${f(-2 * s)} ${f(k * 9 * s)} ${f(-9 * s)}`;
-          v += `M${cx} ${f(cy - 1 * s)}q${f(k * 3 * s)} ${f(-2 * s)} ${f(k * 5 * s)} ${f(-7 * s)}`;
-        }
-        return G(`rotate(${rot} ${cx} ${cy})`, P(d, '#47683f') + P(half, '#36552f') + S(v, '#86a674', 0.6, O(0.85)));
-      };
-      return spike(30, 48, 8) + spike(50, 28, 11) + spike(70, 48, 8) + heart(27, 112, 1.05, -26) + heart(73, 112, 1.05, 26) + heart(50, 119, 1.12, 0);
+      // a broad heart-shaped leaf hanging from (0,0), tip pointing down, with palmate veins
+      const leafD = (() => {
+        const half: Pt[] = [[0, 3], [3, -1.6], [8, -2.4], [13.4, 1], [16, 7.4], [15.4, 14], [12.6, 19.6], [8.4, 25], [4, 30], [0, 35]];
+        const R = smooth(half, 4);
+        const pt = ([px, py]: Pt) => `${f(px)} ${f(py)}`;
+        return {
+          full: `M${R.map(pt).join('L')}L${R.slice().reverse().map(([px, py]) => pt([-px, py])).join('L')}Z`,
+          right: `M${R.map(pt).join('L')}Z`,
+        };
+      })();
+      const veins =
+        'M0 2.6Q.4 18 0 33' +
+        'M0 4Q6 2 11.6 3.4M0 5.4Q8 8 13.4 11.6M0 8Q6.4 15 9.6 21.4M0 13Q3.6 20 5 26.6' +
+        'M0 4Q-6 2 -11.6 3.4M0 5.4Q-8 8 -13.4 11.6M0 8Q-6.4 15 -9.6 21.4M0 13Q-3.6 20 -5 26.6' +
+        'M6 3.2l1.4 2.4M10 6.4l.4 3M8 14.6l2.4 .6M-6 3.2l-1.4 2.4M-10 6.4l-.4 3M-8 14.6l-2.4 .6';
+      const kiri = (x: number, y: number, a: number, s: number, fill: string, shade: string) =>
+        G(`translate(${x} ${y}) rotate(${a}) scale(${s})`, P(leafD.full, fill) + P(leafD.right, shade) + S(veins, '#93ad7c', 0.45, O(0.85)) + S('M0 3L0 -2', '#4a5a2e', 1));
+      return (
+        // stalks rise from behind the leaves
+        raceme(26.6, 88, 32, 2, 15, 1.12) +
+        raceme(73.4, 88, 34, 2, -14, 1.12) +
+        raceme(50, 90, 19, 3, 0, 1.12) +
+        // the three leaves: the two side ones first, the centre one in front
+        kiri(47, 84, 60, 1.22, '#4c6d41', '#3c5a33') +
+        kiri(53, 84, -58, 1.22, '#4c6d41', '#3c5a33') +
+        kiri(50, 86, 2, 1.3, '#56784a', '#44633b') +
+        E(50, 86, 2.4, 1.7, '#4a5a2e')
+      );
     },
   },
 ];
@@ -671,8 +694,17 @@ function ribbon(def: CardDef, month: number): string {
 }
 
 /** Small corner tag naming a special card in kanji (vermilion = bright, gold = animal). */
-function glyphTag(glyph: string, bright: boolean): string {
+function glyphTag(glyph: string, bright: boolean, look?: CardLook): string {
   const ring = bright ? VERMILION : GOLD;
+  if (look?.chip) {
+    const c = look.chip;
+    return (
+      `<rect x="73.6" y="115.6" width="20" height="19" rx="4.5" fill="#000" opacity=".16"/>` +
+      `<rect x="73" y="115" width="20" height="19" rx="4.5" fill="${c.paper}"/>` +
+      `<rect x="74.4" y="116.4" width="17.2" height="16.2" rx="3.4" fill="none" stroke="${ring}" stroke-width="1.1"/>` +
+      `<text x="83" y="128.6" text-anchor="middle" font-size="11" font-family="'Zen Old Mincho', serif" font-weight="600" fill="${c.ink}">${glyph}</text>`
+    );
+  }
   return (
     `<rect x="73.6" y="115.6" width="20" height="19" rx="4.5" fill="#000" opacity=".12"/>` +
     `<rect x="73" y="115" width="20" height="19" rx="4.5" fill="${PAPER}"/>` +
@@ -697,14 +729,30 @@ const cardFinish =
   `<rect x="2.1" y="2.1" width="95.8" height="135.8" rx="7.4" fill="none" stroke="#a58a63" stroke-opacity=".4" stroke-width=".35"/>` +
   `<path d="M48.6 2.1L50 .9L51.4 2.1L50 3.3ZM48.6 137.9L50 136.7L51.4 137.9L50 139.1Z" fill="${VERMILION}" opacity=".42"/>`;
 
+/**
+ * Per-deck-style hooks (see styles.ts). Colours written here should be
+ * UPPERCASE hex: the deck-style painter only rewrites lowercase hex, so these
+ * stay exactly as given.
+ */
+export interface CardLook {
+  /** drawn over the paper panel, under the art */
+  under?: (id: number) => string;
+  /** drawn over the art and the printed finish, under the corner chip */
+  over?: (id: number) => string;
+  /** colours for the corner chip and the kanji tag */
+  chip?: { paper: string; ink: string; edge: string };
+}
+
 /** Full SVG markup (inner) for one card id. */
-export function cardInner(id: number): string {
+export function cardInner(id: number, look?: CardLook): string {
+  if (isBonus(id)) return bonusInner(id, look);
   const month = id >> 2;
   const variant = id & 3;
   const def = cardDef(id);
   const style = STYLES[month];
   const special = SPECIALS[id];
   let bg = cardBase(style.tint);
+  if (look?.under) bg += look.under(id);
   if (special?.back) bg += `<g clip-path="url(#card-clip)">${special.back}</g>`;
 
   // A second plain card is the mirror image, so pairs aren't pixel-identical.
@@ -718,16 +766,38 @@ export function cardInner(id: number): string {
   if (def.kind === 'ribbon') over = ribbon(def, month);
   if (special) {
     over += `<g clip-path="url(#card-clip)">${renderParts(special.parts)}${special.front ?? ''}</g>`;
-    over += glyphTag(special.glyph, def.kind === 'bright');
+    over += glyphTag(special.glyph, def.kind === 'bright', look);
   }
 
   const chipW = month + 1 >= 10 ? 19 : 13.4;
-  const num =
-    `<rect x="6.6" y="7.6" width="${chipW}" height="15" rx="3.8" fill="#000" opacity=".08"/>` +
-    `<rect x="6" y="7" width="${chipW}" height="15" rx="3.8" fill="${PAPER}" opacity=".94"/>` +
-    `<rect x="6.9" y="7.9" width="${f(chipW - 1.8)}" height="13.2" rx="3" fill="none" stroke="${INK}" stroke-opacity=".16" stroke-width=".4"/>` +
-    `<text x="${f(6 + chipW / 2)}" y="18.5" text-anchor="middle" font-size="11" font-family="'Gowun Batang', serif" font-weight="700" fill="${INK}" opacity="0.74">${month + 1}</text>`;
-  return bg + art + over + cardFinish + num;
+  const ch = look?.chip;
+  const num = ch
+    ? `<rect x="6.6" y="7.6" width="${chipW}" height="15" rx="3.8" fill="#000" opacity=".14"/>` +
+      `<rect x="6" y="7" width="${chipW}" height="15" rx="3.8" fill="${ch.paper}"/>` +
+      `<rect x="6.9" y="7.9" width="${f(chipW - 1.8)}" height="13.2" rx="3" fill="none" stroke="${ch.edge}" stroke-width=".45"/>` +
+      `<text x="${f(6 + chipW / 2)}" y="18.5" text-anchor="middle" font-size="11" font-family="'Gowun Batang', serif" font-weight="700" fill="${ch.ink}">${month + 1}</text>`
+    : `<rect x="6.6" y="7.6" width="${chipW}" height="15" rx="3.8" fill="#000" opacity=".08"/>` +
+      `<rect x="6" y="7" width="${chipW}" height="15" rx="3.8" fill="${PAPER}" opacity=".94"/>` +
+      `<rect x="6.9" y="7.9" width="${f(chipW - 1.8)}" height="13.2" rx="3" fill="none" stroke="${INK}" stroke-opacity=".16" stroke-width=".4"/>` +
+      `<text x="${f(6 + chipW / 2)}" y="18.5" text-anchor="middle" font-size="11" font-family="'Gowun Batang', serif" font-weight="700" fill="${INK}" opacity="0.74">${month + 1}</text>`;
+  return bg + art + over + cardFinish + (look?.over ? look.over(id) : '') + num;
+}
+
+/** The two lucky bonus cards (48, 49): see bonus.ts. */
+function bonusInner(id: number, look?: CardLook): string {
+  const b = bonusArt(id);
+  const ch = look?.chip;
+  return (
+    cardBase(BONUS_TINT) +
+    (look?.under ? look.under(id) : '') +
+    `<g clip-path="url(#card-clip)">${b.back}${b.art}</g>` +
+    bonusFrame() +
+    b.front +
+    (ch ? bonusTag(b.tag, ch.paper, ch.ink) : bonusTag(b.tag)) +
+    cardFinish +
+    (look?.over ? look.over(id) : '') +
+    (ch ? bonusChip(ch.paper, '#C4472F', ch.edge) : bonusChip())
+  );
 }
 
 /** A card under snow (First snow levels): pale sky, soft drifts, one crystal. */
@@ -775,8 +845,10 @@ export function cardSnowInner(): string {
   );
 }
 
-/** Large faint flower used as the watermark on board papers. */
-export const MONTH_TINTS = STYLES.map((st) => st.tint);
+/** Panel tint per month (index 12 = the bonus cards). Also the board-paper watermark tints. */
+export const MONTH_TINTS = [...STYLES.map((st) => st.tint), BONUS_TINT];
+/** Paper colour of every card face. */
+export const CARD_PAPER = PAPER;
 
 /** Back of a card (album locked state): indigo seigaiha with a vermilion 짝 seal. */
 export function cardBackInner(): string {
@@ -831,7 +903,7 @@ export function cardBackInner(): string {
 }
 
 /** Shared gradients, patterns and clip paths for every card symbol. */
-function spriteDefs(): string {
+export function spriteDefs(): string {
   const r = rng(3);
   let fib = '';
   for (let i = 0; i < 6; i++) {
@@ -864,6 +936,30 @@ function spriteDefs(): string {
   );
 }
 
+const SNOW_DEFS = /<(linearGradient|radialGradient) id="snow-(?:sky|glow)".*?<\/\1>/g;
+
+/** The month motif markup (unpainted, cached). */
+export const motifMarkup = motif;
+
+/** Every card id that has a face: the 48 month cards and the two lucky cards. */
+export const FACE_IDS = Array.from({ length: 50 }, (_, i) => i);
+
+/**
+ * The deck part of the sprite: shared defs, the 12 motifs and the 50 faces.
+ * `paint` recolours markup (identity for the classic deck); `extraDefs` are
+ * style-specific gradients/patterns, appended unpainted.
+ */
+export function deckSpriteMarkup(paint: (s: string) => string = (s) => s, look?: CardLook, extraDefs = ''): string {
+  const defs = spriteDefs();
+  let painted = paint(defs);
+  // the snow card keeps its own winter colours in every deck, so "covered" always reads the same
+  if (painted !== defs) for (const m of defs.matchAll(SNOW_DEFS)) painted = painted.replace(paint(m[0]), m[0]);
+  let inner = painted + (extraDefs ? `<defs>${extraDefs}</defs>` : '');
+  for (let m = 0; m < 12; m++) inner += `<symbol id="motif-${m}" viewBox="0 0 100 140">${paint(motif(m))}</symbol>`;
+  for (const id of FACE_IDS) inner += `<symbol id="card-${id}" viewBox="0 0 100 140">${paint(cardInner(id, look))}</symbol>`;
+  return inner;
+}
+
 /** Inject the sprite into the document once. */
 export function installCardSprite(): void {
   if (document.getElementById('card-sprite')) return;
@@ -872,11 +968,10 @@ export function installCardSprite(): void {
   svg.id = 'card-sprite';
   svg.setAttribute('aria-hidden', 'true');
   svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
-  let inner = spriteDefs();
-  for (let m = 0; m < 12; m++) inner += `<symbol id="motif-${m}" viewBox="0 0 100 140">${motif(m)}</symbol>`;
-  for (let id = 0; id < 48; id++) inner += `<symbol id="card-${id}" viewBox="0 0 100 140">${cardInner(id)}</symbol>`;
+  let inner = deckSpriteMarkup();
   inner += `<symbol id="card-back" viewBox="0 0 100 140">${cardBackInner()}</symbol>`;
   inner += `<symbol id="card-snow" viewBox="0 0 100 140">${cardSnowInner()}</symbol>`;
+  inner += `<defs id="foil-defs">${foilDefs()}</defs>`;
   svg.innerHTML = inner;
   document.body.prepend(svg);
 }

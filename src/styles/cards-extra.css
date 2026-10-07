@@ -1,0 +1,57 @@
+/* ───────────── Card art extras: gold-leaf foil editions ─────────────
+   The overlay markup comes from foilOverlay() (src/art/styles.ts).
+   Only transform and opacity are animated. */
+
+/* A slow diagonal sheen: it crosses the card in about two seconds, then rests. */
+.is-foil .foil-sheen {
+  animation: foil-sweep 9s cubic-bezier(0.42, 0, 0.3, 1) infinite;
+  will-change: transform;
+}
+@keyframes foil-sweep {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  4% {
+    opacity: 1;
+  }
+  24% {
+    transform: translateX(150px);
+    opacity: 1;
+  }
+  26%,
+  100% {
+    transform: translateX(150px);
+    opacity: 0;
+  }
+}
+
+/* Two small glints that breathe slowly, out of step with the sheen. */
+.is-foil .foil-glint {
+  opacity: 0.25;
+  animation: foil-glint 4.6s ease-in-out infinite;
+}
+@keyframes foil-glint {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-foil .foil-sheen,
+  .is-foil .foil-glint {
+    animation: none;
+  }
+  /* a still, soft sheen resting across the card */
+  .is-foil .foil-sheen {
+    transform: translateX(78px);
+    opacity: 0.55;
+  }
+  .is-foil .foil-glint {
+    opacity: 0.6;
+  }
+}
