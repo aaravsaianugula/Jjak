@@ -16,6 +16,8 @@ import { esc, frag, h, toast } from '../dom';
 import { openSheet } from '../modal';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
+import { GARDEN_ITEMS } from '../../art/garden';
+import { hasAffordableNew, isOwned } from '../../services/market';
 
 /** Last petal total shown on Home, to animate gains. */
 let shownPetals: number | null = null;
@@ -120,6 +122,8 @@ export function homeScreen(): Screen {
       ${tile('zen', 'Zen', 'No clock', '禅', 'Zen, untimed')}
       ${tile('album', 'Album', `${save.album.length}<span class="muted">/48</span>`, '札', `Album, ${save.album.length} of 48 cards`)}
       ${tile('seals', 'Seals', `${save.seals.length}<span class="muted">/${SEALS.length}</span>`, '印', `Seals, ${save.seals.length} of ${SEALS.length} earned`)}
+      ${tile('market', 'Market', 'Spend petals', '市', `Market${hasAffordableNew() ? ', something new you can afford' : ''}`, hasAffordableNew() ? ' has-new' : '')}
+      ${tile('garden', 'Garden', `${GARDEN_ITEMS.filter((g) => isOwned(`garden:${g.id}`)).length}<span class="muted">/${GARDEN_ITEMS.length}</span>`, '庭', `Garden, ${GARDEN_ITEMS.filter((g) => isOwned(`garden:${g.id}`)).length} of ${GARDEN_ITEMS.length} pieces`)}
     </nav>
   </section>`);
 
@@ -136,6 +140,8 @@ export function homeScreen(): Screen {
     if (go === 'gift') openGift(el);
     if (go === 'album') nav.album();
     if (go === 'seals') nav.seals();
+    if (go === 'market') nav.market();
+    if (go === 'garden') nav.garden();
     if (go === 'settings') nav.settings();
   });
   if (pendingGift() && !giftShownThisSession) {

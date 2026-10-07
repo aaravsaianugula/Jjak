@@ -14,6 +14,7 @@ import { store } from './services/store';
 import { haptic } from './services/haptics';
 import { music } from './services/music';
 import { planReminders } from './services/reminders';
+import { applyCosmetics } from './services/market';
 import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
@@ -35,7 +36,7 @@ nav.settings = () => show(settingsScreen());
 nav.welcome = () => show(welcomeScreen());
 nav.map = () => show(mapScreen());
 nav.seals = () => show(sealsScreen());
-nav.market = () => show(marketScreen());
+nav.market = (tab) => show(marketScreen(tab));
 nav.garden = () => show(gardenScreen());
 nav.path = () => show(pathScreen());
 
@@ -43,6 +44,7 @@ async function boot() {
   await loadSave();
   applyTheme();
   installCardSprite();
+  applyCosmetics();
   installWebBannerPreview();
   setBackFallback(() => nav.home());
   let heard = false;
