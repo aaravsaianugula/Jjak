@@ -139,10 +139,10 @@ export function breeze(stage: HTMLElement, dir: Wind, strong = false): void {
 
 // ── Lucky pair ────────────────────────────────────────────────────────
 /** "Lucky! +10 petals" rises from the pair, and a soft gold light washes the stage. */
-export function luckyMoment(stage: HTMLElement, x: number, y: number): void {
+export function luckyMoment(stage: HTMLElement, x: number, y: number, pays = true): void {
   sfx.reveal();
   haptic.success();
-  const f = h('div', { class: 'lucky-float', 'aria-hidden': 'true' }, h('b', {}, 'Lucky!'), h('span', {}, `+${LUCKY_PETALS} petals`));
+  const f = h('div', { class: 'lucky-float', 'aria-hidden': 'true' }, h('b', {}, 'Lucky!'), h('span', {}, pays ? `+${LUCKY_PETALS} petals` : 'a lucky pair'));
   f.style.left = `${x}px`;
   f.style.top = `${y}px`;
   stage.append(f);

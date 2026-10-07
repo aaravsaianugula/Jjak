@@ -23,7 +23,7 @@ import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { music } from '../../services/music';
 import { REMINDER_TIMES, disableReminder, enableReminder, planReminders } from '../../services/reminders';
-import { type ClearSummary, completedMonths, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, type RushRecorded, shareTextFor } from '../../services/progress';
+import { type ClearSummary, completedMonths, luckyPays, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, type RushRecorded, shareTextFor } from '../../services/progress';
 import { store } from '../../services/store';
 import { AD_POLICY } from '../../config';
 import { shareText } from '../../services/share';
@@ -328,6 +328,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   function refreshFaces(flip: boolean) {
+    // Cards re-dealt onto different cells: redraw the board and deal it back in.
+    if (session.relaid) {
+      session.relaid = false;
+      clearHint();
+      renderBoard();
+      deal(0, 14);
+      return;
+    }
     const rm = reducedMotion();
     session.board.cells.forEach((v, i) => {
       const c = cardEls.get(i);
@@ -863,8 +871,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (res.lucky) {
       const p1 = cellXY(res.a);
       const p2 = cellXY(res.b);
-      luckyMoment(stage, board.offsetLeft + (p1.x + p2.x) / 2, board.offsetTop + (p1.y + p2.y) / 2);
-      live(`Lucky pair! Plus ${LUCKY_PETALS} petals when you clear the board.`);
+      // Petals for a lucky pair come with a level's first clear only.
+      const pays = luckyPays(spec.mode, !(save.stars[spec.number] > 0));
+      luckyMoment(stage, board.offsetLeft + (p1.x + p2.x) / 2, board.offsetTop + (p1.y + p2.y) / 2, pays);
+      live(pays ? `Lucky pair! Plus ${LUCKY_PETALS} petals when you clear the board.` : 'Lucky pair!');
     }
     if (res.revealed.length) {
       setTimeout(() => {

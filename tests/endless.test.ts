@@ -280,3 +280,37 @@ describe('pre-generation and rewards', () => {
     expect(again.stamp).toBeUndefined();
   });
 });
+
+describe('review fixes', () => {
+  it('a stored endless spec with a goal or layout this build does not know is generated again, not trusted', () => {
+    const spec = { ...levelPlan(605).spec, number: 605 };
+    const keep = hydrateEndless({ levels: { 605: { spec, target: 0.5, offset: 0, relief: 0, src: 'worker', at: 1 } } });
+    expect(keep.levels[605]).toBeTruthy();
+    for (const bad of [{ goal: 'speed' }, { layout: 'spiral' }]) {
+      const h = hydrateEndless({ levels: { 605: { spec: { ...spec, ...bad }, target: 0.5, offset: 0, relief: 0, src: 'worker', at: 1 } } });
+      expect(h.levels[605]).toBeUndefined();
+    }
+  });
+
+  it('identityOf keeps a level’s own place, shape, mechanics and goal (relief never redraws them)', async () => {
+    const { identityOf } = await import('../src/director/endless-core');
+    const state = defaultEndlessState();
+    const first = endlessIdentity(640, NEUTRAL, state);
+    const spec = first.spec;
+    const again = identityOf(640, spec);
+    expect([again.rows, again.cols]).toEqual([spec.rows, spec.cols]);
+    expect(again.mechanics).toEqual(first.mechanics);
+    expect(again.goal).toBe(first.goal);
+    expect(again.wind).toBe(first.wind);
+  });
+
+  it('honestSpec never promises gates or fences the built board does not have', async () => {
+    const { honestSpec } = await import('../src/engine/levels');
+    for (let k = 0; k < 30; k++) {
+      const s = honestSpec({ ...levelPlan(170).spec, seed: `honest-${k}`, gates: 4, fences: 8 });
+      const b = buildBoard(s);
+      if (s.gates) expect(b.cells.some((v) => v <= -16)).toBe(true);
+      if (s.fences) expect(b.walls).toBeTruthy();
+    }
+  });
+});

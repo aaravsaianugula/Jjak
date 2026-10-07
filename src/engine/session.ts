@@ -215,7 +215,7 @@ export class Session implements PlayState, GoalStats {
       this.finishedAt = now;
     } else if (releaseIfStuck(this, revealed, untied)) {
       // Snow or knots alone never strand you (released above, for free); a true dead end reshuffles.
-      this.board = reshuffle(this.board, this.rng);
+      this.redeal(revealed, untied);
       this.autoShuffles++;
       if (wind && wind !== 'down') this.windShuffles++;
       reshuffled = true;
@@ -235,13 +235,36 @@ export class Session implements PlayState, GoalStats {
    * board (knots untied for the same reason are listed in `lastUntied`).
    */
   shuffle(): number[] {
-    this.board = reshuffle(this.board, this.rng);
     this.selected = -1;
     this.shufflesUsed++;
     const melted: number[] = [];
     this.lastUntied = [];
+    this.redeal(melted, this.lastUntied);
     if (this.hidden.size || this.knots.size) releaseIfStuck(this, melted, this.lastUntied);
     return melted;
+  }
+
+  /**
+   * True after a reshuffle that had to move cards onto different cells (a card
+   * walled in by stones): the screen must redraw the board, not just the faces.
+   */
+  relaid = false;
+
+  /**
+   * Reshuffle the cards. Usually they stay in their cells; if they had to be
+   * re-dealt onto other cells, snow and knots can't follow a card's identity, so
+   * they are released (free, as with any stuck board) and reported.
+   */
+  private redeal(revealed: number[], untied: number[]): void {
+    const before = this.board.cells.map((v) => v >= 0);
+    this.board = reshuffle(this.board, this.rng);
+    this.relaid = this.board.cells.some((v, i) => (v >= 0) !== before[i]);
+    if (this.relaid) {
+      revealed.push(...[...this.hidden].filter((i) => this.board.cells[i] >= 0));
+      untied.push(...[...this.knots].filter((i) => this.board.cells[i] >= 0));
+      this.hidden.clear();
+      this.knots.clear();
+    }
   }
   /** knots untied by the last shuffle() */
   lastUntied: number[] = [];

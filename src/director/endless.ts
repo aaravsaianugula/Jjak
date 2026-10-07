@@ -23,12 +23,12 @@
  */
 import { ROUTE_LEVELS } from '../data/route';
 import { GOAL_IDS, type GoalId } from '../engine/goals';
-import { type LevelSpec, type Mechanic } from '../engine/levels';
+import { type LevelSpec, type Mechanic, honestSpec } from '../engine/levels';
 import { on } from '../services/events';
 import { type EndlessEntry, type EndlessSave, ENDLESS_CAP } from '../services/save-journey';
 import { persist, save } from '../services/storage';
 import { DIRECTOR, targetFor } from './director';
-import { ENDLESS, type EndlessJob, type EndlessResult, type EndlessState, endlessIdentity, makeJob, runEndlessJob, tailorFor } from './endless-core';
+import { ENDLESS, type EndlessJob, type EndlessResult, type EndlessState, endlessIdentity, identityOf, makeJob, runEndlessJob, tailorFor } from './endless-core';
 import { MODEL } from './model';
 import { PARTNERS, levelPlan } from './plan';
 import { playStyle } from './profile';
@@ -203,14 +203,15 @@ async function generate(n: number, relief: number): Promise<LevelSpec> {
   const style = playStyle(save.analytics);
   const tailoring = tailorFor(style, state, sessionBoards());
   const prev = es.levels[n - 1]?.spec ?? null;
-  const plan = endlessIdentity(n, tailoring, state, prev);
+  const old = es.levels[n];
+  // Relief keeps the level's own identity (no new draws from the bags); only the target drops.
+  const plan = relief && old ? identityOf(n, old.spec) : endlessIdentity(n, tailoring, state, prev);
   const parts = targetFor(save.analytics, n);
   let offset = parts.target - plan.base + (tailoring.sessionPeak ? ENDLESS.peakLift : 0);
   const before = es.levels[n - 1];
   // Smooth steps from the board before (as the bank's ±1 tier), deeper only for deep relief.
   if (before && !relief) offset = clamp(offset, before.offset - (parts.pacing <= -DIRECTOR.deepRelief ? 0.2 : 0.1), before.offset + 0.1);
   let target = clamp(plan.base + offset, 0.05, 0.95);
-  const old = es.levels[n];
   if (relief && old) target = Math.max(0.05, Math.min(target, old.target - RELIEF_STEP));
   const job = makeJob(n, plan, target, tailoring, recentSpecs(es, n), { seedPrefix: `endless-${n}${relief ? `-r${relief}` : ''}` });
 
@@ -231,10 +232,12 @@ async function generate(n: number, relief: number): Promise<LevelSpec> {
   let spec: LevelSpec;
   if (result) {
     spec = result.spec;
-    commitState(es, state);
+    if (!(relief && old)) commitState(es, state);
   } else {
     src = 'plan';
-    spec = { ...levelPlan(n).spec, tier: tierFor(levelPlan(n).base, target) };
+    // Last resort: the identity's own board (solvable by construction when nothing slides),
+    // labelled honestly if generation had to drop a gate or a fence.
+    spec = honestSpec({ ...plan.spec, tier: tierFor(plan.base, target) });
   }
   const ms = Math.round(clock() - t0);
   es.seq++;

@@ -186,6 +186,33 @@ function drawFrom<T>(bag: T[], refill: () => T[], ok: (x: T) => boolean, avoid: 
 }
 
 /**
+ * The identity an endless level already has (from its stored spec): the same
+ * place, shape, mechanics, wind and goal. Used to make a gentler board for the
+ * same level without drawing new partners or goals from the player's bags.
+ */
+export function identityOf(n: number, spec: LevelSpec): LevelPlan {
+  const base = levelPlan(n);
+  const has: Record<Mechanic, boolean> = {
+    stones: spec.stones > 0,
+    leaves: spec.gravity === true || spec.gravity === 'down',
+    snow: spec.snow > 0,
+    lucky: !!spec.lucky,
+    knots: (spec.knots ?? 0) > 0,
+    wind: typeof spec.gravity === 'string' && spec.gravity !== 'down',
+    gates: (spec.gates ?? 0) > 0,
+    fences: (spec.fences ?? 0) > 0,
+  };
+  const mechanics = (['stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences'] as Mechanic[]).filter((m) => has[m]);
+  const wind = has.leaves ? 'down' : has.wind ? (spec.gravity as LevelPlan['wind']) : null;
+  const plan: LevelPlan = { ...base, rows: spec.rows, cols: spec.cols, mechanics, wind, lucky: has.lucky, par: spec.par, spec: undefined as unknown as LevelSpec };
+  if (spec.goal) plan.goal = spec.goal;
+  else delete plan.goal;
+  plan.spec = planSpec(plan, tierKnobs(plan, 2), `endless-${n}`);
+  plan.par = spec.par;
+  return plan;
+}
+
+/**
  * The identity of endless level n for this player: `levelPlan(n)` with the partner
  * mechanics and the goal drawn from the player's bags, the shape fitted to their
  * sessions, and a lucky pair on a session-end peak. Mutates `state` (the bags).

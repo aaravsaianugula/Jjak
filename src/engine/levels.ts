@@ -394,6 +394,21 @@ function pickCards(spec: LevelSpec, rng: Rng, pairs: number): number[] {
   return cards;
 }
 
+/**
+ * A spec that tells the truth about its board. Generation can drop fences, or
+ * turn gates into stones, when a layout can't be placed; the bank and the
+ * endless search reject such boards, but a last-resort fallback uses this so
+ * the title card, chips and missions never promise a mechanic that isn't there.
+ */
+export function honestSpec(spec: LevelSpec): LevelSpec {
+  if (!spec.gates && !spec.fences) return spec;
+  const b = buildBoard(spec);
+  const out = { ...spec };
+  if (spec.gates && !b.cells.some((v) => v <= -16)) delete out.gates;
+  if (spec.fences && !b.walls) delete out.fences;
+  return out;
+}
+
 export function buildBoard(spec: LevelSpec): Board {
   const rng = createRng(spec.seed);
   const stones = pickStones(spec.rows, spec.cols, spec.stones, rng, spec.layout);

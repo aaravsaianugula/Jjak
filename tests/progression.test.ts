@@ -156,6 +156,21 @@ describe('XP from play', () => {
     expect(save.meta.xp).toBe(rep.xp);
   });
 
+  it('a replay that adds no blossoms earns only its pairs, so easy boards cannot be ground for ranks', () => {
+    const play = () => {
+      const s = cleared(journeyLevel(8));
+      emit('start', { session: s });
+      emit('pair', { mode: 'journey', cards: [0, 1], combo: 1, fever: false, yaku: [], session: s });
+      const summary = recordClear(s);
+      emit('clear', { session: s, summary });
+      return boardReport(s)!.xp;
+    };
+    const first = play();
+    const again = play(); // same stars as before
+    expect(first).toBeGreaterThan(20);
+    expect(again).toBeLessThan(5);
+  });
+
   it('counts the lucky cards and collects them for the Album', () => {
     const s = new Session(zenLevel('z'), 0);
     emit('pair', { mode: 'zen', cards: [BONUS_IDS[0], BONUS_IDS[1]], combo: 1, fever: false, yaku: [], session: s });

@@ -520,6 +520,11 @@ on('clear', ({ session, summary }) => {
   if (mode === 'zen') {
     addXp(XP.zenClear);
     bump('zen');
+  } else if (mode === 'journey' && !summary.firstClear) {
+    // A replay earns XP only for blossoms it adds (like petals), so an easy board
+    // can't be ground for ranks; its pairs still count.
+    const gained = Math.max(0, summary.stars - b.prevStars);
+    if (gained) addXp(XP.clear + gained * XP.perStar);
   } else {
     addXp(XP.clear + summary.stars * XP.perStar);
     if (summary.firstClear) addXp(XP.firstClear);

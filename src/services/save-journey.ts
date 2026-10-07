@@ -1,3 +1,5 @@
+import { GOAL_IDS } from '../engine/goals';
+
 /**
  * Journey route: passport stamps, chapter chests, mechanic intros (owned by the Journey feature).
  * Pure data + defaults only: no imports from storage.ts (it imports this file).
@@ -99,6 +101,9 @@ function endlessSpec(raw: unknown, n: number): LevelSpec | null {
   const g = s.gravity;
   if (!(typeof g === 'boolean' || g === 'down' || g === 'left' || g === 'right' || g === 'up')) return null;
   for (const k of ['knots', 'gates', 'fences', 'tier', 'difficulty'] as const) if (s[k] != null && !isNum(s[k])) return null;
+  // A goal or stone layout from another build (or a damaged save) would break the screens that name it.
+  if (s.goal != null && !(GOAL_IDS as string[]).includes(s.goal)) return null;
+  if (s.layout != null && !['spread', 'lines', 'clusters'].includes(s.layout)) return null;
   return { ...(s as LevelSpec), variants: s.variants !== false };
 }
 
