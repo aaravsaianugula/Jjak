@@ -2,7 +2,7 @@
 
 > Paste everything below the line into a new Claude Code session on this repo,
 > or say: "Read `docs/NEXT_SESSION.md` and do it."
-> **Part C is for your new requests.** Replace the placeholder with your list before you start.
+> Order: Part A must-fix bugs → **Part C (the main work)** → Part B launch readiness on the final build.
 
 ---
 
@@ -11,8 +11,9 @@ You're continuing work on **Jjak (짝)**, a calm pair-connecting puzzle game (Sh
 13+ US/global audience. The look is paper and ink: no neon, no gamer style, nothing childish.
 
 The previous session built a large launch expansion and was cut off by a usage limit midway
-through the final QA and polish pass. Finish that work (Part A), get the build launch-ready
-(Part B), then think through, design and build the owner's new requests (Part C).
+through the final QA and polish pass. Fix Part A's bugs first, then think through, design and
+build the owner's new requests in Part C (adaptive difficulty, 100–200 fresh launch levels, new
+mechanics, show-don't-tell onboarding). Finish with Part B launch readiness on the final build.
 
 ## 0. Read first (in this order)
 1. `docs/EXPANSION_PLAN.md`: the expansion, the shared contracts and the 50-hour content budget
@@ -131,7 +132,7 @@ unfinished, and commit in logical steps.
 
    Fix whichever ones are cheap.
 
-## Part B: launch readiness
+## Part B: launch readiness (do this last, on the final build)
 1. Update `scripts/screenshots.mjs` for the new screens. Regenerate `store/screenshots/` (pick the 8
    strongest: Home, a Flower Road board with a mechanic, the Map, the Market Decks tab, the Garden at
    night, Flower Path, a result sheet with a stamp, Fever), and update the README screenshot tables.
@@ -151,27 +152,179 @@ unfinished, and commit in logical steps.
 
 ## Part C: the owner's new requests (think, reason, then develop)
 
-> **OWNER: paste your list here before running this prompt.**
+The owner's words, lightly edited:
+
+> Build an algorithm that looks at the player's data (time to solve, which cards they move first,
+> where on the board they make their first moves, and any other gameplay and time-spent analytics the
+> app can get) and uses it to make levels harder or easier. Right now the later levels are too simple
+> and not challenging enough. Levels need to get challenging while still giving the dopamine hit
+> players want, so they get hooked.
 >
-> - …
-> - …
+> Build an intro for new users that shows them how to play and explains the game. When new features
+> or mechanics arrive in later levels, the game must explain them by **showing** them, not with text
+> like it does now, because text is boring.
+>
+> Make sure the algorithm makes levels fun, more challenging and adaptive to the player. Every level
+> should feel fresh and challenging, never simple, boring or repetitive. Be creative about making
+> levels more fun and challenging so players stay hooked.
+>
+> For launch, have **100–200 levels**. Make sure each one is fun and that the algorithm ties into
+> them and changes them for each player. Add new mechanics and things to the game, but keep it fun
+> and nice to play. Don't fill it with gimmicks or anything that takes away from the core idea.
 
-For **each** item:
-1. **Think it through:** the goal, what the player actually wants, how it fits the calm 13+
-   paper-and-ink tone, and how it interacts with the economy (≈ 300 petals per hour), the fair-ads promises
-   and the 50-hour content budget. Research when facts matter (Play policy, plugin APIs, cultural
-   accuracy for Korean and Japanese content) and cite primary sources.
-2. **Reason about options:** 2–3 approaches with trade-offs (player value, build cost, risk, performance on
-   mid-range Android). Pick one and say why.
-3. **Develop it:** write a short spec into `docs/EXPANSION_PLAN.md` (a new section), then build it.
-   - For large items, run parallel worktree subagents with explicit file ownership and contracts, as the
-     last session did.
-   - Add tests, verify with screenshots in both themes, commit and push.
-4. **Report:** what shipped, what you decided and why, what the owner needs to do, and the open questions.
+Treat this as the main work of the session, after Part A's must-fix bugs. Read the current code
+first: `src/engine/{levels,generate,session,moves,path}.ts`, `src/data/route.ts`,
+`src/ui/screens/{welcome,game}.ts`, `src/ui/journey-fx.ts` (the knots/wind "Try it" tips) and
+`showVariantTip` in `game.ts`.
 
-If Part C is still the placeholder when you start, finish Parts A and B. Then propose the 3–5 most
-valuable next features for retention, revenue and launch quality, with reasoning, and ask the owner
-which to build. Don't build them unasked.
+### C1. Adaptive difficulty ("the Gardener")
+**Think first.** Write the design into `docs/EXPANSION_PLAN.md` §C1 before coding.
+
+**Player model.** The data the game can collect on-device every board:
+- solve time vs par
+- think time before the first pair, and between pairs (median and long pauses)
+- the first cards touched and where (edge vs centre, rows/columns scanned)
+- mismatches and blocked-path taps
+- reselects
+- hints, shuffles and auto-shuffles
+- combo rate and Fever reached
+- restarts, quits mid-board, retries for stars
+- session length and boards per session, days active
+- per-mechanic performance (stones, leaves, snow, lucky, knots, wind)
+
+Turn it into a small skill estimate, for example an Elo/Glicko-style rating per player, plus
+per-mechanic modifiers and a "frustration/boredom" signal from recent boards. Keep it robust to
+noise: rolling windows, and no swings from one bad board.
+
+**Difficulty model for a board.** Don't guess. **Measure** candidate boards with simulated solvers
+(greedy, random-legal and lookahead bots) and features such as:
+- branching factor: legal pairs available at each step, and its minimum along the solve
+- the share of pairs that need 2-turn paths
+- decoy density (same-flower pairs that are blocked)
+- dead-end probability for naive play
+- how buried the cards are
+- the mechanic load
+
+Calibrate a difficulty score against the bots and, later, real players.
+
+**Generation loop.** For each level, keep its *identity* (place, mechanic focus, rhythm role, board
+shape range) but generate N candidate boards from the level seed plus a variant index. Pick the one
+whose measured difficulty is closest to the player's **target**.
+- Keep it deterministic per (level, player-tier), so a retry is the same board.
+- The **Daily stays identical for everyone.**
+- Rush and Zen can adapt too.
+
+**Target curve.** Aim for flow, not maximum hardness:
+- a sawtooth within each chapter (build → peak → breather → festival)
+- a ~75–85% "clear without assists" target for most boards
+- a relief board after a struggle and a stretch board after a streak of easy wins
+
+Hard boards must feel fair: they're solvable by construction, and the challenge comes from reading
+the board, not from luck.
+
+**Fix "later levels are too simple."** The current curve plateaus (8×6 maximum, gentle mechanic
+counts). Use the knobs, within phone-tappable limits:
+- months on the board and how many 4-variant flowers there are
+- stone count and placement that forces long paths
+- more decoys and fewer free moves early in a board
+- tighter par
+- mechanic density and combinations (e.g. wind + knots, snow + stones)
+- **level goals** (see C3)
+
+Test 9×6 or 8×7 on 360-wide screens before using it.
+
+**Dopamine without manipulation** (13+ audience):
+- reward skill moments: combos, Fever, card sets, "perfect read" clears, near-miss saves
+- vary rewards a little
+- end boards on a high note (the last few pairs open up)
+
+No dark patterns: no fake near-misses, no difficulty spikes to sell hints, no punishing streaks.
+Never make a board harder *because* the player has hints to spend.
+
+**Privacy.** Keep all of this **on-device** (a new `save.analytics` slice with a capped history),
+so the Data safety form and privacy policy stay as they are. If you think remote analytics are
+needed later, write it up as an optional proposal (Firebase/Play Games: what's collected, the
+consent and policy changes). Don't add it now.
+
+**Tests:**
+- simulated player personas (novice, average, expert, impatient, hint-heavy) converge to the
+  target success rate without oscillating
+- difficulty is monotonic in its knobs
+- determinism
+- all boards solvable
+- the Daily is unaffected
+
+Add a hidden dev panel (gated by `import.meta.env.DEV`) that shows the rating, the target and the
+chosen board's metrics.
+
+### C2. Launch content: 100–200 levels that each feel fresh
+- The owner wants **100–200 launch levels**, each fun. Today there are 600 generated levels.
+- **Recommended:** curate the first **~180 levels (15 places × 12)** as the launch Journey, then
+  unlock further places in content updates. That makes a live-ops cadence and keeps every launch
+  level reviewed.
+- Give every level a hand-set identity: place, rhythm role, focus mechanic, an optional goal, a
+  par band, and a short title or postcard beat on festival levels. Let the Gardener tune the
+  board within that identity.
+- Write a level audit script that plays all launch levels with the bots at three skill tiers. It
+  should flag levels that are too easy (high branching, no 2-turn paths), too hard (dead-end rate),
+  or too similar to their neighbours (feature-vector distance).
+- Re-check the **50-hour budget** and the economy tests against the new level count. Fewer levels
+  means replay, goals, Daily, missions and the Garden carry more. Report the honest new estimate.
+
+### C3. New mechanics and level goals that deepen the core
+The core is **finding a same-flower pair joined by a path with at most two turns**. New ideas must
+make that reading richer, not distract from it. Brainstorm 8–10, pick the best **3–4**, and
+explain why the others were rejected. Directions to evaluate (they're not mandatory):
+- **Bridges / stepping stones:** a cell paths may cross through.
+- **Walls / fences on cell edges:** paths can't cross them.
+- **Pair order / "seasons in order":** clear one flower's pairs first for a bonus.
+- **Lanterns:** a path through a lantern cell lights it, and the goal is to light them all.
+- **Twin pairs:** two matching pairs that must be cleared back to back.
+- **Fog / night boards:** you see only near cleared space.
+- **Rotating tiles.**
+- **Level goals instead of only "clear the board":** clear all Brights, finish with a ×4 combo,
+  use only 0- or 1-turn paths for a bonus, clear within N moves of the hint-free solution.
+
+Every mechanic must stay solvable by construction or have a fair safety net. Add engine tests and
+solvability fuzz for each, and follow the knots/wind pattern in `journey-fx.ts`.
+
+### C4. Show, don't tell: new-player intro and mechanic introductions
+- **New-player intro:** replace the text-heavy welcome and Level 1 coach with an *interactive,
+  animated* first minute.
+  1. A hand or ink brush **demonstrates** a pair on a tiny board, with the path drawing itself and
+     the 0/1/2-turn rule shown visually.
+  2. The player does it.
+  3. A blocked-path demo shows why a pair doesn't connect.
+  4. A combo is demonstrated.
+
+  Minimal words. It must be skippable, never block a returning player, and respect reduced motion.
+  Measure it: a new player should make their first real pair in under 20 seconds.
+- **Every mechanic intro** (stones, falling leaves, snow, lucky, knots, wind, plus the C3 additions)
+  becomes a short **animated demonstration on a mini board** (2–4 seconds, looping, the cards
+  actually moving), then a 1-step "your turn" on that mini board, then play. Build one reusable
+  "demo player" that scripts card moves, path draws and highlights, so every intro is about
+  10 lines of data rather than custom code.
+- Also offer a **Replay intro** from How to Play and from the level's pause menu.
+- Test all of these with screenshots and short frame sequences in both themes at 360×640.
+
+### Process
+1. Spec each of C1–C4 in `docs/EXPANSION_PLAN.md`: goal, options with trade-offs, recommendation,
+   acceptance criteria.
+2. Build in parallel worktree agents with clear file ownership:
+   - engine and Gardener (C1)
+   - level curation and audit (C2)
+   - mechanics (C3)
+   - demos and intro (C4)
+
+   Then integrate.
+3. Verify by actually playing the first 30 levels, plus sampled later ones, in the browser.
+4. Report the measured difficulty curve as a chart in an artifact, before and after.
+
+**Decisions to put to the owner** (with a recommendation for each):
+- the final launch level count
+- whether adaptive difficulty may *lower* difficulty below the designed floor for struggling players
+- whether star thresholds (par) adapt or stay fixed (recommended: fixed, so stars mean something)
+- whether level goals can fail a level, or only cost a star (recommended: only cost a star)
 
 ## Definition of done
 - Every Part A flow has been walked, with no console errors and nothing clipped at 360×640 or 390×844, in
