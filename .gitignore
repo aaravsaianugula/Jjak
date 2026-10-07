@@ -14,3 +14,6 @@ android/keystore.properties
 android/app/release/
 android/capacitor-cordova-android-plugins/build/
 dist-demo/
+
+# Agent worktrees (temporary)
+.claude/worktrees/
