@@ -3,6 +3,7 @@
  * on-device analytics service (EXPANSION_PLAN §C1, §C5).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
+import { bankSpec } from '../src/director/bank';
 import { DIRECTOR, decide, pinnedTier, recordAttempt, targetFor, tierD } from '../src/director/director';
 import { MODEL, engagement, expected, ingest, performance, proficiency } from '../src/director/model';
 import { designedBase } from '../src/director/plan';
@@ -288,7 +289,8 @@ describe('director', () => {
     a.recent = [easy(), easy(), easy()];
     expect(decide(a, N, false)).toMatchObject({ tier: first.tier, reason: 'pinned' });
     expect(decide(a, N, true)).toMatchObject({ tier: first.tier, reason: 'pinned' });
-    expect(tierD(N, first.tier)).toBeCloseTo(designedBase(N), 5);
+    // the pinned tier's difficulty is its bank board's measured d (the curve only stands in without a bank entry)
+    expect(tierD(N, first.tier)).toBe(bankSpec(N, first.tier).difficulty ?? designedBase(N) + (first.tier - 2) * MODEL.tierStep);
   });
 
   it('re-pins one tier lower after two failed attempts at an uncleared level', () => {

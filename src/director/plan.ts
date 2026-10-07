@@ -116,12 +116,25 @@ const SLOT_SIZE = [1, 1, 2, 2, 3, 3, 0, 3, 4, 4, 5, 6];
  * boards climb, the peak tops it, and the festival is a celebration a little
  * below the peak.
  */
-const SAW = [-0.1, 0, -0.04, 0.03, 0.06, 0.08, -0.12, 0.09, 0.11, 0.13, 0.2, 0.06];
-const TUTORIAL_BASE = [0.03, 0.05, 0.07, 0.09, 0.11, 0.12];
+const SAW = [-0.1, 0, -0.07, 0.03, 0.06, 0.08, -0.12, 0.09, 0.11, 0.13, 0.2, 0.06];
+const TUTORIAL_BASE = [0.03, 0.05, 0.08, 0.1, 0.12, 0.14];
 
 const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x);
 const evenRound = (x: number) => 2 * Math.round(x / 2);
 export const parFor = (pairs: number) => Math.ceil((pairs * 4.5 + 10) / 5) * 5;
+
+/**
+ * The road under the sawtooth: the smooth rise across the 50 places (no chapter
+ * rhythm). The first pass climbs from 0.22 to 0.55, the range the generator can
+ * really cover at every tier (calibrated on the bank build); Wanderer years start
+ * higher. A steady player's skill follows this line; the sawtooth swings around it.
+ */
+export function roadBase(n: number): number {
+  n = Math.max(1, Math.floor(n));
+  const { index, year } = routeOf(n);
+  const p = index / (ROUTE_CHAPTERS - 1);
+  return year > 0 ? 0.5 + 0.04 * Math.min(year, 3) + 0.06 * p : 0.22 + 0.33 * p;
+}
 
 /** Designed difficulty of level n, 0–1: a sawtooth in each chapter on a road that rises. */
 export function designedBase(n: number): number {
@@ -129,10 +142,8 @@ export function designedBase(n: number): number {
   if (n <= TUTORIAL_BASE.length) return TUTORIAL_BASE[n - 1];
   const { index, year, slot } = routeOf(n);
   const p = index / (ROUTE_CHAPTERS - 1);
-  // The first pass climbs from 0.14 to 0.70; Wanderer years start higher.
-  const road = year > 0 ? 0.62 + 0.06 * Math.min(year, 3) + 0.08 * p : 0.14 + 0.56 * p;
   const amp = 0.6 + 0.4 * Math.min(1, p + year);
-  return Math.round(clamp(road + SAW[slot] * amp, 0.03, 0.97) * 1000) / 1000;
+  return Math.round(clamp(roadBase(n) + SAW[slot] * amp, 0.03, 0.97) * 1000) / 1000;
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +325,7 @@ function identityOf(n: number): Identity {
 // Knobs: how each tier fills the identity in.
 
 /** How far up its legal ranges a tier pushes the knobs, 0–1: the road's progress plus a step per tier. */
-export const intensity = (base: number, tier: number) => clamp(0.05 + 0.75 * base + 0.16 * (tier - 2), 0, 1);
+export const intensity = (base: number, tier: number) => clamp(-0.05 + 1.1 * base + 0.16 * (tier - 2), 0, 1);
 
 /** Gentle tiers use fewer flowers (more partners for every card); the top tiers use all twelve. */
 const MONTH_DROP = [4, 2, 1, 0, 0];
@@ -332,14 +343,16 @@ export interface KnobRange {
 
 const has = (p: Pick<LevelPlan, 'mechanics'>, m: Mechanic) => p.mechanics.includes(m);
 /** Snow and knots both sit on walled-in cards: with knots on the board, snow leaves them room. */
-const snowShare = (p: Pick<LevelPlan, 'mechanics'>) => (has(p, 'knots') ? 0.35 : 0.5);
+const snowShare = (p: Pick<LevelPlan, 'mechanics'>) => (has(p, 'knots') ? 0.25 : 0.5);
 
 /** Legal ranges of every knob for this identity. A mechanic in the identity keeps a minimum of 2 (fences 3). */
 export function knobRange(p: LevelPlan): KnobRange {
   const cells = p.rows * p.cols;
   const maxS = maxStones(p.rows, p.cols);
-  const stones: [number, number] = has(p, 'stones') ? [Math.min(2, maxS), maxS] : [0, 0];
-  const gates: [number, number] = has(p, 'gates') ? [2, cells >= 40 ? 6 : 4] : [0, 0];
+  // Snow and knots sit on cards walled in by other cards: keep the inside mostly cards.
+  const covered = has(p, 'snow') || has(p, 'knots');
+  const stones: [number, number] = has(p, 'stones') ? [Math.min(2, maxS), covered ? Math.min(has(p, 'gates') ? 2 : 4, maxS) : maxS] : [0, 0];
+  const gates: [number, number] = has(p, 'gates') ? [2, cells >= 40 && !covered ? 6 : 4] : [0, 0];
   const pairsHi = (cells - stones[0] - gates[0]) / 2;
   const flower = (pairs: number) => (p.lucky ? pairs - 1 : pairs);
   const monthsHi = Math.min(12, flower((cells - stones[1] - gates[1]) / 2));

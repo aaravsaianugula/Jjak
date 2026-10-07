@@ -129,8 +129,8 @@ describe('level plan (the stable identity)', () => {
       expect(b(9)).toBeGreaterThan(b(2));
     }
     const mean = (from: number) => Array.from({ length: 48 }, (_, i) => designedBase(from + i)).reduce((a, x) => a + x, 0) / 48;
-    expect(mean(553)).toBeGreaterThan(mean(13) + 0.4);
-    expect(designedBase(599)).toBeGreaterThan(0.85);
+    expect(mean(553)).toBeGreaterThan(mean(13) + 0.25);
+    expect(designedBase(599)).toBeGreaterThan(0.7);
     // Wanderer years start above the end of the first pass's average.
     expect(mean(601 + 12)).toBeGreaterThan(mean(13));
   });

@@ -65,7 +65,7 @@ function runChapter(ch: number, K: number): LevelResult[] {
   for (let s = 0; s < 12; s++) {
     const n = ch * 12 + s + 1;
     const plan = levelPlan(n);
-    const r = searchTiers(plan, { K, recentByTier });
+    const r = searchTiers(plan, { K, climb: 3, recentByTier });
     const mech = plan.mechanics.join('+');
     const curveBase = {
       n,
