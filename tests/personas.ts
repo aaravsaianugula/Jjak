@@ -11,7 +11,7 @@
 import { createRng, type Rng } from '../src/engine/rng';
 import { decide, recordAttempt, tierD } from '../src/director/director';
 import { ingest, isClean } from '../src/director/model';
-import { designedBase } from '../src/director/plan';
+import { roadBase } from '../src/director/plan';
 import { type AnalyticsSave, type BoardRecord, defaultAnalytics } from '../src/services/save-analytics';
 
 export interface Persona {
@@ -21,12 +21,12 @@ export interface Persona {
 }
 
 export const PERSONAS: Record<string, Persona> = {
-  steady: { name: 'steady', skill: (n) => designedBase(n) },
-  strong: { name: 'strong', skill: (n) => designedBase(n) + 0.12 },
-  weak: { name: 'weak', skill: (n) => designedBase(n) - 0.12 },
-  learner: { name: 'learner', skill: (n, p) => designedBase(n) - 0.15 + 0.27 * Math.min(1, p / 200) },
-  expert: { name: 'expert', skill: (n) => designedBase(n) + 0.35 },
-  novice: { name: 'novice', skill: (n) => designedBase(n) - 0.3 },
+  steady: { name: 'steady', skill: (n) => roadBase(n) },
+  strong: { name: 'strong', skill: (n) => roadBase(n) + 0.12 },
+  weak: { name: 'weak', skill: (n) => roadBase(n) - 0.12 },
+  learner: { name: 'learner', skill: (n, p) => roadBase(n) - 0.15 + 0.27 * Math.min(1, p / 200) },
+  expert: { name: 'expert', skill: (n) => roadBase(n) + 0.35 },
+  novice: { name: 'novice', skill: (n) => roadBase(n) - 0.3 },
 };
 
 const sigma = (x: number) => 1 / (1 + Math.exp(-x));
