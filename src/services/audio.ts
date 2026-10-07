@@ -124,4 +124,24 @@ export const sfx = {
     const t = c.currentTime;
     [7, 9, 12].forEach((s, i) => tone(note(Math.min(9, s - 3)), t + i * 0.06, 0.8, 'sine', 0.07));
   },
+  /** Garden wind chime: a small bronze bell, inharmonic partials, long soft tail. */
+  chime() {
+    const c = ac();
+    if (!c) return;
+    const t = c.currentTime;
+    const f = note(5 + Math.floor(Math.random() * 3), 880);
+    tone(f, t, 2.4, 'sine', 0.08);
+    tone(f * 2.76, t, 1.1, 'sine', 0.025);
+    tone(f * 5.4, t, 0.4, 'sine', 0.01);
+    tone(f * 1.5, t + 0.32, 1.6, 'sine', 0.03);
+  },
+  /** Bamboo fountain: a hollow wooden clack. */
+  clack() {
+    const c = ac();
+    if (!c) return;
+    const t = c.currentTime;
+    noise(t, 0.04, 900, 0.5);
+    tone(420, t, 0.09, 'triangle', 0.18, 300);
+    tone(840, t, 0.05, 'sine', 0.06);
+  },
 };
