@@ -967,11 +967,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   // ── Fever (×5 combo) ──────────────────────────────────────────────
   let feverTimer: ReturnType<typeof setTimeout> | null = null;
+  let feverDrain: Animation | null = null;
   function startFever(a: number, b: number) {
     el.classList.add('is-fever');
     // The tag stays up through a renewed Fever; only its drain line starts over.
     feverTag.classList.add('is-on');
-    if (!feverTag.classList.contains('is-drain') || !restartAnimations(feverTag, ['combo-drain'])) retrigger(feverTag, 'is-drain');
+    feverDrain?.cancel();
+    feverDrain = feverTag.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: FEVER_MS, easing: 'linear', fill: 'forwards', pseudoElement: '::after' });
     sfx.stamp();
     haptic.success();
     banner(
@@ -1012,7 +1014,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   function endFever() {
     el.classList.remove('is-fever');
     feverTag.classList.remove('is-on');
-    untrigger(feverTag, 'is-drain');
+    const drained = feverDrain;
+    feverDrain = null;
+    setTimeout(() => drained?.cancel(), 320);
     if (!air.querySelector('.drift')) return;
     air.classList.add('is-fading');
     setTimeout(() => {
@@ -1171,15 +1175,30 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   let comboBarOff: ReturnType<typeof setTimeout> | null = null;
+  let comboDrain: Animation[] = [];
+  /**
+   * The combo window drains (and cools from gold to ash near the end). The bar
+   * stays lit between pairs and only its drain starts over: Web Animations, so
+   * no class toggling (no blink) and no style flush on the tap.
+   */
   function restartComboBar() {
-    // The bar stays lit; only its drain starts over (no flicker between pairs).
     comboBar.classList.add('on');
-    if (!comboBar.classList.contains('is-run') || !restartAnimations(comboBar, ['combo-drain', 'g-ember'])) retrigger(comboBar, 'is-run');
+    for (const a of comboDrain) a.cancel();
+    const fill = comboBar.firstElementChild as HTMLElement;
+    const opts: KeyframeAnimationOptions = { duration: COMBO_WINDOW_MS, easing: 'linear', fill: 'forwards' };
+    comboDrain = [fill.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], opts)];
+    if (!el.classList.contains('is-fever')) {
+      comboDrain.push(fill.animate([{ backgroundColor: 'var(--gold)' }, { backgroundColor: 'var(--gold)', offset: 0.62 }, { backgroundColor: 'var(--muted)' }], opts));
+    }
     if (comboBarOff) clearTimeout(comboBarOff);
-    comboBarOff = setTimeout(() => {
-      comboBar.classList.remove('on');
-      untrigger(comboBar, 'is-run');
-    }, COMBO_WINDOW_MS + 200);
+    comboBarOff = setTimeout(stopComboBar, COMBO_WINDOW_MS + 200);
+  }
+  function stopComboBar() {
+    comboBar.classList.remove('on');
+    // Let the bar fade out at empty before the drain lets go of it.
+    const drained = comboDrain;
+    comboDrain = [];
+    setTimeout(() => drained.forEach((a) => a.cancel()), 420);
   }
 
   // ── Tools ─────────────────────────────────────────────────────────
@@ -1748,8 +1767,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     updateHud();
     goalState = '';
     updateGoal();
-    comboBar.classList.remove('on');
-    untrigger(comboBar, 'is-run');
+    stopComboBar();
     showCombo(0);
     if (feverTimer) clearTimeout(feverTimer);
     endFever();

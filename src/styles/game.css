@@ -434,24 +434,9 @@
   border-radius: 3px;
   background: var(--gold);
 }
-/* The window drains; near the end it cools from gold to ash — keep the rhythm. */
-.game .combo-bar.on.is-run i {
-  animation:
-    combo-drain var(--combo-ms, 4s) linear forwards,
-    g-ember var(--combo-ms, 4s) linear forwards;
-}
-@keyframes g-ember {
-  0%,
-  62% {
-    background-color: var(--gold);
-  }
-  100% {
-    background-color: var(--muted);
-  }
-}
+/* The drain and its gold-to-ash cooling run as Web Animations (game.ts restartComboBar). */
 .game.is-fever .combo-bar i {
   background: var(--accent);
-  animation-name: combo-drain;
 }
 .fever-tag {
   position: relative;
@@ -508,9 +493,7 @@
     max-width 0s,
     padding 0s;
 }
-.fever-tag.is-on.is-drain::after {
-  animation: combo-drain var(--fever-ms, 6s) linear forwards;
-}
+/* .fever-tag::after drains via a Web Animation (game.ts startFever). */
 
 /* ───────────────────────────── Stage + board ───────────────────────────── */
 .game .stage {
