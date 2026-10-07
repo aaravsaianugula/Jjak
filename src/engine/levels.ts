@@ -2,7 +2,7 @@ import { type Board } from './board';
 import { generateBoard } from './generate';
 import { createRng, type Rng } from './rng';
 
-export type ModeId = 'journey' | 'daily' | 'zen';
+export type ModeId = 'journey' | 'daily' | 'zen' | 'rush';
 
 export interface LevelSpec {
   mode: ModeId;
@@ -153,6 +153,39 @@ export function zenLevel(seed: string): LevelSpec {
   const [rows, cols] = rng.pick<[number, number]>([[6, 5], [6, 6], [7, 6], [8, 5]]);
   const pairs = (rows * cols) / 2;
   return { mode: 'zen', number: 0, seed, rows, cols, stones: 0, months: 12, variants: true, par: parFor(pairs), gravity: false, snow: 0 };
+}
+
+/**
+ * Rush: a run of quick boards against the clock. Boards grow a little as the
+ * run goes on and pick up stones, so long runs stay tense.
+ */
+export const RUSH = {
+  startMs: 60_000,
+  perPairMs: 1000,
+  perComboPairMs: 2000, // pairs made at ×3 or more
+  boardClearMs: 8000,
+  continueMs: 20_000,
+  boardClearBonus: 1000,
+};
+
+export function rushLevel(runSeed: string, round: number): LevelSpec {
+  const shapes: [number, number][] = [[5, 4], [6, 4], [6, 5], [6, 6], [7, 6]];
+  const [rows, cols] = shapes[Math.min(round, shapes.length - 1)];
+  const stones = round >= 3 ? 2 : 0;
+  const pairs = (rows * cols - stones) / 2;
+  return {
+    mode: 'rush',
+    number: round + 1,
+    seed: `${runSeed}-r${round}`,
+    rows,
+    cols,
+    stones,
+    months: Math.min(12, pairs),
+    variants: round >= 1,
+    par: parFor(pairs),
+    gravity: false,
+    snow: 0,
+  };
 }
 
 /** Most stones a board can hold without walling itself off (kept even). */

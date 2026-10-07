@@ -1,4 +1,4 @@
-import { ECONOMY } from '../config';
+import { ECONOMY, GIFTS } from '../config';
 import { ALL_CARD_IDS } from '../data/deck';
 import { localDateKey } from '../engine/levels';
 import { type Session, starCount } from '../engine/session';
@@ -12,6 +12,8 @@ export interface ClearSummary {
   drawn: number | null;
   /** daily only */
   daily?: { counted: boolean; streak: number; number: number };
+  /** lantern gift for every 4th Journey level */
+  lantern?: { petals: number; hints: number; shuffles: number };
 }
 
 const yesterdayKey = (today: string) => {
@@ -51,6 +53,14 @@ export function recordClear(s: Session): ClearSummary {
     save.stars[n] = Math.max(prev, stars);
     if (n >= save.level) save.level = n + 1;
     if (out.firstClear) out.drawn = drawCard();
+    if (out.firstClear && n % ECONOMY.lanternEvery === 0) {
+      // Alternate the bonus tool so both stay topped up.
+      const hint = (n / ECONOMY.lanternEvery) % 2 === 1;
+      out.lantern = { petals: ECONOMY.lanternPetals, hints: hint ? 1 : 0, shuffles: hint ? 0 : 1 };
+      save.petals += out.lantern.petals;
+      save.hints += out.lantern.hints;
+      save.shuffles += out.lantern.shuffles;
+    }
     // A small gift at the end of each chapter.
     if (out.firstClear && n % 12 === 0) {
       save.hints++;
@@ -127,3 +137,55 @@ export function lastWeek(today = new Date()): { key: string; day: string; solved
   }
   return out;
 }
+
+/** Levels until the next lantern gift (0 = this level has one). */
+export function levelsToLantern(level = save.level): number {
+  const r = level % ECONOMY.lanternEvery;
+  return r === 0 ? 0 : ECONOMY.lanternEvery - r;
+}
+
+export interface RushSummary {
+  score: number;
+  best: number;
+  newBest: boolean;
+  petals: number;
+  rounds: number;
+}
+
+/** Record a finished Rush run. */
+export function recordRush(score: number, rounds: number, pairs: number, bestCombo: number): RushSummary {
+  const prevBest = save.rush.best;
+  save.rush.runs++;
+  save.rush.best = Math.max(prevBest, score);
+  save.rush.bestRound = Math.max(save.rush.bestRound, rounds);
+  save.stats.pairs += pairs;
+  save.stats.bestCombo = Math.max(save.stats.bestCombo, bestCombo);
+  const petals = Math.min(ECONOMY.rushPetalCap, Math.floor(score / ECONOMY.rushPointsPerPetal));
+  save.petals += petals;
+  persist();
+  return { score, best: save.rush.best, newBest: score > prevBest && prevBest > 0, petals, rounds };
+}
+
+/** Today's gift if it hasn't been claimed yet. */
+export function pendingGift(): { day: number; gift: (typeof GIFTS)[number] } | null {
+  if (save.gift.lastClaim === localDateKey()) return null;
+  return { day: save.gift.day % GIFTS.length, gift: GIFTS[save.gift.day % GIFTS.length] };
+}
+
+/** Claim today's gift (×2 when doubled by a rewarded ad). Returns any card drawn. */
+export function claimGift(times = 1): number | null {
+  const p = pendingGift();
+  if (!p) return null;
+  const g = p.gift;
+  save.petals += (g.petals ?? 0) * times;
+  save.hints += (g.hints ?? 0) * times;
+  save.shuffles += (g.shuffles ?? 0) * times;
+  let card: number | null = null;
+  if (g.card) card = drawCard();
+  save.gift.day = (save.gift.day + 1) % GIFTS.length;
+  save.gift.lastClaim = localDateKey();
+  persist();
+  return card;
+}
+
+export const localToday = () => localDateKey();

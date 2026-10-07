@@ -46,6 +46,18 @@ rm -rf android && npx cap add android && npm run assets
 > ⚠️ Until the IDs are replaced the app shows Google *test* ads and earns nothing. That's
 > intended for development.
 
+## 2b. In-app product: Remove ads
+
+1. Play Console → **Monetize → Products → In-app products → Create product**.
+2. Product ID **`jjak_remove_ads`** (must match `IAP.removeAds` in `src/config.ts`). Name it
+   "Remove ads" and add a description ("No ads between boards and no banners. Optional
+   reward ads stay available."). Suggested price US$2.99; let Play convert it for other
+   countries.
+3. Activate it. Products only appear in builds installed from a Play track (internal
+   testing is fine), so add your account as a **license tester** (Settings → License
+   testing) to buy without being charged.
+4. Data safety: add **Purchase history** (collected, not shared, for app functionality).
+
 ## 3. Signing
 
 Create an **upload key** once and back it up in two places. If you lose it, you have to
@@ -161,6 +173,7 @@ The cards come from the 48-card flower deck that Korea (Hwatu 화투) and Japan
   falling leaves in autumn, first snow in winter
 ◆ DAILY JJAK — one board for the whole world each day, with a new theme every weekday.
   Keep your streak, share your time
+◆ RUSH — a 60-second score attack. Chain combos into Full Bloom for double points
 ◆ ZEN — endless boards with no clock at all
 ◆ ALBUM — collect all 48 cards and learn each flower's name in Korean and Japanese,
   with little stories behind them (why is the October deer looking away?)
@@ -200,6 +213,10 @@ rewarded ads are always your choice.
 - [ ] EU test (UMP debug geography EEA): consent form appears, and Settings shows "Ad privacy choices"
 - [ ] Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s
 - [ ] Rewarded: closing early grants nothing, and finishing grants the item
+- [ ] After a rewarded ad, no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card
+- [ ] Remove ads: buy as a license tester → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back
+- [ ] Rush: timer, +time floaters, next board on clear, "Keep going +20s" once per run
+- [ ] Daily gift opens once a day; claiming advances the calendar; skipping a day doesn't reset it
 - [ ] Banner on Home and Album only; the layout isn't covered (bottom padding adjusts)
 - [ ] Android back button: closes sheets → returns home → minimizes on home
 - [ ] Rotate / split-screen / large-screen: layout still fits (portrait locked on phones)

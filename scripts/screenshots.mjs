@@ -70,6 +70,8 @@ const base17 = {
   seenTips: ['variants', 'stones'],
   seals: ['first', 'combo3', 'combo5', 'spring', 'daily1', 'streak3', 'month', 'godori', 'tsukimi'],
   paper: 'plain',
+  gift: { day: 3, lastClaim: key(today) },
+  rush: { best: 8400, runs: 6, bestRound: 5 },
 };
 
 // 1. First launch
@@ -146,5 +148,25 @@ await page.click('[data-go="daily"]');
 await page.waitForSelector('.card');
 await page.waitForTimeout(1400);
 await shot('16-daily');
+
+// 7. Daily gift, Rush, Fever
+await open({ ...base17, gift: { day: 3, lastClaim: null } });
+await page.waitForTimeout(900);
+await shot('17-gift');
+await open({ ...base17, hints: 999 });
+await page.click('[data-go="rush"]');
+await page.waitForSelector('.card');
+await page.waitForTimeout(1400);
+await playPairs(6, 260); // quick pairs build a ×5 combo → Fever
+await page.waitForTimeout(150);
+await page.screenshot({ path: `${out}/18-fever.png` });
+console.log('saved 18-fever');
+await playPairs(30, 260); // finish the first board → next board
+await page.waitForTimeout(600);
+await shot('19-rush');
+if (process.env.RUSH_END) {
+  await page.waitForSelector('.rush-score', { timeout: 200000 });
+  await shot('20-rush-end');
+}
 
 await browser.close();

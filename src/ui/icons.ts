@@ -11,6 +11,8 @@ export const ICONS = {
   restart: icon('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/>'),
   share: icon('<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>'),
   pause: icon('<path d="M9 5.5v13M15 5.5v13" stroke-width="2.2"/>'),
+  lantern: icon('<path d="M12 2.5v2.5M9 5h6"/><path d="M7.5 8.5C7.5 6.6 9.5 5 12 5s4.5 1.6 4.5 3.5v7c0 1.9-2 3.5-4.5 3.5s-4.5-1.6-4.5-3.5z" fill="currentColor" fill-opacity=".15"/><path d="M7.5 12h9M9 19h6M12 19v2.5"/>'),
+  gift: icon('<rect x="3.5" y="9" width="17" height="11" rx="2"/><path d="M3.5 13h17M12 9v11"/><path d="M12 9C10 5 6.5 5 6.5 7.2S9.5 9 12 9zM12 9c2-4 5.5-4 5.5-1.8S14.5 9 12 9z"/>'),
   play: icon('<path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/>'),
   ad: icon('<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.2-2.5z" fill="currentColor" stroke="none"/>'),
   star: '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12.00" cy="6.70" r="4.5"/><circle cx="17.04" cy="10.36" r="4.5"/><circle cx="15.12" cy="16.29" r="4.5"/><circle cx="8.88" cy="16.29" r="4.5"/><circle cx="6.96" cy="10.36" r="4.5"/><circle cx="12" cy="12" r="4"/></g><circle cx="12" cy="12" r="2.1" style="fill:var(--surface)"/><circle cx="12" cy="12" r=".9" fill="currentColor"/></svg>',

@@ -41,7 +41,21 @@ export interface SaveData {
   seals: string[];
   /** selected board paper: 'plain' or a month key */
   paper: string;
-  ads: { clearsSinceInterstitial: number; lastInterstitialAt: number };
+  ads: {
+    clearsSinceInterstitial: number;
+    lastInterstitialAt: number;
+    /** when the player last finished a rewarded ad (earns an interstitial-free window) */
+    lastRewardedAt: number;
+    interstitialsShown: number;
+    rewardedWatched: number;
+    /** date key of the last gentle "remove ads" mention */
+    lastUpsell: string | null;
+  };
+  /** owns the one-time "Remove ads" purchase */
+  adFree: boolean;
+  rush: { best: number; runs: number; bestRound: number };
+  /** 7-day gift calendar: next day index (0–6) and the date it was last claimed */
+  gift: { day: number; lastClaim: string | null };
   seenTips: string[];
 }
 
@@ -62,7 +76,10 @@ export const defaultSave = (): SaveData => ({
   stats: { pairs: 0, clears: 0, bestCombo: 0, zenBoards: 0, cleanClears: 0, fastClears: 0, bestDailyMs: 0 },
   seals: [],
   paper: 'plain',
-  ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0 },
+  ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0, lastRewardedAt: 0, interstitialsShown: 0, rewardedWatched: 0, lastUpsell: null },
+  adFree: false,
+  rush: { best: 0, runs: 0, bestRound: 0 },
+  gift: { day: 0, lastClaim: null },
   seenTips: [],
 });
 
@@ -79,6 +96,8 @@ function hydrate(raw: unknown): SaveData {
     settings: { ...base.settings, ...(r.settings ?? {}) },
     stats: { ...base.stats, ...(r.stats ?? {}) },
     ads: { ...base.ads, ...(r.ads ?? {}) },
+    rush: { ...base.rush, ...(r.rush ?? {}) },
+    gift: { ...base.gift, ...(r.gift ?? {}) },
   };
 }
 
@@ -130,7 +149,8 @@ export async function flush(): Promise<void> {
 }
 
 export async function resetSave(): Promise<void> {
-  const keep = { onboarded: save.onboarded, settings: save.settings };
+  // A purchase is never lost by resetting progress.
+  const keep = { onboarded: save.onboarded, settings: save.settings, adFree: save.adFree };
   save = { ...defaultSave(), ...keep };
   await flush();
 }

@@ -40,10 +40,13 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 | **Journey** | Session | Endless levels in 4 seasonal chapters × 12 levels, then "Year 2" with more stones. |
 | **Daily Jjak** | Daily | One worldwide board per date with a weekday theme (Stone Monday, Snowy Tuesday, Leaf-fall Wednesday…). Streak counter, a 7-day strip on Home, a countdown to the next board, and an emoji share card. |
 | **Album** | Weeks | 48 collectible cards with KR/JP names, romanization, and culture notes. One new card per first clear and per Daily. Each card shows which real card sets (yaku) it belongs to. |
-| **Seals 印** | Weeks–months | 28 achievements in four groups (Play, Journey, Daily, Album sets), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
+| **Seals 印** | Weeks–months | 31 achievements in four groups (Play, Journey, Daily, Album sets), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
 | **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif) under Settings. 12 to collect. |
 | **Journey map** | Any time | Every unlocked level with its blossoms, so you can replay for missing ones. |
 | **Zen** | Any time | Endless, untimed, no stars. |
+| **Rush** | Minutes | 60-second score attack: pairs add time, cleared boards add more, boards grow. Personal best, plus an optional rewarded "keep going +20 s" once per run. |
+| **Fever** | Seconds | A ×5 combo starts 6 s of 만개 · 満開 "full bloom": double points and a glowing board. |
+| **Gifts** | Daily / every 4 levels | 7-day gift calendar (never resets) and a lantern gift every 4th Journey level. |
 
 ## 4. Level curve
 
@@ -139,3 +142,6 @@ label on each card names its flower and month, and sound/haptics can be toggled.
 3. "Remove ads" in-app purchase and cosmetic card backs and board papers.
 4. Weekly "Festival" boards tied to real seasonal events (Seollal, Hanami, Chuseok, Tsukimi).
 5. Optional "Yaku" sets (Korean *Godori*, red/blue ribbons) as bonus objectives, with no wagering.
+
+
+See [`MONETIZATION.md`](MONETIZATION.md) for the full ad and engagement strategy.

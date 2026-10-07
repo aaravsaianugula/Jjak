@@ -36,6 +36,9 @@ export const SEALS: Seal[] = [
   { id: 'combo5', group: 'Play', title: 'Standing ovation', native: '짝짝짝짝짝', desc: 'Reach a ×5 combo.', reward: 25, progress: () => [save.stats.bestCombo, 5] },
   { id: 'clean10', group: 'Play', title: 'Unaided', desc: 'Clear 10 boards without hints or shuffles.', reward: 20, progress: () => [save.stats.cleanClears, 10] },
   { id: 'fast25', group: 'Play', title: 'Swift brush', desc: 'Beat par time on 25 boards.', reward: 30, progress: () => [save.stats.fastClears, 25] },
+  { id: 'fever', group: 'Play', title: 'Full bloom', native: '만개 · 満開', desc: 'Trigger Fever with a ×5 combo.', reward: 15, progress: () => [Math.min(save.stats.bestCombo, 5), 5] },
+  { id: 'rush5k', group: 'Play', title: 'Quick hands', desc: 'Score 5,000 in a Rush run.', reward: 15, progress: () => [save.rush.best, 5000] },
+  { id: 'rush15k', group: 'Play', title: 'Lightning brush', desc: 'Score 15,000 in a Rush run.', reward: 40, progress: () => [save.rush.best, 15000] },
   { id: 'zen10', group: 'Play', title: 'Still water', native: '禅', desc: 'Finish 10 Zen boards.', reward: 15, progress: () => [save.stats.zenBoards, 10] },
 
   // Journey
@@ -44,7 +47,7 @@ export const SEALS: Seal[] = [
   { id: 'autumn', group: 'Journey', title: 'Autumn', native: '가을 · 秋', desc: 'Finish the Autumn chapter.', reward: 30, progress: () => [Math.min(cleared(), 36), 36] },
   { id: 'winter', group: 'Journey', title: 'Winter', native: '겨울 · 冬', desc: 'Finish the Winter chapter — a full year.', reward: 50, progress: () => [Math.min(cleared(), 48), 48] },
   { id: 'stars100', group: 'Journey', title: 'Hundred blossoms', desc: 'Earn 100 blossoms in Journey.', reward: 40, progress: () => [starsTotal(), 100] },
-  { id: 'perfect12', group: 'Journey', title: 'Full bloom', desc: 'Earn all three blossoms on 12 levels.', reward: 30, progress: () => [threeStarLevels(), 12] },
+  { id: 'perfect12', group: 'Journey', title: 'Twelve perfect boards', desc: 'Earn all three blossoms on 12 levels.', reward: 30, progress: () => [threeStarLevels(), 12] },
 
   // Daily
   { id: 'daily1', group: 'Daily', title: 'Good morning', desc: 'Solve a Daily Jjak.', reward: 5, progress: () => [Math.min(1, Object.keys(save.daily.results).length), 1] },

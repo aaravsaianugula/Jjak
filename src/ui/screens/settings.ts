@@ -3,6 +3,7 @@ import { MONTHS } from '../../data/deck';
 import { completedMonths } from '../../services/progress';
 import { APP_VERSION, LINKS } from '../../config';
 import { ads } from '../../services/ads';
+import { store } from '../../services/store';
 import { resetSave, save, persist, type Theme } from '../../services/storage';
 import { applyTheme, type Screen } from '../app';
 import { esc, frag, h, toast } from '../dom';
@@ -28,6 +29,13 @@ export function settingsScreen(): Screen {
             <button data-set-theme="auto">Auto</button><button data-set-theme="paper">Paper</button><button data-set-theme="ink">Ink</button>
           </div>
         </div>
+      </div>
+      <div class="section-label">Support Jjak</div>
+      <div class="list">
+        ${save.adFree
+          ? `<div class="row"><span>Ads removed<small>Thank you for supporting Jjak. Optional reward ads stay available.</small></span><span class="muted">✓</span></div>`
+          : `<button class="row" data-act="buy"><span>Remove ads<small>No ads between boards and no banners. Rewards you choose stay optional.</small></span><span class="price">${store.available ? esc(store.price) : 'Android'}</span></button>`}
+        <button class="row" data-act="restore"><span>Restore purchase<small>Already bought it on another device?</small></span><span class="muted">›</span></button>
       </div>
       <div class="section-label">Help</div>
       <div class="list">
@@ -75,6 +83,18 @@ export function settingsScreen(): Screen {
     }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'how') showHowToPlay();
+    if (act === 'buy') {
+      if (!store.available) return toast('Remove ads is available in the Android app from Google Play.');
+      if (await store.buyRemoveAds()) {
+        toast('Ads removed. Thank you!');
+        nav.settings();
+      }
+    }
+    if (act === 'restore') {
+      const owned = await store.restore();
+      toast(owned ? 'Purchase restored. Ads are off.' : 'No purchase found for this Google account.');
+      if (owned) nav.settings();
+    }
     if (act === 'paper') {
       await pickPaper();
       sync();

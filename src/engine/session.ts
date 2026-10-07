@@ -9,6 +9,8 @@ import { createRng, type Rng } from './rng';
 export const COMBO_WINDOW_MS = 4000;
 export const MAX_COMBO = 5;
 export const BASE_PAIR_SCORE = 100;
+/** Reaching a ×5 combo starts Fever (満開 · 만개, "full bloom"): double score for a few seconds. */
+export const FEVER_MS = 6000;
 
 export type TapResult =
   | { kind: 'select'; cell: number }
@@ -28,6 +30,10 @@ export type TapResult =
       moved: [number, number][];
       /** snow-covered cells uncovered by this pair */
       revealed: number[];
+      /** Fever is active for this pair (score doubled) */
+      fever: boolean;
+      /** this pair started Fever */
+      feverStarted: boolean;
     }
   | { kind: 'hidden'; cell: number }
   | { kind: 'ignore' };
@@ -60,6 +66,9 @@ export class Session {
   /** cells whose card is still under snow */
   hidden: Set<number>;
   private lastMatchAt = -Infinity;
+  /** Fever ends at this timestamp */
+  feverUntil = -Infinity;
+  feverCount = 0;
   private rng: Rng;
 
   constructor(spec: LevelSpec, now: number, board?: Board) {
@@ -111,7 +120,15 @@ export class Session {
     this.combo = now - this.lastMatchAt <= COMBO_WINDOW_MS ? Math.min(MAX_COMBO, this.combo + 1) : 1;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
     this.lastMatchAt = now;
-    const gained = BASE_PAIR_SCORE * this.combo;
+    const wasFever = now < this.feverUntil;
+    let feverStarted = false;
+    if (this.combo >= MAX_COMBO && !wasFever) {
+      this.feverUntil = now + FEVER_MS;
+      this.feverCount++;
+      feverStarted = true;
+    }
+    const fever = now < this.feverUntil;
+    const gained = BASE_PAIR_SCORE * this.combo * (fever ? 2 : 1);
     this.score += gained;
     this.pairsMade++;
 
@@ -141,7 +158,7 @@ export class Session {
         reshuffled = true;
       }
     }
-    return { kind: 'match', a, b, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed };
+    return { kind: 'match', a, b, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, fever, feverStarted };
   }
 
   /** Uncover snowy cards that now touch an empty cell (or the board edge). */

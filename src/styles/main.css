@@ -2120,3 +2120,298 @@ select:focus-visible {
   width: 40px;
   height: 40px;
 }
+
+/* Fever (×5 combo): warm glow around the board for a few seconds */
+.game.is-fever .stage::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 22px;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, color-mix(in srgb, var(--gold) 26%, transparent));
+  animation: fever-pulse 1.2s ease-in-out infinite;
+}
+.game.is-fever .combo-bar i {
+  background: var(--accent);
+}
+@keyframes fever-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+.fever {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 9;
+  transform: translate(-50%, -50%);
+  padding: 14px 22px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  text-align: center;
+  box-shadow: 0 14px 30px -12px rgba(140, 40, 20, 0.6);
+  pointer-events: none;
+  animation: fever-in 1.6s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
+}
+.fever b {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 26px;
+}
+.fever span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+@keyframes fever-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7) rotate(-4deg);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.04) rotate(-2deg);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(-2deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(0.96);
+  }
+}
+
+/* Rush */
+.floater {
+  position: absolute;
+  z-index: 8;
+  transform: translate(-50%, 0);
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--good);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: float-up 900ms ease-out forwards;
+}
+@keyframes float-up {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -34px);
+  }
+}
+.game.is-urgent .hud__stat:first-child .hud__v {
+  color: var(--accent);
+  animation: urgent 1s ease-in-out infinite;
+}
+@keyframes urgent {
+  50% {
+    opacity: 0.45;
+  }
+}
+.board.is-swap {
+  animation: swap-in 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+}
+.rush-score {
+  margin: 18px 0 4px;
+  text-align: center;
+}
+.rush-score b {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 52px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.rush-score span {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Lantern gift row on the result sheet */
+.lantern {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--gold) 14%, var(--surface));
+  font-size: 14px;
+  animation: pop 400ms both;
+}
+.lantern__icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #fff;
+}
+.lantern__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Gentle upsell: a text link, never a popup */
+.upsell {
+  align-self: center;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 6px;
+}
+
+/* "Short break" card before an interstitial */
+.ad-break {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  background: rgba(28, 24, 20, 0.45);
+  animation: fade 160ms both;
+}
+.ad-break__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.5);
+  animation: pop 260ms both;
+}
+.ad-break__card span:not(.seal) {
+  color: var(--muted);
+}
+
+/* Home additions */
+.home__head-right {
+  display: flex;
+  gap: 8px;
+}
+.gift-btn {
+  position: relative;
+  color: var(--accent);
+}
+.gift-btn i {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.journey__lantern {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+.journey__lantern svg {
+  width: 16px;
+  height: 16px;
+  color: var(--gold);
+}
+.tiles {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.tile {
+  min-height: 78px;
+  padding: 12px;
+}
+.tile__title {
+  font-size: 16px;
+}
+.tile__sub {
+  font-size: 12px;
+}
+.tile__glyph {
+  font-size: 34px;
+  right: 6px;
+}
+.tile--rush {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.tile--rush .tile__title {
+  color: var(--accent);
+}
+
+/* Gift calendar */
+.gdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+}
+.gday {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+  min-width: 0;
+}
+.gday__n {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.gday__icon {
+  font-size: 18px;
+  line-height: 1.2;
+}
+.gday__label {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.gday--done {
+  opacity: 0.45;
+}
+.gday--now {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.gday__icon svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.price {
+  flex: none;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}

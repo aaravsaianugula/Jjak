@@ -80,6 +80,7 @@ class AdService {
   private readonly npa = false;
 
   async showBanner(): Promise<void> {
+    if (save.adFree) return this.hideBanner();
     if (!native) {
       this.onWebBanner?.(true);
       return;
@@ -135,25 +136,43 @@ class AdService {
     }
   }
 
+  /** Would an interstitial be allowed right now? (Pure policy check, no side effects.) */
+  interstitialDue(journeyLevelCleared: number | null): boolean {
+    if (save.adFree) return false;
+    if (journeyLevelCleared != null && journeyLevelCleared < AD_POLICY.firstInterstitialAfterLevel) return false;
+    if (save.ads.clearsSinceInterstitial < AD_POLICY.interstitialEveryClears) return false;
+    const now = Date.now();
+    if (now - save.ads.lastInterstitialAt < AD_POLICY.interstitialMinSeconds * 1000) return false;
+    // Players who chose a rewarded ad recently get a break from interstitials.
+    if (now - save.ads.lastRewardedAt < AD_POLICY.rewardedGraceMinutes * 60_000) return false;
+    return true;
+  }
+
   /**
    * Called after a board is cleared, *before* the next one starts.
-   * Shows an interstitial only when the fair-ads policy allows it.
+   * Shows an interstitial only when the fair-ads policy allows it, and always
+   * announces it first so it never ambushes the player.
    */
-  async betweenBoards(journeyLevelCleared: number | null): Promise<void> {
+  async betweenBoards(journeyLevelCleared: number | null): Promise<boolean> {
     save.ads.clearsSinceInterstitial++;
     persist();
-    if (journeyLevelCleared != null && journeyLevelCleared < AD_POLICY.firstInterstitialAfterLevel) return;
-    if (save.ads.clearsSinceInterstitial < AD_POLICY.interstitialEveryClears) return;
-    if (Date.now() - save.ads.lastInterstitialAt < AD_POLICY.interstitialMinSeconds * 1000) return;
-    if (!native || !this.ready || !this.interstitialLoaded) return;
+    if (!this.interstitialDue(journeyLevelCleared)) return false;
+    if (native && (!this.ready || !this.interstitialLoaded)) return false;
+    await adBreakNotice();
     try {
-      this.interstitialLoaded = false;
-      await AdMob.showInterstitial();
+      if (native) {
+        this.interstitialLoaded = false;
+        await AdMob.showInterstitial();
+      } else {
+        await webStub('Interstitial ad', 'Between boards only, never mid-puzzle.', 1200);
+      }
       save.ads.clearsSinceInterstitial = 0;
       save.ads.lastInterstitialAt = Date.now();
+      save.ads.interstitialsShown++;
       persist();
+      return true;
     } catch {
-      /* no fill — skip silently */
+      return false; // no fill: skip silently
     } finally {
       void this.preloadInterstitial();
     }
@@ -166,19 +185,28 @@ class AdService {
 
   /** Show a rewarded ad. Resolves true only if the reward was earned. */
   async rewarded(): Promise<boolean> {
-    if (!native) return webRewardStub();
-    if (!this.ready) return false;
-    if (!this.rewardedLoaded) await this.preloadRewarded();
-    if (!this.rewardedLoaded) return false;
-    try {
-      this.rewardedLoaded = false;
-      const item = await AdMob.showRewardVideoAd();
-      return !!item && item.amount >= 0;
-    } catch {
-      return false;
-    } finally {
-      void this.preloadRewarded();
+    let ok = false;
+    if (!native) ok = await webStub('Rewarded ad', 'On Android a short video plays here.', 1400);
+    else if (this.ready) {
+      if (!this.rewardedLoaded) await this.preloadRewarded();
+      if (this.rewardedLoaded) {
+        try {
+          this.rewardedLoaded = false;
+          const item = await AdMob.showRewardVideoAd();
+          ok = !!item && item.amount >= 0;
+        } catch {
+          ok = false;
+        } finally {
+          void this.preloadRewarded();
+        }
+      }
     }
+    if (ok) {
+      save.ads.lastRewardedAt = Date.now();
+      save.ads.rewardedWatched++;
+      persist();
+    }
+    return ok;
   }
 
   async showPrivacyOptions(): Promise<void> {
@@ -191,17 +219,31 @@ class AdService {
   }
 }
 
-/** Web preview: a short, honest stand-in so the reward flow can be tried. */
-function webRewardStub(): Promise<boolean> {
+/** Web preview: a short, honest stand-in so ad flows can be tried in the browser. */
+function webStub(label: string, body: string, ms: number): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.className = 'ad-stub';
-    el.innerHTML = '<div><p class="ad-stub__label">Rewarded ad</p><p>On Android a short video ad plays here.</p></div>';
+    el.innerHTML = `<div><p class="ad-stub__label">${label}</p><p>${body}</p></div>`;
     document.body.append(el);
     setTimeout(() => {
       el.remove();
       resolve(true);
-    }, 1400);
+    }, ms);
+  });
+}
+
+/** "Short break" card shown just before an interstitial. */
+function adBreakNotice(): Promise<void> {
+  return new Promise((resolve) => {
+    const el = document.createElement('div');
+    el.className = 'ad-break';
+    el.innerHTML = '<div class="ad-break__card"><span class="seal seal--sm">짝</span><div><b>Short break</b><br><span>An ad keeps Jjak free. Back in a moment.</span></div></div>';
+    document.body.append(el);
+    setTimeout(() => {
+      el.remove();
+      resolve();
+    }, AD_POLICY.adBreakNoticeMs);
   });
 }
 

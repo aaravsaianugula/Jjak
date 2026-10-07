@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY, STONE, type Board, cardsLeft, isCard, monthOf } from '../src/engine/board';
 import { generateBoard, reshuffle } from '../src/engine/generate';
-import { buildBoard, dailyLevel, dailyNumber, dailyTheme, journeyLevel, pickSnow, zenLevel } from '../src/engine/levels';
+import { buildBoard, dailyLevel, dailyNumber, dailyTheme, journeyLevel, pickSnow, rushLevel, zenLevel } from '../src/engine/levels';
 import { applyGravity, countMoves, findMove } from '../src/engine/moves';
 import { findPath, reachable } from '../src/engine/path';
 import { createRng } from '../src/engine/rng';
@@ -289,5 +289,34 @@ describe('falling leaves & snow', () => {
     const names = new Set(['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'].map((d) => dailyTheme(d).name));
     expect(names.size).toBe(7);
     expect(dailyTheme('2026-10-07').gravity).toBe(true); // a Wednesday
+  });
+});
+
+describe('fever & rush', () => {
+  it('a ×5 combo starts Fever, which doubles score until it runs out', () => {
+    const s = new Session(journeyLevel(20), 0);
+    let t = 0;
+    const results = [];
+    for (let k = 0; k < 7; k++) {
+      const [a, b] = findMove(s.board, s.hidden)!;
+      s.tap(a, (t += 500));
+      results.push(s.tap(b, (t += 500)));
+    }
+    const m = results.filter((r) => r.kind === 'match') as Extract<(typeof results)[number], { kind: 'match' }>[];
+    expect(m[4].combo).toBe(5);
+    expect(m[4].feverStarted).toBe(true);
+    expect(m[4].gained).toBe(100 * 5 * 2);
+    expect(m[5].fever).toBe(true);
+    expect(s.feverCount).toBe(1);
+  });
+
+  it('rush boards build and grow over a run', () => {
+    let prev = 0;
+    for (let r = 0; r < 8; r++) {
+      const spec = rushLevel('run-1', r);
+      const b = buildBoard(spec);
+      expect(cardsLeft(b)).toBeGreaterThanOrEqual(prev);
+      prev = cardsLeft(b);
+    }
   });
 });

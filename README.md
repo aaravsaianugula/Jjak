@@ -12,19 +12,20 @@ and collect every card with its Korean and Japanese name.
 |---|---|---|---|
 | ![](store/screenshots/03-home.png) | ![](store/screenshots/11-falling-leaves.png) | ![](store/screenshots/13-snow.png) | ![](store/screenshots/06-result.png) |
 
-| Journey map | Seals | Card detail | Daily |
+| Fever (×5 combo) | Rush | Seals | Card detail |
 |---|---|---|---|
-| ![](store/screenshots/07-map.png) | ![](store/screenshots/08-seals.png) | ![](store/screenshots/10-card-detail.png) | ![](store/screenshots/16-daily.png) |
+| ![](store/screenshots/18-fever.png) | ![](store/screenshots/20-rush-end.png) | ![](store/screenshots/08-seals.png) | ![](store/screenshots/10-card-detail.png) |
 
 ## What's inside
 
 | | |
 |---|---|
-| **Modes** | Journey (4 seasonal chapters, endless, with a level map), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed), Album (48 collectible cards) |
+| **Modes** | Journey (4 seasonal chapters, endless, with a level map), Rush (60 s score attack), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed), Album (48 collectible cards) |
 | **Mechanics** | Stones (Summer), Falling leaves (Autumn), First snow (Winter), mixed from Year 2 |
-| **Meta** | 28 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
+| **Meta** | Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, 31 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
 | **Engine** | Shisen-sho path rule (≤ 2 turns, edge routing), boards that are **solvable by construction**, deterministic seeds, auto-reshuffle on dead ends |
-| **Monetization** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, ads capped at PG content (13+ audience) |
+| **Monetization** | See [`docs/MONETIZATION.md`](docs/MONETIZATION.md). Rewarded-first ads, smart interstitials (cooldown after rewarded, "short break" notice), menu-only banners, and a one-time Remove ads purchase (Google Play Billing). |
+| **Ads (detail)** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, ads capped at PG content (13+ audience) |
 | **Tech** | TypeScript + Vite (no UI framework) + Capacitor 8 (Android target SDK 36, min SDK 24) |
 | **Art & sound** | Original SVG cards drawn in code, OFL fonts subset to the glyphs used, WebAudio-synthesized sound |
 
@@ -32,6 +33,7 @@ and collect every card with its Korean and Japanese name.
 
 * [`docs/RESEARCH.md`](docs/RESEARCH.md): the 2026 puzzle market, what players like and hate, and why this concept
 * [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md): loops, level curve, economy, ad rules, art direction
+* [`docs/MONETIZATION.md`](docs/MONETIZATION.md): ad placements, frequency rules, remove-ads purchase, KPIs and A/B tests
 * [`docs/PLAY_STORE_RELEASE.md`](docs/PLAY_STORE_RELEASE.md): **step-by-step publishing checklist** (AdMob IDs, signing, Play Console answers, listing copy)
 * [`docs/CLAUDE_BUILD_PROMPT.md`](docs/CLAUDE_BUILD_PROMPT.md): the prompt for Claude to plan, rebuild, or extend the game
 * [`docs/privacy-policy.html`](docs/privacy-policy.html): privacy policy ready for GitHub Pages

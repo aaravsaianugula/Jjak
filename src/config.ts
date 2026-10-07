@@ -27,6 +27,23 @@ export const AD_POLICY = {
   interstitialMinSeconds: 150,
   /** banners only on these screens — never over the board */
   bannerScreens: ['home', 'album'] as string[],
+  /** watching a rewarded ad earns this long without interstitials */
+  rewardedGraceMinutes: 6,
+  /** shown before an interstitial so it never arrives unannounced */
+  adBreakNoticeMs: 900,
+  /** at most one gentle "remove ads" mention per day, after this many interstitials */
+  upsellAfterInterstitials: 3,
+};
+
+/**
+ * One-time "Remove ads" purchase (Google Play Billing, managed product).
+ * Create a product with this id in Play Console → Monetize → In-app products.
+ * It removes interstitials and banners; rewarded ads stay available because the
+ * player chooses them.
+ */
+export const IAP = {
+  removeAds: 'jjak_remove_ads',
+  fallbackPrice: '$2.99',
 };
 
 export const ECONOMY = {
@@ -37,7 +54,24 @@ export const ECONOMY = {
   petalsPerStar: 5,
   dailyPetals: 15,
   zenPetals: 3,
+  /** every Nth Journey level (first clear) hangs a lantern gift */
+  lanternEvery: 4,
+  lanternPetals: 15,
+  /** Rush: petals per this many points, capped */
+  rushPointsPerPetal: 800,
+  rushPetalCap: 25,
 };
+
+/** 7-day gift calendar. Missing a day never resets it: it simply waits. */
+export const GIFTS: { petals?: number; hints?: number; shuffles?: number; card?: boolean; label: string }[] = [
+  { petals: 10, label: '10 petals' },
+  { hints: 1, label: 'A hint' },
+  { petals: 15, label: '15 petals' },
+  { shuffles: 1, label: 'A shuffle' },
+  { petals: 20, label: '20 petals' },
+  { hints: 1, shuffles: 1, label: 'Hint + shuffle' },
+  { card: true, petals: 10, label: 'Album card' },
+];
 
 /** Public URLs (host the privacy policy from docs/privacy-policy.html, e.g. on GitHub Pages). */
 export const LINKS = {

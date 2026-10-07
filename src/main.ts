@@ -4,6 +4,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import { installCardSprite } from './art/cards';
 import { ads } from './services/ads';
+import { store } from './services/store';
 import { haptic } from './services/haptics';
 import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
@@ -44,6 +45,7 @@ async function boot() {
     /* fonts API unavailable */
   }
 
+  void store.init();
   if (!save.onboarded) nav.welcome();
   else {
     nav.home();

@@ -2,13 +2,15 @@ import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
 import { type Point, STONE, cardsLeft, isCard } from '../../engine/board';
-import { type LevelSpec, chapterOf, dailyTheme, journeyLevel, zenLevel } from '../../engine/levels';
-import { Session, formatTime } from '../../engine/session';
+import { type LevelSpec, RUSH, chapterOf, dailyTheme, journeyLevel, rushLevel, zenLevel } from '../../engine/levels';
+import { FEVER_MS, Session, formatTime } from '../../engine/session';
 import { checkSeals, type Seal } from '../../services/achievements';
 import { ads } from '../../services/ads';
 import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
-import { type ClearSummary, completedMonths, drawCard, formatCountdown, msToNextDaily, recordClear, shareTextFor } from '../../services/progress';
+import { type ClearSummary, completedMonths, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, shareTextFor } from '../../services/progress';
+import { store } from '../../services/store';
+import { AD_POLICY } from '../../config';
 import { shareText } from '../../services/share';
 import { persist, save } from '../../services/storage';
 import { type Screen } from '../app';
@@ -26,16 +28,23 @@ const COMBO_WORDS = ['', '', 'Pair', 'Nice', 'Lovely', 'Brilliant'];
 
 function titleFor(spec: LevelSpec): string {
   if (spec.mode === 'daily') return `Daily #${spec.number}`;
+  if (spec.mode === 'rush') return 'Rush';
   if (spec.mode === 'zen') return 'Zen';
   return `Level ${spec.number}`;
 }
 
-export function gameScreen(spec: LevelSpec): Screen {
+export function gameScreen(initialSpec: LevelSpec): Screen {
+  let spec = initialSpec;
   let session = new Session(spec, performance.now());
-  const total = cardsLeft(session.board);
+  let total = cardsLeft(session.board);
+  /** Rush run state (null in other modes). */
+  const rush =
+    spec.mode === 'rush'
+      ? { runSeed: spec.seed.replace(/-r\d+$/, ''), round: 0, banked: 0, left: RUSH.startMs, continued: false, pairs: 0, bestCombo: 0, last: 0, over: false }
+      : null;
 
   // ── Layout ────────────────────────────────────────────────────────
-  const timeEl = h('b', { class: 'hud__v' }, spec.mode === 'zen' ? `0/${total / 2}` : '0:00');
+  const timeEl = h('b', { class: 'hud__v' }, spec.mode === 'zen' ? `0/${total / 2}` : rush ? formatTime(RUSH.startMs) : '0:00');
   const scoreEl = h('b', { class: 'hud__v' }, '0');
   const leftEl = h('b', { class: 'hud__v' }, String(total / 2));
   const bar = h('i');
@@ -54,7 +63,9 @@ export function gameScreen(spec: LevelSpec): Screen {
       ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ja}${twist}`
       : spec.mode === 'daily'
         ? `${dailyTheme(spec.seed.replace('daily-', '')).name} · same board worldwide`
-        : 'No clock, no pressure';
+        : rush
+          ? `Score attack · best ${save.rush.best.toLocaleString('en-US')}`
+          : 'No clock, no pressure';
   const comboBar = h('div', { class: 'combo-bar', 'aria-hidden': 'true' }, h('i'));
   const el = h(
     'section',
@@ -69,7 +80,7 @@ export function gameScreen(spec: LevelSpec): Screen {
     h(
       'div',
       { class: 'hud' },
-      h('div', { class: 'hud__stat' }, h('span', { class: 'hud__k' }, spec.mode === 'zen' ? 'Pairs' : 'Time'), timeEl),
+      h('div', { class: 'hud__stat' }, h('span', { class: 'hud__k' }, spec.mode === 'zen' ? 'Pairs' : rush ? 'Time left' : 'Time'), timeEl),
       h('div', { class: 'hud__stat hud__stat--mid' }, h('span', { class: 'hud__k' }, 'Pairs left'), leftEl),
       h('div', { class: 'hud__stat' }, h('span', { class: 'hud__k' }, 'Score'), scoreEl),
     ),
@@ -218,17 +229,17 @@ export function gameScreen(spec: LevelSpec): Screen {
     }
   }
 
-  function showCombo(n: number) {
+  function showCombo(n: number, fever = false) {
     if (n < 2) return;
     stage.querySelectorAll('.combo').forEach((x) => x.remove());
-    const node = h('div', { class: 'combo' }, h('b', {}, '짝'.repeat(n)), h('span', {}, `${COMBO_WORDS[n]} · ×${n}`.toUpperCase()));
+    const node = h('div', { class: 'combo' }, h('b', {}, '짝'.repeat(n)), h('span', {}, `${COMBO_WORDS[n]} · ×${n}${fever ? ' · ×2 bloom' : ''}`.toUpperCase()));
     stage.append(node);
     setTimeout(() => node.remove(), 950);
   }
 
   // ── HUD ───────────────────────────────────────────────────────────
   function updateHud() {
-    scoreEl.textContent = session.score.toLocaleString('en-US');
+    scoreEl.textContent = ((rush?.banked ?? 0) + session.score).toLocaleString('en-US');
     const left = cardsLeft(session.board);
     leftEl.textContent = String(left / 2);
     bar.style.width = `${((total - left) / total) * 100}%`;
@@ -244,6 +255,17 @@ export function gameScreen(spec: LevelSpec): Screen {
   let paused = false;
   let pausedAt = 0;
   const tick = setInterval(() => {
+    if (rush) {
+      const now = performance.now();
+      const dt = rush.last ? now - rush.last : 0;
+      rush.last = now;
+      if (paused || rush.over || busy) return;
+      rush.left = Math.max(0, rush.left - dt);
+      timeEl.textContent = formatTime(rush.left + 999);
+      el.classList.toggle('is-urgent', rush.left < 10_000);
+      if (rush.left <= 0) void endRush();
+      return;
+    }
     if (paused || session.done || spec.mode === 'zen') return;
     timeEl.textContent = formatTime(session.elapsedMs(performance.now()));
   }, 250);
@@ -351,7 +373,15 @@ export function gameScreen(spec: LevelSpec): Screen {
 
     sfx.match(res.combo);
     haptic.medium();
-    showCombo(res.combo);
+    showCombo(res.combo, res.fever);
+    if (res.feverStarted) startFever();
+    if (rush) {
+      const add = res.combo >= 3 ? RUSH.perComboPairMs : RUSH.perPairMs;
+      rush.left += add;
+      rush.pairs++;
+      rush.bestCombo = Math.max(rush.bestCombo, res.combo);
+      floatText(`+${add / 1000}s`, res.b);
+    }
     restartComboBar();
     updateHud();
     tutorialStep();
@@ -362,7 +392,101 @@ export function gameScreen(spec: LevelSpec): Screen {
         toast('No moves left — the cards were reshuffled.');
       }, 520);
     }
-    if (res.cleared) void finish();
+    if (res.cleared) void (rush ? nextRushBoard() : finish());
+  }
+
+  // ── Fever (×5 combo) ──────────────────────────────────────────────
+  let feverTimer: ReturnType<typeof setTimeout> | null = null;
+  function startFever() {
+    el.classList.add('is-fever');
+    sfx.stamp();
+    haptic.success();
+    const banner = h('div', { class: 'fever' }, h('b', {}, '만개 · 満開'), h('span', {}, 'Full bloom · double points'));
+    stage.append(banner);
+    setTimeout(() => banner.remove(), 1600);
+    if (feverTimer) clearTimeout(feverTimer);
+    feverTimer = setTimeout(() => el.classList.remove('is-fever'), FEVER_MS);
+  }
+
+  /** Small rising label over a cell (Rush time bonus). */
+  function floatText(text: string, cell: number) {
+    const c = cardEls.get(cell);
+    const x = c ? c.offsetLeft + c.offsetWidth / 2 : board.clientWidth / 2;
+    const y = c ? c.offsetTop : board.clientHeight / 2;
+    const f = h('span', { class: 'floater' }, text);
+    f.style.left = `${x}px`;
+    f.style.top = `${y}px`;
+    board.append(f);
+    setTimeout(() => f.remove(), 900);
+  }
+
+  // ── Rush ──────────────────────────────────────────────────────────
+  async function nextRushBoard() {
+    if (!rush) return;
+    busy = true;
+    rush.banked += session.score + RUSH.boardClearBonus;
+    rush.left += RUSH.boardClearMs;
+    floatText(`Board! +${RUSH.boardClearMs / 1000}s`, -1);
+    sfx.stamp();
+    await wait(450);
+    rush.round++;
+    spec = rushLevel(rush.runSeed, rush.round);
+    session = new Session(spec, performance.now());
+    total = cardsLeft(session.board);
+    board.classList.add('is-swap');
+    renderBoard();
+    updateHud();
+    setTimeout(() => board.classList.remove('is-swap'), 400);
+    busy = false;
+  }
+
+  async function endRush() {
+    if (!rush || rush.over) return;
+    rush.over = true;
+    busy = true;
+    el.classList.remove('is-urgent');
+    sfx.miss();
+    haptic.warn();
+    const score = rush.banked + session.score;
+    const content = frag(`<div>
+      <div class="result__head"><div class="seal">짝</div><div><h2>Time!</h2><div class="muted">Rush · ${rush.round + 1} boards · ${rush.pairs} pairs</div></div></div>
+      <div class="rush-score"><b>${score.toLocaleString('en-US')}</b><span>${score > save.rush.best && save.rush.best > 0 ? 'New best!' : `Best ${Math.max(save.rush.best, score).toLocaleString('en-US')}`}</span></div>
+    </div>`);
+    const actions = h('div', { class: 'sheet__actions' });
+    content.append(actions);
+    const sheet = openSheet(content, { dismissible: false, label: 'Rush over' });
+
+    const finishRun = async (again: boolean) => {
+      sheet.close();
+      const sum = recordRush(score, rush.round + 1, rush.pairs, rush.bestCombo);
+      const won = checkSeals();
+      if (sum.petals) toast(`+${sum.petals} petals${won.length ? ` · Seal earned: ${won.map((w) => w.title).join(', ')}` : ''}`);
+      else if (won.length) toast(`Seal earned: ${won.map((w) => w.title).join(', ')}`);
+      await ads.betweenBoards(null);
+      if (again) nav.game(rushLevel(`rush-${Date.now()}`, 0));
+      else nav.home();
+    };
+
+    if (!rush.continued && ads.rewardedAvailable) {
+      actions.append(
+        h('button', {
+          class: 'btn btn--accent btn--block',
+          html: `${ICONS.ad}<span>Keep going · +${RUSH.continueMs / 1000}s</span>`,
+          onclick: async () => {
+            const ok = await ads.rewarded();
+            if (!ok) return toast('The ad didn’t finish, so no extra time this round.');
+            sheet.close();
+            rush.continued = true;
+            rush.over = false;
+            rush.left = RUSH.continueMs;
+            busy = false;
+            rush.last = performance.now();
+          },
+        }),
+      );
+    }
+    actions.append(h('button', { class: 'btn btn--primary btn--block', html: `Play again ${ICONS.play}`, onclick: () => void finishRun(true) }));
+    actions.append(h('button', { class: 'btn btn--quiet btn--block', onclick: () => void finishRun(false) }, 'Home'));
   }
 
   function restartComboBar() {
@@ -598,6 +722,10 @@ export function gameScreen(spec: LevelSpec): Screen {
     }
 
     if (summary.drawn != null) content.append(drawPanel(summary.drawn, 'New card'));
+    if (summary.lantern) {
+      const l = summary.lantern;
+      content.append(frag(`<div class="lantern"><span class="lantern__icon" aria-hidden="true">${ICONS.lantern}</span><span><b>Lantern gift</b><br><span class="muted">+${l.petals} petals${l.hints ? ' · +1 hint' : ''}${l.shuffles ? ' · +1 shuffle' : ''}</span></span></div>`));
+    }
     if (newPaper) content.append(frag(`<p class="unlock">A flower is complete — a new board paper is ready in Settings.</p>`));
     if (seals.length) content.append(sealRow(seals));
     if (spec.mode === 'daily') content.append(frag(`<p class="muted" style="text-align:center;margin-top:14px">Next Daily in ${formatCountdown(msToNextDaily())}</p>`));
@@ -622,6 +750,20 @@ export function gameScreen(spec: LevelSpec): Screen {
       );
     }
     const next = nextSpec();
+    // Near miss: one tap to try for the missing blossoms.
+    if (spec.mode === 'journey' && summary.stars < 3) {
+      const missing = !st.noAssist ? 'without hints or shuffles' : `under ${formatTime(spec.par * 1000)}`;
+      actions.append(
+        h('button', {
+          class: 'btn btn--ghost btn--block',
+          html: `${ICONS.restart}<span>Retry for 3 blossoms <small>· ${missing}</small></span>`,
+          onclick: () => {
+            sheet.close();
+            nav.game(journeyLevel(spec.number));
+          },
+        }),
+      );
+    }
     if (next) {
       actions.append(
         h('button', {
@@ -646,6 +788,20 @@ export function gameScreen(spec: LevelSpec): Screen {
       }, 'Home'),
     );
     if (summary.drawn != null) setTimeout(() => sfx.reveal(), 350);
+    // At most once a day, and only after a few interstitials: a quiet way out of ads.
+    const today = localToday();
+    if (!save.adFree && store.available && save.ads.interstitialsShown >= AD_POLICY.upsellAfterInterstitials && save.ads.lastUpsell !== today) {
+      save.ads.lastUpsell = today;
+      persist();
+      const link = h('button', { class: 'upsell' }, `Prefer no ads between boards? Remove them for ${store.price}`);
+      link.addEventListener('click', async () => {
+        if (await store.buyRemoveAds()) {
+          link.textContent = 'Thank you! Ads between boards are gone.';
+          link.setAttribute('disabled', '');
+        }
+      });
+      actions.append(link);
+    }
   }
 
   function sealRow(seals: Seal[]): HTMLElement {
@@ -696,7 +852,7 @@ export function gameScreen(spec: LevelSpec): Screen {
   }
 
   function leave() {
-    if (session.done || session.pairsMade === 0) nav.home();
+    if ((session.done || session.pairsMade === 0) && !(rush && rush.round > 0)) nav.home();
     else openPause();
   }
 
@@ -752,6 +908,10 @@ export function gameScreen(spec: LevelSpec): Screen {
   }
 
   function restartBoard() {
+    if (rush) {
+      nav.game(rushLevel(`rush-${Date.now()}`, 0));
+      return;
+    }
     session = new Session(spec, performance.now());
     clearHint();
     renderBoard();
@@ -761,11 +921,13 @@ export function gameScreen(spec: LevelSpec): Screen {
 
   /** Title card at the start of a board; the clock starts when it clears. */
   function intro(): Promise<void> {
-    const twistNote = spec.gravity ? 'Cards fall to fill the gaps' : spec.snow ? 'Some cards start under snow' : spec.stones ? 'Stones block the way' : '';
+    const twistNote = rush
+      ? `${RUSH.startMs / 1000} seconds · pairs add time`
+      : spec.gravity ? 'Cards fall to fill the gaps' : spec.snow ? 'Some cards start under snow' : spec.stones ? 'Stones block the way' : '';
     const card = frag(`<div class="intro" aria-hidden="true">
-      <div class="intro__kicker">${esc(spec.mode === 'journey' ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}` : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : 'Zen · 禅')}</div>
+      <div class="intro__kicker">${esc(spec.mode === 'journey' ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}` : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : 'Zen · 禅')}</div>
       <div class="intro__title">${esc(titleFor(spec))}</div>
-      <div class="intro__sub">${total / 2} pairs${twistNote ? ` · ${esc(twistNote)}` : ''}</div>
+      <div class="intro__sub">${rush ? '' : `${total / 2} pairs · `}${esc(twistNote)}</div>
     </div>`);
     stage.append(card);
     busy = true;
