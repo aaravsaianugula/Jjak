@@ -140,6 +140,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Keep Korean words whole when wrapping (공산, not 공 / 산). */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   user-select: none;
   -webkit-user-select: none;
 }
