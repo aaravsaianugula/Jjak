@@ -35,7 +35,7 @@ const KN = (v: number) => String(Math.round(v * 10) / 10);
 const cordY = (x: number, y: number) => y + Math.sin(((x + 4) / 108) * Math.PI * 2) * 1.4;
 function cordPath(y: number, wave = 0, phase = 0): string {
   let d = '';
-  for (let x = -4; x <= 104; x += 2) {
+  for (let x = -4; x <= 104; x += wave ? 2 : 6) {
     const yy = cordY(x, y) + Math.sin(x * 0.9 + phase) * wave;
     d += `${x === -4 ? 'M' : 'L'}${x} ${KN(yy)}`;
   }

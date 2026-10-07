@@ -343,7 +343,10 @@ export const SPECIALS: Record<number, Special> = {
       }
       // heading band with cord loops
       s += `<rect x="0" y="99" width="100" height="4.4" fill="#7f251c"/>`;
-      for (let x = 10; x < 92; x += 8) s += `<circle cx="${x}" cy="101.2" r="1" fill="none" stroke="#c9a24a" stroke-width=".55"/>`;
+      // a gold cord laced along the heading, dipping between the hanging points
+      let cord = 'M0 100.4';
+      for (let x = 0; x < 100; x += 8) cord += `Q${x + 4} 102.8 ${x + 8} 100.4`;
+      s += `<path d="${cord}" fill="none" stroke="#c9a24a" stroke-width=".6"/>`;
       s += `<path d="M0 103.4H100" stroke="#c9a24a" stroke-width=".4" stroke-opacity=".8"/>`;
       s += `</g>`;
       // crest: cherry blossom in a ring
