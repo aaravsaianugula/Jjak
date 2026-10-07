@@ -22,9 +22,10 @@ and collect every card with its Korean and Japanese name.
 |---|---|
 | **Modes** | Journey (4 seasonal chapters, endless, with a level map), Rush (60 s score attack), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed), Album (48 collectible cards) |
 | **Mechanics** | Stones (Summer), Falling leaves (Autumn), First snow (Winter), mixed from Year 2 |
-| **Meta** | Card-set (yaku) bonuses on the board, generative seasonal music, opt-in Daily reminders, Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, 33 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
+| **Meta** | Card-set (yaku) bonuses on the board, generative seasonal music, opt-in Daily reminders, Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, 44 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
+| **Flower Path 꽃길 · 花道** | Free 100-rank track (~50 h) with a title every 10 ranks and a reward on every rank, 3 daily missions from 40 templates + a weekly chest, chapter star chests at 12/24/36 blossoms, gold-leaf (foil) editions of the 48 cards, a Bonus page for the two lucky cards, and Warm tea streak freezes. Tuned by `tests/economy.test.ts` (~315 petals/h, rank 100 at ~50 h) |
 | **Engine** | Shisen-sho path rule (≤ 2 turns, edge routing), boards that are **solvable by construction**, deterministic seeds, auto-reshuffle on dead ends |
-| **Monetization** | See [`docs/MONETIZATION.md`](docs/MONETIZATION.md). Rewarded-first ads, smart interstitials (cooldown after rewarded, "short break" notice), menu-only banners, and a one-time Remove ads purchase (Google Play Billing). |
+| **Monetization** | See [`docs/MONETIZATION.md`](docs/MONETIZATION.md). Rewarded-first ads, smart interstitials (cooldown after rewarded, "short break" notice), menu-only banners, a one-time Remove ads purchase, petal pouches (consumable) and a Supporter pack (Google Play Billing). No timers, fake discounts or loot boxes. |
 | **Ads (detail)** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, ads capped at PG content (13+ audience) |
 | **Tech** | TypeScript + Vite (no UI framework) + Capacitor 8 (Android target SDK 36, min SDK 24) |
 | **Art & sound** | Original SVG cards drawn in code, OFL fonts subset to the glyphs used, WebAudio-synthesized sound |
@@ -43,7 +44,8 @@ and collect every card with its Korean and Japanese name.
 ```bash
 npm install
 npm run dev          # http://localhost:5173 — plays in any browser (ads are stubbed)
-npm test             # 24 engine tests: path finding, 1,000-board solvability fuzz, gravity/snow, 120-level play-through, daily themes
+npm test             # engine tests (path finding, 1,000-board solvability fuzz, gravity/snow, 120-level play-through, daily themes),
+                     # Flower Path tests (ranks, missions, chests, foil, purchases, Warm tea) and the economy simulation
 npm run typecheck
 ```
 

@@ -44,6 +44,20 @@ export const AD_POLICY = {
 export const IAP = {
   removeAds: 'jjak_remove_ads',
   fallbackPrice: '$2.99',
+  /**
+   * Petal pouches: **consumable** in-app products (consumed after the petals are
+   * credited, so they can be bought again). Prices come from Play (`priceString`);
+   * the fallbacks are only shown while Play hasn't answered. See docs/MONETIZATION.md §4b.
+   */
+  pouches: [
+    { id: 'jjak_petals_small', name: 'Small pouch', petals: 600, fallbackPrice: '$0.99' },
+    { id: 'jjak_petals_medium', name: 'Pouch of petals', petals: 1600, fallbackPrice: '$2.49' },
+    { id: 'jjak_petals_large', name: 'Large pouch', petals: 4000, fallbackPrice: '$4.99' },
+  ],
+  /** Supporter pack: **non-consumable**. Remove ads + 1,500 petals once + the Clouds card back + a Supporter seal. */
+  supporter: 'jjak_supporter',
+  supporterPetals: 1500,
+  supporterFallbackPrice: '$4.99',
 };
 
 export const ECONOMY = {

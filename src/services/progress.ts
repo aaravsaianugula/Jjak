@@ -11,7 +11,7 @@ export interface ClearSummary {
   /** newly unlocked album card, if any */
   drawn: number | null;
   /** daily only */
-  daily?: { counted: boolean; streak: number; number: number };
+  daily?: { counted: boolean; streak: number; number: number; tea?: number };
   /** lantern gift for every 4th Journey level */
   lantern?: { petals: number; hints: number; shuffles: number };
 }
@@ -20,6 +20,25 @@ const yesterdayKey = (today: string) => {
   const [y, m, d] = today.split('-').map(Number);
   return localDateKey(new Date(y, m - 1, d - 1));
 };
+
+/** Whole days from one date key to another (local calendar, DST-safe). */
+export function daysBetween(from: string, to: string): number {
+  const at = (k: string) => {
+    const [y, m, d] = k.split('-').map(Number);
+    return new Date(y, m - 1, d).getTime();
+  };
+  return Math.round((at(to) - at(from)) / 86400000);
+}
+
+/**
+ * Warm tea (streak freezes) needed to bridge the days missed since the last
+ * Daily, or 0 if none were missed or there isn't enough tea to cover them all.
+ */
+export function teaToBridge(today: string, last = save.daily.lastDate): number {
+  if (!last || save.daily.streak <= 0) return 0;
+  const missed = daysBetween(last, today) - 1;
+  return missed >= 1 && missed <= save.streakFreezes ? missed : 0;
+}
 
 /** Pick a random locked card and add it to the album. */
 export function drawCard(): number | null {
@@ -74,13 +93,21 @@ export function recordClear(s: Session): ClearSummary {
       const ms = s.elapsedMs(s.finishedAt);
       save.daily.results[key] = { ms, score: s.score, combo: s.bestCombo, stars };
       save.stats.bestDailyMs = save.stats.bestDailyMs ? Math.min(save.stats.bestDailyMs, ms) : ms;
-      save.daily.streak = save.daily.lastDate === yesterdayKey(today) ? save.daily.streak + 1 : 1;
+      // Warm tea keeps the streak through missed days, one cup per day.
+      const tea = teaToBridge(today);
+      if (tea) {
+        save.streakFreezes -= tea;
+        save.meta.teaNotice += tea;
+        save.meta.stats.teaUsed += tea;
+      }
+      save.daily.streak = save.daily.lastDate === yesterdayKey(today) || tea > 0 ? save.daily.streak + 1 : 1;
       save.daily.best = Math.max(save.daily.best, save.daily.streak);
       save.daily.lastDate = today;
       out.petals = ECONOMY.dailyPetals;
       out.drawn = drawCard();
     }
     out.daily = { counted, streak: save.daily.streak, number: s.spec.number };
+    if (counted && save.meta.teaNotice) out.daily.tea = save.meta.teaNotice;
   } else {
     save.stats.zenBoards++;
     out.petals = ECONOMY.zenPetals;
@@ -91,11 +118,12 @@ export function recordClear(s: Session): ClearSummary {
   return out;
 }
 
-/** Streak to display: still alive if the last daily was today or yesterday. */
+/** Streak to display: still alive if the last daily was today or yesterday, or Warm tea would cover the gap. */
 export function liveStreak(): number {
   const today = localDateKey();
   const last = save.daily.lastDate;
-  return last === today || last === yesterdayKey(today) ? save.daily.streak : 0;
+  if (last === today || last === yesterdayKey(today)) return save.daily.streak;
+  return teaToBridge(today) > 0 ? save.daily.streak : 0;
 }
 
 export function shareTextFor(s: Session, summary: ClearSummary, storeUrl: string): string {

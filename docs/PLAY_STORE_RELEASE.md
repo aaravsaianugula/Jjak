@@ -46,17 +46,46 @@ rm -rf android && npx cap add android && npm run assets
 > ⚠️ Until the IDs are replaced the app shows Google *test* ads and earns nothing. That's
 > intended for development.
 
-## 2b. In-app product: Remove ads
+## 2b. In-app products: Remove ads, petal pouches, Supporter pack
 
-1. Play Console → **Monetize → Products → In-app products → Create product**.
-2. Product ID **`jjak_remove_ads`** (must match `IAP.removeAds` in `src/config.ts`). Name it
-   "Remove ads" and add a description ("No ads between boards and no banners. Optional
-   reward ads stay available."). Suggested price US$2.99; let Play convert it for other
-   countries.
-3. Activate it. Products only appear in builds installed from a Play track (internal
-   testing is fine), so add your account as a **license tester** (Settings → License
-   testing) to buy without being charged.
-4. Data safety: add **Purchase history** (collected, not shared, for app functionality).
+All five are **one-time products** (Play Console → **Monetize → Products → In-app
+products → Create product**). The ids must match `IAP` in `src/config.ts`. The app
+always shows Play's own localized `priceString`; the prices below are suggestions (set
+the US price and let Play's price templates convert it).
+
+| Product ID | Name | Type in the app | Suggested price | What it gives |
+|---|---|---|---|---|
+| `jjak_remove_ads` | Remove ads | Non-consumable | US$2.99 | No interstitials or banners. Rewarded ads stay. |
+| `jjak_petals_small` | Small pouch | **Consumable** | US$0.99 | 600 petals |
+| `jjak_petals_medium` | Pouch of petals | **Consumable** | US$2.49 | 1,600 petals |
+| `jjak_petals_large` | Large pouch | **Consumable** | US$4.99 | 4,000 petals |
+| `jjak_supporter` | Supporter pack | Non-consumable | US$4.99 | Remove ads + 1,500 petals once + the Clouds card back (`back:clouds`, only here) + a Supporter seal |
+
+1. Create each product with the id above, a plain description of exactly what it
+   gives (copy the "What it gives" column), and activate it.
+2. Play has no separate "consumable" type: the app **consumes** a pouch itself, after
+   the petals are credited and saved (`NativePurchases.consumePurchase`), so it can be
+   bought again. If the app closes between payment and consumption, the next launch
+   finds the unconsumed purchase, credits it (each purchase token is remembered, so
+   never twice) and consumes it. Pending payments (e.g. cash) are credited on a later
+   launch once Play marks them purchased.
+3. Remove ads and the Supporter pack are **restored** on every launch and by
+   *Settings → Restore purchase* (both remove ads; the Supporter gifts are granted once).
+   Refunded non-consumables drop out of Play's list and ads come back on next launch.
+4. Products only appear in builds installed from a Play track (internal testing is
+   fine), so add your account as a **license tester** (Settings → License testing) to
+   buy without being charged. Test a pouch twice in a row to confirm consumption.
+5. If the pouch / Supporter products aren't set up, their section hides itself; Remove
+   ads keeps working on its own.
+6. Data safety: add **Purchase history** (collected, not shared, purpose: app
+   functionality). It's read from Google Play on the device to restore purchases; the
+   app keeps only pouch purchase tokens locally to avoid double credit. No payment
+   details ever reach the app.
+
+**Honesty rules for these products** (Play's policies and our own tone): every product
+says exactly what it contains, there are no timers, no "% off" or fake "best value"
+labels, no random rewards for money, and petals only buy cosmetics, garden items and
+tools: never levels or progress gates.
 
 ## 3. Signing
 
@@ -142,6 +171,7 @@ because it's the authoritative source. At the time of writing, typical answers a
 | Approximate location (from IP) | Yes | Yes | Advertising, fraud prevention | |
 | App interactions | Yes | Yes | Advertising, analytics | |
 | Crash logs / diagnostics | Yes | Yes | Analytics, fraud prevention | |
+| Purchase history (Google Play Billing) | Yes | No | App functionality | Read from Play on the device to restore Remove ads / Supporter pack and credit petal pouches once. Not sent anywhere by the app. |
 
 * Data is encrypted in transit: **Yes**.
 * Users can request deletion: game data is local, so uninstalling or using *Settings →
@@ -216,6 +246,11 @@ rewarded ads are always your choice.
 - [ ] Rewarded: closing early grants nothing, and finishing grants the item
 - [ ] After a rewarded ad, no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card
 - [ ] Remove ads: buy as a license tester → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back
+- [ ] Petal pouch: buy → petals credited once; buy the same pouch again right away (proves it was consumed); kill the app mid-purchase → next launch credits it once
+- [ ] Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice
+- [ ] Flower Path: Home strip shows rank, title, XP bar and missions; a result sheet shows +XP and the bar fills; a rank-up shows the rank-up moment; claims stamp and pay out
+- [ ] Missions: 3 a day, progress during play with a small toast; one reroll each; the weekly chest opens at 15
+- [ ] Warm tea: miss a day with tea → the Daily keeps the streak and says "Warm tea kept your streak" once
 - [ ] Rush: timer, +time floaters, next board on clear, "Keep going +20s" once per run
 - [ ] Daily gift opens once a day; claiming advances the calendar; skipping a day doesn't reset it
 - [ ] Daily reminder: offered after the first Daily; Android 13+ asks for notification permission; a notification arrives at the chosen hour with the day's theme and doesn't arrive for days already played

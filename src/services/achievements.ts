@@ -4,6 +4,7 @@
  * here through the Album, never wagered.
  */
 import { MONTHS } from '../data/deck';
+import { rankOf } from '../data/meta';
 import { liveStreak } from './progress';
 import { persist, save } from './storage';
 
@@ -18,7 +19,7 @@ export interface Seal {
   progress(): [number, number];
   /** album card ids, for card-set seals */
   cards?: number[];
-  group: 'Play' | 'Journey' | 'Daily' | 'Album sets';
+  group: 'Play' | 'Journey' | 'Daily' | 'Album sets' | 'Flower Path';
 }
 
 const has = (ids: number[]) => ids.filter((id) => save.album.includes(id)).length;
@@ -26,6 +27,7 @@ const starsTotal = () => Object.values(save.stars).reduce((a, b) => a + b, 0);
 const threeStarLevels = () => Object.values(save.stars).filter((s) => s >= 3).length;
 const fullMonths = () => MONTHS.filter((m) => [0, 1, 2, 3].every((v) => save.album.includes(m.index * 4 + v))).length;
 const cleared = () => save.level - 1;
+const pathRank = () => rankOf(save.meta.xp);
 
 export const SEALS: Seal[] = [
   // Play
@@ -68,7 +70,26 @@ export const SEALS: Seal[] = [
   { id: 'hanami', group: 'Album sets', title: 'Blossom-viewing sake', native: '花見酒', desc: 'The cherry curtain and the sake cup.', cards: [11, 35], reward: 15, progress: () => [has([11, 35]), 2] },
   { id: 'ogwang', group: 'Album sets', title: 'Five brights', native: '오광 · 五光', desc: 'Crane, curtain, moon, rain and phoenix.', cards: [3, 11, 31, 43, 47], reward: 50, progress: () => [has([3, 11, 31, 43, 47]), 5] },
   { id: 'album48', group: 'Album sets', title: 'The whole deck', native: '화투 · 花札', desc: 'Collect all 48 cards.', reward: 100, progress: () => [save.album.length, 48] },
+
+  // Flower Path
+  { id: 'rank10', group: 'Flower Path', title: 'In bud', native: '꽃봉오리 · 蕾', desc: 'Reach rank 10 on the Flower Path.', reward: 20, progress: () => [pathRank(), 10] },
+  { id: 'rank50', group: 'Flower Path', title: 'Garden keeper', native: '정원지기 · 庭守', desc: 'Reach rank 50 on the Flower Path.', reward: 50, progress: () => [pathRank(), 50] },
+  { id: 'rank100', group: 'Flower Path', title: 'Master of flowers', native: '꽃의 명인 · 花の名人', desc: 'Reach rank 100, the end of the Flower Path.', reward: 100, progress: () => [pathRank(), 100] },
+  { id: 'missions10', group: 'Flower Path', title: 'Small errands', desc: 'Complete 10 daily missions.', reward: 20, progress: () => [save.meta.stats.missions, 10] },
+  { id: 'missions100', group: 'Flower Path', title: 'A hundred errands', desc: 'Complete 100 daily missions.', reward: 60, progress: () => [save.meta.stats.missions, 100] },
+  { id: 'weekly1', group: 'Flower Path', title: 'A week well spent', desc: 'Open a weekly chest.', reward: 20, progress: () => [Math.min(1, save.meta.stats.weeks), 1] },
+  { id: 'chest36', group: 'Flower Path', title: 'Every blossom', desc: 'Open a 36-blossom star chest.', reward: 30, progress: () => [Math.min(1, save.meta.stats.fullChests), 1] },
+  { id: 'foil1', group: 'Flower Path', title: 'Gold leaf', native: '금박 · 金箔', desc: 'Find a gold-leaf card.', reward: 15, progress: () => [Math.min(1, save.meta.foil.length), 1] },
+  { id: 'foil12', group: 'Flower Path', title: 'A gilded dozen', desc: 'Find 12 gold-leaf cards.', reward: 40, progress: () => [save.meta.foil.length, 12] },
+  { id: 'bonus2', group: 'Flower Path', title: 'Lucky pair', native: '보너스패', desc: 'Pair the two lucky bonus cards.', reward: 15, progress: () => [save.meta.bonus.length, 2] },
+  { id: 'tea1', group: 'Flower Path', title: 'Warm tea', native: '차 · 茶', desc: 'Keep your Daily streak with a cup of Warm tea.', reward: 10, progress: () => [Math.min(1, save.meta.stats.teaUsed), 1] },
 ];
+
+/**
+ * A thank-you seal for Supporter pack owners. It joins the seal book only once
+ * owned, so finishing the book never needs a purchase.
+ */
+const SUPPORTER_SEAL: Seal = { id: 'supporter', group: 'Flower Path', title: 'Supporter', native: '후원 · 応援', desc: 'Thank you for supporting Jjak.', reward: 25, progress: () => [save.meta.supporter ? 1 : 0, 1] };
 
 export const sealDone = (s: Seal) => {
   const [a, b] = s.progress();
@@ -77,6 +98,7 @@ export const sealDone = (s: Seal) => {
 
 /** Award any newly completed seals; returns them (caller shows a toast). */
 export function checkSeals(): Seal[] {
+  if (save.meta.supporter && !SEALS.includes(SUPPORTER_SEAL)) SEALS.push(SUPPORTER_SEAL);
   const fresh = SEALS.filter((s) => !save.seals.includes(s.id) && sealDone(s));
   for (const s of fresh) {
     save.seals.push(s.id);

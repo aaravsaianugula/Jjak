@@ -29,7 +29,12 @@ Numbers from vendor blogs are directional. Validate them with Jjak's own data (s
 | **Gift calendar** | Daily | Seven days of gifts ending in an album card. **Missing a day never resets it.** |
 | **Daily reminder** | Daily | Opt-in only, offered inline after your first Daily (never a pop-up). It names that day's theme ("Leaf-fall Wednesday · Daily #8 is ready"), skips days you've already played, and uses inexact alarms (no special permission). |
 | **Card sets** | Per board | Clearing a real yaku set inside one board scores a named bonus, a discovery layer for players who learn the deck. |
-| **Album, Seals, papers** | Weeks | 48 cards, 31 seals including real yaku sets, and 12 board papers. |
+| **Album, Seals, papers** | Weeks | 48 cards, 44 seals including real yaku sets, and 12 board papers. |
+| **Flower Path 꽃길 · 花道** | Every board → ~50 h | Free 100-rank track fed by XP from all play. A title every 10 ranks, a reward on every rank (petals, tools, Warm tea, gold-leaf cards), and six exclusives that can't be bought (`back:moon` r25 … `music:moonlight` r100). Rank 2 comes in the first session, rank 5 in the first hour, rank 100 at about 50 hours. |
+| **Daily missions** | Daily | Three a day (light, steady, long) drawn from 40 templates across Journey, Daily, Rush and Zen, one free swap each. Completing them fills a **weekly chest** (15 → XP, tools and a gold-leaf card). Missing days costs nothing. |
+| **Star chests** | Per chapter | Three chests per 12-level chapter at 12 / 24 / 36 blossoms: a reason to replay for missing blossoms. |
+| **Gold leaf 金箔** | Months | Rare foil editions of album cards from rank rewards, weekly and 36-blossom chests, and a small chance on perfect first clears later on. Never for sale. |
+| **Warm tea** | Daily | A streak freeze (hold up to 2). Missed days are covered automatically when the Daily is next solved. |
 
 We deliberately avoid dark patterns: no paid loot boxes, no energy or lives, no streak
 shaming, no fake countdown offers, and no ads that block progress.
@@ -63,6 +68,34 @@ All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without 
 * Implemented with `@capgo/native-purchases` (Capacitor 8, Google Play Billing). Purchases
   are auto-acknowledged.
 
+## 4b. Petal pouches and the Supporter pack
+
+Optional purchases for players who want to support the game or save time. They're shown
+in one quiet "Support Jjak" section of the Market (`bundlesSection()` in
+`src/ui/screens/path.ts`), never as pop-ups.
+
+| Product | Type | Suggested price | Contents |
+|---|---|---|---|
+| `jjak_petals_small` | Consumable | US$0.99 | 600 petals |
+| `jjak_petals_medium` | Consumable | US$2.49 | 1,600 petals |
+| `jjak_petals_large` | Consumable | US$4.99 | 4,000 petals |
+| `jjak_supporter` | Non-consumable | US$4.99 | Remove ads + 1,500 petals once + the Clouds card back (only here) + a Supporter seal |
+
+* **Honest by design:** each tile shows exactly what you get and Play's own localized
+  price. No timers, no "% off", no "best value" badges, no random contents. Larger
+  pouches cost a little less per petal, simply because the prices step that way.
+* **No pay-to-skip:** petals buy cosmetics, garden pieces and tools. Journey levels,
+  ranks, titles, the Flower Path exclusives and gold leaf can't be bought. For scale, a
+  steady player earns about 300 petals an hour, so the large pouch is roughly 13 hours of
+  play and the whole Market (~12,000) about 40.
+* **Paid seal is opt-in:** the Supporter seal joins the seal book only for owners, so
+  completing the book never requires a purchase.
+* **Consumables are consumed** right after the petals are credited and saved. A
+  purchase interrupted mid-way is credited on the next launch, once per purchase token.
+  Remove ads and the Supporter pack restore from Play on every launch and via Settings.
+* On the web demo the section shows a disabled preview; on a device where the products
+  aren't set up it hides itself.
+
 ## 5. Raising revenue without more ads
 
 1. **AdMob mediation** (biggest lever, no extra ads): AdMob → Mediation, then add AppLovin,
@@ -71,8 +104,8 @@ All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without 
 2. **Rewarded placement quality:** offers that save the player time (Rush continue,
    gifts ×2) convert best. Keep the reward generous; stingy rewards erode trust.
 3. **app-ads.txt** on your site, which AdMob needs for full demand.
-4. **Later:** cosmetic IAP (card backs, board papers) and a seasonal "festival" pass with
-   no gameplay advantage.
+4. **Shipped in 1.0:** petal pouches and the Supporter pack (section 4b). **Later:** a
+   seasonal "festival" pass with no gameplay advantage.
 
 ## 6. Measure, then tune
 
@@ -86,6 +119,9 @@ without app updates. Watch:
 | Rewarded engagement rate (watchers ÷ DAU) | Higher is better. It means the offers feel worth it. |
 | ARPDAU (ads + IAP) | Primary revenue metric. |
 | Remove-ads conversion | Typically a small share of players; price-test $1.99 vs $2.99 vs $3.99. |
+| Pouch / Supporter conversion | Watch alongside D30: purchases should follow engagement, not frustration. |
+| Flower Path rank at D7 / D30 | Should track the simulated curve (rank ~38 at 10 h). Much slower means XP is too stingy. |
+| Missions completed per DAU | ~2–3. If the hard one is rarely done, swap harder templates for steadier ones. |
 | Store rating and review keywords "ads" | Leading indicator of ad fatigue. |
 
 **A/B test ideas:** interstitial every 3 vs 4 boards; first interstitial after level 5 vs 8;
