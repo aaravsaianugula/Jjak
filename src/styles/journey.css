@@ -521,13 +521,7 @@
 }
 
 /* ───────────────────────────── Game: wind ───────────────────────────── */
-/* Cards drift sideways or up: slide on both axes (falling leaves keep main.css's top-only slide). */
-.game .card.is-drift {
-  transition:
-    left 360ms cubic-bezier(0.3, 0.7, 0.3, 1.08),
-    top 360ms cubic-bezier(0.3, 0.7, 0.3, 1.08),
-    transform 160ms ease;
-}
+/* Cards drift sideways or up on `translate` (.is-sliding in game.css). */
 .breeze {
   position: absolute;
   inset: 0;
@@ -874,9 +868,6 @@
   }
   .passport__bleed {
     display: none;
-  }
-  .game .card.is-drift {
-    transition: none;
   }
 }
 

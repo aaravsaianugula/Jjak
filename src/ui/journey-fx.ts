@@ -12,14 +12,8 @@ import { sfx } from '../services/audio';
 import { haptic } from '../services/haptics';
 import { save } from '../services/storage';
 import { esc, frag, h } from './dom';
+import { reducedMotion, retrigger } from './motion';
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const retrigger = (node: Element | null | undefined, cls: string) => {
-  if (!node) return;
-  node.classList.remove(cls);
-  void (node as HTMLElement).offsetWidth;
-  node.classList.add(cls);
-};
 
 // ── Knots ─────────────────────────────────────────────────────────────
 /**
@@ -99,10 +93,11 @@ export function windVane(dir: Wind): HTMLElement {
 }
 
 /** A few faint streaks blow across the stage in the wind's direction. */
-export function breeze(stage: HTMLElement, dir: Wind, strong = false): void {
+export function breeze(stage: HTMLElement, dir: Wind, strong = false, width = 0, height = 0): void {
   if (reducedMotion() || dir === 'down') return;
-  const w = stage.clientWidth;
-  const ht = stage.clientHeight;
+  // Callers that already know the stage size pass it, so a gust never forces layout.
+  const w = width || stage.clientWidth;
+  const ht = height || stage.clientHeight;
   if (!w || !ht) return;
   const layer = stage.querySelector('.breeze') ?? stage.appendChild(h('div', { class: 'breeze', 'aria-hidden': 'true' }));
   const n = strong ? 7 : 4;

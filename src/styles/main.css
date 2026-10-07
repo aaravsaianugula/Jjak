@@ -47,7 +47,16 @@
   --font-serif: 'Gowun Batang', 'Noto Serif KR', 'Noto Serif', Georgia, serif;
   --font-sans: 'Gowun Dodum', 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-ja: 'Zen Old Mincho', 'Noto Serif JP', serif;
+  /* Motion: ink, paper and wood. Soft ease-outs, small travel, a tiny settle at most. */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.45, 0, 0.85, 0.5);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+  --ease-settle: cubic-bezier(0.25, 1.25, 0.45, 1); /* ~3% overshoot: a card set down on wood */
+  --dur-press: 80ms;
+  --dur-fast: 160ms;
+  --dur-base: 260ms;
+  --dur-slow: 380ms;
+  --dur-sheet: 380ms;
   --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --banner-h: 0px;
@@ -805,16 +814,19 @@ button.panel:active {
   height: 120px;
   font-size: 64px;
   z-index: 9;
-  animation: stamp 700ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  animation: stamp 520ms linear forwards;
 }
+/* The seal is pressed: it drops toward the paper, meets it a hair small, then settles. */
 @keyframes stamp {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(2) rotate(-14deg);
+    transform: translate(-50%, -50%) scale(1.5) rotate(-12deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
   }
-  60% {
+  45% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(0.94) rotate(-6deg);
+    transform: translate(-50%, -50%) scale(0.95) rotate(-6deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   100% {
     opacity: 1;
@@ -1107,9 +1119,6 @@ button.panel:active {
 }
 
 /* Falling leaves */
-.card.is-falling {
-  transition: top 300ms cubic-bezier(0.3, 0.7, 0.35, 1.15), transform 160ms;
-}
 .card.is-snow {
   filter: saturate(0.9);
 }
@@ -2151,28 +2160,46 @@ button.panel:active {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: var(--scrim);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  animation: fade 220ms both;
-  transition: opacity 180ms ease-in;
+  isolation: isolate;
+}
+/* The dim lives on its own layer, so the sheet itself is never see-through while it moves. */
+.scrim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--scrim);
+  animation: fade var(--dur-base) var(--ease-out) both;
+  transition: opacity 240ms var(--ease-out);
 }
 .scrim--center {
   align-items: center;
   padding: 16px;
 }
 .scrim.is-closing {
-  opacity: 0;
   pointer-events: none;
 }
+.scrim.is-closing::before {
+  opacity: 0;
+}
+/* Closing: the paper slides back down past the edge (it never fades). */
+.scrim.is-closing .sheet {
+  /* Drop the entrance animation's fill so the closing transition can run. */
+  animation: none;
+}
 .scrim--sheet.is-closing .sheet {
-  transform: translateY(28px);
-  transition: transform 200ms ease-in;
+  transform: translateY(calc(100% + 24px));
+  transition: transform 260ms var(--ease-in);
 }
 .scrim--center.is-closing .sheet {
-  transform: scale(0.97);
-  transition: transform 180ms ease-in;
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transition:
+    opacity 180ms ease-in,
+    transform 200ms var(--ease-in);
 }
 @keyframes fade {
   from {
@@ -2191,7 +2218,7 @@ button.panel:active {
   border-radius: 24px 24px 0 0;
   padding: 10px 20px calc(var(--safe-bottom) + 20px);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--raised) 70%, transparent), 0 -12px 40px rgba(20, 12, 4, 0.22);
-  animation: sheet-up 360ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation: sheet-up var(--dur-sheet) cubic-bezier(0.22, 0.75, 0.25, 1) both;
 }
 .sheet::-webkit-scrollbar {
   display: none;
@@ -2213,12 +2240,24 @@ button.panel:active {
   max-width: 400px;
   border-radius: 22px;
   padding: 24px 20px 20px;
-  animation: pop 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation: dialog-in var(--dur-base) var(--ease-out) both;
 }
+/* A sheet of paper slides up from the edge and settles by a hair. */
 @keyframes sheet-up {
+  0% {
+    transform: translateY(100%);
+  }
+  78% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes dialog-in {
   from {
-    transform: translateY(40%);
     opacity: 0;
+    transform: translateY(8px) scale(0.97);
   }
 }
 @keyframes pop {
@@ -3415,6 +3454,20 @@ a.row:active {
     transform: translate(-50%, 4px);
   }
 }
+/* A newer toast arrived: this one sinks away quickly underneath it. */
+.toast.is-out {
+  animation: toast-out 160ms var(--ease-in) forwards;
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
 
 /* ───────────────────────────── Motion & layout guards ───────────────────────────── */
 /* ───────────────────────────── Press states ─────────────────────────────
@@ -3466,6 +3519,52 @@ button.row:active,
   }
   .gift-btn i {
     animation: none !important;
+  }
+  /* Instead of travelling, the big surfaces cross-fade briefly (no movement). */
+  .screen,
+  .scrim::before,
+  .scrim .sheet {
+    animation: rm-in 160ms ease-out both !important;
+  }
+  .screen--leaving {
+    animation: rm-out 140ms ease-in both !important;
+  }
+  .scrim.is-closing .sheet {
+    animation: rm-out 140ms ease-in both !important;
+    transform: none !important;
+  }
+  .scrim.is-closing::before {
+    animation: rm-out 140ms ease-in both !important;
+  }
+  /* Toasts must stay readable: they fade in, hold, and fade out in place. */
+  .toast {
+    animation: toast-rm var(--toast-ms, 2400ms) linear both !important;
+  }
+  .toast.is-out {
+    animation: rm-out 120ms ease-in both !important;
+    transform: translateX(-50%);
+  }
+}
+@keyframes rm-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rm-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes toast-rm {
+  0% {
+    opacity: 0;
+  }
+  6%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 

@@ -32,7 +32,7 @@ export function openSheet(
       if (i < 0) return;
       stack.splice(i, 1);
       scrim.classList.add('is-closing');
-      setTimeout(() => scrim.remove(), 200);
+      setTimeout(() => scrim.remove(), 280);
       if (opener?.isConnected) opener.focus({ preventScroll: true });
       resolve();
     },
@@ -90,9 +90,9 @@ function swipeToDismiss(sheet: HTMLElement, close: () => void): void {
   const end = () => {
     if (!dragging) return;
     dragging = false;
-    sheet.style.transition = 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)';
+    sheet.style.transition = 'transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1)';
     if (dy > Math.min(140, sheet.offsetHeight * 0.25)) {
-      sheet.style.transform = 'translateY(100%)';
+      sheet.style.transform = 'translateY(calc(100% + 24px))';
       close();
     } else sheet.style.transform = '';
   };

@@ -5,12 +5,43 @@
 
 export const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Re-run a one-shot CSS animation class. */
+const pending = new WeakMap<Element, Map<string, number>>();
+/**
+ * Re-run a one-shot CSS animation class without forcing a synchronous reflow
+ * (reading offsetWidth mid-frame cost a full style + layout pass per call on
+ * the board). A class that isn't on yet is simply added; one that is comes off
+ * for a frame and goes back on, so the animation starts over.
+ */
 export function retrigger(node: Element | null | undefined, cls: string): void {
   if (!node) return;
+  let map = pending.get(node);
+  const was = map?.get(cls);
+  if (was) cancelAnimationFrame(was);
+  if (!node.classList.contains(cls) && !was) {
+    node.classList.add(cls);
+    return;
+  }
   node.classList.remove(cls);
-  void (node as HTMLElement).offsetWidth;
-  node.classList.add(cls);
+  if (!map) pending.set(node, (map = new Map()));
+  const m = map;
+  const id = requestAnimationFrame(() => {
+    m.set(cls, requestAnimationFrame(() => {
+      m.delete(cls);
+      node.classList.add(cls);
+    }));
+  });
+  m.set(cls, id);
+}
+
+/** Drop a pending retrigger and the class itself (e.g. a shake on a card that was just selected). */
+export function untrigger(node: Element | null | undefined, cls: string): void {
+  if (!node) return;
+  const id = pending.get(node)?.get(cls);
+  if (id) {
+    cancelAnimationFrame(id);
+    pending.get(node)!.delete(cls);
+  }
+  node.classList.remove(cls);
 }
 
 const easeOut = (k: number) => 1 - (1 - k) ** 3;
