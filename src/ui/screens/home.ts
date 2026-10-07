@@ -1,6 +1,7 @@
 import { sceneParticles, sceneSvg } from '../../art/scene';
 import { GIFTS } from '../../config';
 import { cardSvg } from '../../art/cards';
+import { pathArt } from '../../art/path-art';
 import { ads } from '../../services/ads';
 import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
@@ -185,10 +186,12 @@ function openGift(home: HTMLElement): void {
   if (!p) return;
   const days = GIFTS.map((g, i) => {
     const state = i < p.day ? 'done' : i === p.day ? 'now' : 'next';
-    const icon = g.card ? '<span class="ja">札</span>' : g.hints ? ICONS.hint : g.shuffles ? ICONS.shuffle : ICONS.petal;
+    // Each day shows what's inside: petals (more of them as the week goes on), a lantern hint, cards to shuffle, an album card.
+    const pic = g.card ? 'i-card' : g.hints && g.shuffles ? 'i-hintshuffle' : g.hints ? 'i-hint' : g.shuffles ? 'i-shuffle' : `i-petal${Math.min(3, Math.max(1, Math.round((g.petals ?? 10) / 5) - 1))}`;
+    const icon = pathArt(pic, 'gday__art');
     return `<li class="gday gday--${state}" aria-label="Day ${i + 1}: ${esc(g.label)}${state === 'done' ? ', claimed' : state === 'now' ? ', today' : ''}">
       <span class="gday__n">${state === 'now' ? 'Today' : `Day ${i + 1}`}</span>
-      <span class="gday__icon" aria-hidden="true">${state === 'done' ? ICONS.check : icon}</span>
+      <span class="gday__icon" aria-hidden="true">${icon}${state === 'done' ? `<i class="gday__done">${ICONS.check}</i>` : ''}</span>
       <span class="gday__label">${esc(g.label)}</span>
     </li>`;
   }).join('');

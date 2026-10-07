@@ -303,6 +303,8 @@ export interface BurstOpts {
   cw: number;
   /** draw the particles part-way through their flight, with no motion (tile previews) */
   still?: boolean;
+  /** fixed seed for the particle layout (still previews), instead of Math.random */
+  seed?: number;
 }
 
 /**
@@ -324,7 +326,15 @@ export function burstFx(host: HTMLElement, x: number, y: number, fx: string, o: 
     host.append(p);
     out.push(p);
   };
-  const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+  let sd = (o.seed ?? 0) >>> 0;
+  const rand =
+    o.seed == null
+      ? Math.random
+      : () => {
+          sd = (sd * 1664525 + 1013904223) >>> 0;
+          return sd / 4294967296;
+        };
+  const rnd = (a: number, b: number) => a + rand() * (b - a);
   const px = (v: number) => `${f(v)}px`;
   let life = 800;
 
@@ -333,9 +343,9 @@ export function burstFx(host: HTMLElement, x: number, y: number, fx: string, o: 
     const colors = ['#e3a5b0', '#d98a98', '#c4472f', '#e6c27a', '#f2d4da'];
     for (let k = 0; k < 7; k++) {
       const ink = k >= 5;
-      const a = (k / 7) * Math.PI * 2 + Math.random() * 0.8;
-      const d = cw * (ink ? 0.35 + Math.random() * 0.3 : 0.55 + Math.random() * 0.55);
-      add(ink ? 'fxb--bink' : 'fxb--petal', ink ? 5 : 10, { '--dx': px(Math.cos(a) * d), '--dy': px(Math.sin(a) * d - cw * 0.1), '--rot': `${Math.round((Math.random() - 0.5) * 540)}deg`, ...(ink ? {} : { background: colors[k % colors.length] }) });
+      const a = (k / 7) * Math.PI * 2 + rand() * 0.8;
+      const d = cw * (ink ? 0.35 + rand() * 0.3 : 0.55 + rand() * 0.55);
+      add(ink ? 'fxb--bink' : 'fxb--petal', ink ? 5 : 10, { '--dx': px(Math.cos(a) * d), '--dy': px(Math.sin(a) * d - cw * 0.1), '--rot': `${Math.round((rand() - 0.5) * 540)}deg`, ...(ink ? {} : { background: colors[k % colors.length] }) });
     }
   } else if (fx === 'ink') {
     add('fxb--blot', cw * 0.62, { '--rot': `${Math.round(rnd(0, 360))}deg` });

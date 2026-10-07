@@ -1383,3 +1383,323 @@ ol.road::before {
   font-weight: 700;
   color: var(--muted);
 }
+
+/* ═════════════ Crafted objects: seals, the road, chests, missions, gifts ═════════════
+   Drawn pieces come from src/art/path-art.ts (one sprite symbol each). The seals
+   here are CSS: a carved stone pressed in vermilion, with the uneven weight of a
+   real impression (a soft wash, never speckle), and a hand-cut outline. */
+
+/* Rank seal: uneven paste, a slightly hand-cut stone, the inner border a little worn. */
+.fp-seal {
+  border-radius: 13% 17% 12% 16% / 16% 12% 17% 13%;
+  background:
+    radial-gradient(70% 60% at 28% 22%, rgba(255, 214, 190, 0.28), transparent 70%),
+    radial-gradient(60% 50% at 82% 88%, rgba(90, 16, 6, 0.32), transparent 72%),
+    linear-gradient(160deg, transparent 62%, rgba(255, 236, 220, 0.16) 63%, transparent 78%),
+    var(--accent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.18) inset, 0 2px 0 rgba(0, 0, 0, 0.06), 0 6px 14px -8px rgba(110, 30, 15, 0.6);
+}
+.fp-seal::after {
+  border-color: rgba(251, 245, 234, 0.78);
+  border-right-color: rgba(251, 245, 234, 0.5);
+  border-bottom-color: rgba(251, 245, 234, 0.62);
+  border-radius: 8% 11% 7% 10%;
+}
+.fp-seal b {
+  text-shadow: 0 0.5px 0 rgba(90, 16, 6, 0.35);
+}
+
+/* The road: a brushed ink line (no dashes), fading in and out at its ends. */
+ol.road::before {
+  width: 2.5px;
+  left: 20.75px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--line) 90%, var(--ink)) 3%, var(--line) 50%, color-mix(in srgb, var(--line) 90%, var(--ink)) 97%, transparent);
+}
+/* Each rank is a small stone disc, lit from the upper left. */
+.road__node {
+  background: radial-gradient(circle at 34% 28%, var(--raised), var(--bg) 72%);
+  box-shadow: inset 0 0 0 1.5px var(--line), 0 1px 2px rgba(60, 40, 20, 0.12);
+}
+.road__step--ten .road__node {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--gold) 70%, var(--line)), inset 0 0 0 3px var(--surface), inset 0 0 0 3.8px color-mix(in srgb, var(--gold) 40%, transparent), 0 1px 2px rgba(60, 40, 20, 0.12);
+}
+/* Claimed: a dried vermilion impression. */
+.road__step--claimed .road__node {
+  color: var(--accent-text);
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--accent) 10%, var(--surface)), color-mix(in srgb, var(--accent) 18%, var(--surface-2)) 80%);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* Ready: red lacquer with a brass rim. */
+.road__step--ready .road__node {
+  background: radial-gradient(circle at 34% 26%, #e46c50, var(--accent) 52%, #8e2e1f);
+  box-shadow: inset 0 0 0 1.5px #e3c27a, inset 0 0 0 2.5px rgba(90, 30, 10, 0.4), 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+@keyframes fp-glow {
+  50% {
+    box-shadow: inset 0 0 0 1.5px #e3c27a, inset 0 0 0 2.5px rgba(90, 30, 10, 0.4), 0 0 0 7px color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+}
+/* Next: a brass ring that fills with the rank's progress. */
+.road__step--next .road__node {
+  background:
+    radial-gradient(circle at 34% 28%, var(--raised), var(--surface) 70%) content-box,
+    conic-gradient(var(--gold) var(--p, 0%), color-mix(in srgb, var(--line) 80%, transparent) 0);
+  padding: 3px;
+  box-shadow: 0 1px 2px rgba(60, 40, 20, 0.15);
+}
+/* Locked: a quiet, uninked stone. */
+.road__step--locked .road__node {
+  border: none;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  box-shadow: inset 0 0 0 1.2px color-mix(in srgb, var(--muted) 32%, transparent);
+}
+/* Path exclusives: a thin gold ring around the stone. */
+.road__step--ex .road__node::after {
+  inset: -4.5px;
+  border: 1.2px solid color-mix(in srgb, var(--gold) 75%, transparent);
+  box-shadow: 0 0 6px -1px color-mix(in srgb, var(--gold) 40%, transparent);
+}
+
+/* Title rows (every ten ranks): a plaque on a strip of woven silk, with its seal. */
+.road__title {
+  overflow: hidden;
+  padding-left: 16px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 9%, var(--surface)), var(--surface) 45%);
+}
+.road__title::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 9px;
+  bottom: 9px;
+  width: 4px;
+  border-radius: 2px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18), transparent 60%),
+    repeating-linear-gradient(160deg, #2f4a6d 0 3px, #3d5d86 3px 4.5px, #b8893b 4.5px 5.5px);
+}
+.road__title-seal {
+  width: 34px;
+  height: 34px;
+  margin-left: 4px;
+  font-size: 19px;
+  border-radius: 13% 17% 12% 16% / 16% 12% 17% 13%;
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  box-shadow: inset 0 0 0 1.6px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 0 3.6px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.road__title--on .road__title-seal {
+  color: var(--accent-ink);
+  background:
+    radial-gradient(70% 60% at 28% 22%, rgba(255, 214, 190, 0.28), transparent 70%),
+    radial-gradient(60% 50% at 82% 88%, rgba(90, 16, 6, 0.32), transparent 72%),
+    var(--accent);
+  box-shadow: inset 0 0 0 2.6px var(--accent), inset 0 0 0 3.8px rgba(251, 245, 234, 0.7), 0 4px 10px -6px rgba(110, 30, 15, 0.6);
+}
+
+/* Reward chips: small pressed tokens with a drawn icon. */
+.chip {
+  box-shadow: inset 0 1px 0 var(--mk-art-light), inset 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent);
+}
+.chip .chip__art {
+  width: 18px;
+  height: 18px;
+  margin: -2px 0;
+}
+.chips--sm .chip .chip__art {
+  width: 15px;
+  height: 15px;
+}
+.chip--xp {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--gold) 22%, var(--surface)), color-mix(in srgb, var(--gold) 10%, var(--surface)) 60%);
+  box-shadow: inset 0 1px 0 var(--mk-art-light), inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+}
+.chip__foil {
+  background: linear-gradient(135deg, #f0d48a, #b8893b 45%, #e8c77e 70%, #9c7128);
+  box-shadow: inset 0 0 0 0.5px rgba(90, 60, 10, 0.5);
+}
+.chip__ex {
+  border-radius: 3px 4px 3px 4px;
+  background: radial-gradient(80% 70% at 30% 25%, rgba(255, 214, 190, 0.3), transparent 70%), var(--accent);
+}
+
+/* Star chests */
+.chest__icon {
+  position: relative;
+  width: 52px;
+  height: 46px;
+}
+.chest__icon .chest__art {
+  width: 52px;
+  height: 46px;
+}
+.chest--ready .chest__icon {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 34%, transparent), transparent);
+}
+.chest--locked .chest__icon {
+  opacity: 1;
+}
+.chest--locked .chest__art {
+  opacity: 0.5;
+  filter: saturate(0.3);
+}
+.chest--claimed .chest__art {
+  opacity: 0.8;
+}
+.chest__done {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  color: var(--accent-ink);
+  background: var(--good);
+  box-shadow: 0 0 0 2px var(--surface-2);
+}
+.chest--claimed .chest__done {
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.chest__icon .chest__done svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Weekly chest: the bandaji */
+.wchest__icon {
+  width: 58px;
+  height: 50px;
+  border-radius: 14px;
+  background: radial-gradient(80% 70% at 50% 40%, color-mix(in srgb, var(--gold) 16%, var(--surface)), transparent 75%);
+}
+.wchest__icon .wchest__art {
+  width: 56px;
+  height: 48px;
+}
+.wchest.is-ready .wchest__icon {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 36%, transparent), transparent);
+  animation: fp-bob 2.4s ease-in-out infinite;
+}
+.wchest.is-claimed .wchest__art {
+  opacity: 0.8;
+}
+.wchest__pips i {
+  border-radius: 1.5px;
+  background: color-mix(in srgb, var(--line) 85%, transparent);
+}
+.wchest__pips i.on {
+  background: linear-gradient(180deg, #e8c77e, var(--gold));
+}
+
+/* Chest opened (reveal sheet) */
+.fp-chest-big {
+  width: 132px;
+  height: 120px;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.fp-chest-big .fp-chest-big__art {
+  width: 132px;
+  height: 120px;
+}
+.fp-rise-in {
+  animation: card-rise 560ms var(--ease-out) both;
+}
+
+/* Missions: a drawn badge for where the mission is played, with its tier under it. */
+.mcard__badge {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: -2px;
+}
+.mcard__art {
+  width: 34px;
+  height: 34px;
+}
+.mcard__badge .tier {
+  margin-top: 0;
+}
+.mcard__stamp {
+  border-radius: 13% 17% 12% 16% / 16% 12% 17% 13%;
+  background:
+    radial-gradient(70% 60% at 28% 22%, rgba(255, 214, 190, 0.28), transparent 70%),
+    radial-gradient(60% 50% at 82% 88%, rgba(90, 16, 6, 0.3), transparent 72%),
+    var(--accent);
+}
+
+/* Rank-up and title seals in the dialogs */
+.fp-title-seal {
+  border-radius: 13% 17% 12% 16% / 16% 12% 17% 13%;
+  background:
+    radial-gradient(70% 60% at 28% 22%, rgba(255, 214, 190, 0.3), transparent 70%),
+    radial-gradient(60% 50% at 82% 88%, rgba(90, 16, 6, 0.34), transparent 72%),
+    linear-gradient(160deg, transparent 62%, rgba(255, 236, 220, 0.14) 63%, transparent 80%),
+    var(--accent);
+}
+.fp-title-seal::after {
+  border-radius: 8% 11% 7% 10%;
+  border-right-color: rgba(251, 245, 234, 0.5);
+}
+
+/* Gift calendar: each day shows the gift itself. */
+.gday__icon {
+  position: relative;
+  height: 32px;
+}
+.gday__icon .gday__art {
+  width: 30px;
+  height: 30px;
+}
+.gday--done .gday__art {
+  opacity: 0.42;
+  filter: saturate(0.5);
+}
+.gday__done {
+  position: absolute;
+  right: -5px;
+  bottom: -1px;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  color: var(--accent-ink);
+  background: var(--good);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.gday__icon .gday__done svg {
+  width: 11px;
+  height: 11px;
+}
+.gday--now .gday__icon {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--gold) 30%, transparent), transparent);
+}
+.gday--now .gday__art {
+  animation: fp-bob 2.6s ease-in-out infinite;
+}
+
+/* The lantern gift on the result sheet: a lit lantern against dusk. */
+.lantern .lantern__icon {
+  width: 42px;
+  height: 42px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3CradialGradient id='mka-glow' cx='0.5' cy='0.5' r='0.5'%3E%3Cstop offset='0' stop-color='%23fff1c8' stop-opacity='0.95'/%3E%3Cstop offset='0.32' stop-color='%23f9d27e' stop-opacity='0.5'/%3E%3Cstop offset='1' stop-color='%23f6c46a' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='mka-lantern' cx='0.44' cy='0.42' r='0.62'%3E%3Cstop offset='0' stop-color='%23ffe7b0'/%3E%3Cstop offset='0.36' stop-color='%23f4a062'/%3E%3Cstop offset='0.78' stop-color='%23cf4f33'/%3E%3Cstop offset='1' stop-color='%23a2341d'/%3E%3C/radialGradient%3E%3ClinearGradient id='mka-brass' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f6e4aa'/%3E%3Cstop offset='0.45' stop-color='%23cfa252'/%3E%3Cstop offset='1' stop-color='%238a5f24'/%3E%3C/linearGradient%3E%3ClinearGradient id='mka-indigo' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%234a6b9e'/%3E%3Cstop offset='1' stop-color='%2322385a'/%3E%3C/linearGradient%3E%3CradialGradient id='mka-night' cx='0.62' cy='0.32' r='0.8'%3E%3Cstop offset='0' stop-color='%234d5e8c'/%3E%3Cstop offset='0.6' stop-color='%232d3a62'/%3E%3Cstop offset='1' stop-color='%231b2340'/%3E%3C/radialGradient%3E%3ClinearGradient id='mka-silk' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23dd5a3e'/%3E%3Cstop offset='1' stop-color='%23a5341f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='19.4' fill='url(%23mka-night)'/%3E%3Ccircle cx='20' cy='20' r='18.6' fill='none' stroke='%23c99a48' stroke-width='.8'/%3E%3Cg transform='translate(20 4.2) scale(0.5)'%3E%3Ccircle cx='0' cy='24' r='40' fill='url(%23mka-glow)' opacity='.9'/%3E%3Ccircle cx='0' cy='1.4' r='1.8' fill='url(%23mka-brass)'/%3E%3Cpath d='M-7 3H7L10.5 8H-10.5Z' fill='url(%23mka-brass)' stroke='%233b2c20' stroke-width='.5'/%3E%3Cpath d='M-11 8C-15.5 16-15.5 32-11 40H11C15.5 32 15.5 16 11 8Z' fill='url(%23mka-lantern)'/%3E%3Cpath d='M-11 8H11C12.4 10.4 13.2 12 13.8 13.6H-13.8C-13.2 12-12.4 10.4-11 8Z' fill='url(%23mka-indigo)'/%3E%3Cpath d='M-13.8 34.4H13.8C13.2 36 12.4 37.6 11 40H-11C-12.4 37.6-13.2 36-13.8 34.4Z' fill='url(%23mka-indigo)'/%3E%3Cpath d='M-13.8 13.6H13.8M-13.8 34.4H13.8' fill='none' stroke='%23e8c77e' stroke-width='0.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M-5.6 13.6C-6.8 20-6.8 28-5.6 34.4M0 13.6V34.4M5.6 13.6C6.8 20 6.8 28 5.6 34.4' fill='none' stroke='%239a3420' stroke-width='0.55' stroke-linecap='round' stroke-linejoin='round' opacity='.4'/%3E%3Cellipse cx='-1.5' cy='22' rx='5' ry='7.5' fill='%23fff5d6' opacity='.38'/%3E%3Cpath d='M-11 8C-15.5 16-15.5 32-11 40H11C15.5 32 15.5 16 11 8Z' fill='none' stroke='%233b2c20' stroke-width='0.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M-9 40H9L6 44.6H-6Z' fill='url(%23mka-brass)' stroke='%233b2c20' stroke-width='.5'/%3E%3Cpath d='M0 44.6V48' fill='none' stroke='%23b23a26' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M-2.4 48.2H2.4L2.2 50.4H-2.2Z' fill='%23e3c27a'/%3E%3Cpath d='M-2.2 50.4H2.2L3.4 62Q0 63.6-3.4 62Z' fill='url(%23mka-silk)'/%3E%3Cpath d='M-1.4 52.4-2 61.4M0 52.4V62M1.4 52.4 2 61.4' fill='none' stroke='%237d2414' stroke-width='0.4' stroke-linecap='round' stroke-linejoin='round' opacity='.6'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  box-shadow: 0 6px 12px -6px rgba(20, 20, 50, 0.6);
+}
+.lantern .lantern__icon svg {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wchest.is-ready .wchest__icon,
+  .gday--now .gday__art,
+  .fp-rise-in {
+    animation: none !important;
+  }
+}

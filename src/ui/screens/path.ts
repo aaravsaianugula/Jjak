@@ -8,6 +8,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { cardSvg } from '../../art/cards';
+import { pathArt } from '../../art/path-art';
 import { IAP } from '../../config';
 import { cardDef, monthDef } from '../../data/deck';
 import {
@@ -36,12 +37,6 @@ type Tab = 'path' | 'missions' | 'chests';
 const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const fmt = (n: number) => n.toLocaleString('en-US');
 
-const ICON_TEA =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5h12v3.2a5.3 5.3 0 0 1-5.3 5.3h-1.4a5.3 5.3 0 0 1-5.3-5.3z" fill="currentColor" fill-opacity=".14"/><path d="M16.5 11.5h1.2a2.3 2.3 0 0 1 0 4.6h-1.9"/><path d="M8.5 3.8c-.9 1.1.9 1.9 0 3.4M12.3 3.8c-.9 1.1.9 1.9 0 3.4"/></svg>';
-/** A small lidded box, drawn like the lantern: line art with a soft fill. */
-const ICON_CHEST =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5h16v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z" fill="currentColor" fill-opacity=".14"/><path d="M4 10.5V9a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1.5"/><path d="M10.5 10.5v3h3v-3M4 14h6.5M13.5 14H20"/></svg>';
-
 const TIER_LABEL = { 1: 'Light', 2: 'Steady', 3: 'Long' } as const;
 
 /** The rank seal: a vermilion square with the rank number, like a dojang. */
@@ -53,9 +48,9 @@ function chips(r: Reward, small = false): string {
     `<span class="chip chip--${cls}" title="${esc(label)}">${icon}<span>${text}</span></span>`;
   if (r.xp) out.push(c('xp', '', `+${fmt(r.xp)} XP`, `${r.xp} XP`));
   if (r.petals) out.push(c('petals', ICONS.petal, String(r.petals), `${r.petals} petals`));
-  if (r.hints) out.push(c('tool', ICONS.hint, small ? `${r.hints}` : `${r.hints} hint${r.hints > 1 ? 's' : ''}`, `${r.hints} hint${r.hints > 1 ? 's' : ''}`));
-  if (r.shuffles) out.push(c('tool', ICONS.shuffle, small ? `${r.shuffles}` : `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`, `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`));
-  if (r.tea) out.push(c('tea', ICON_TEA, 'Warm tea', 'Warm tea: keeps your Daily streak through a missed day'));
+  if (r.hints) out.push(c('tool', pathArt('i-hint', 'chip__art'), small ? `${r.hints}` : `${r.hints} hint${r.hints > 1 ? 's' : ''}`, `${r.hints} hint${r.hints > 1 ? 's' : ''}`));
+  if (r.shuffles) out.push(c('tool', pathArt('i-shuffle', 'chip__art'), small ? `${r.shuffles}` : `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`, `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`));
+  if (r.tea) out.push(c('tea', pathArt('i-tea', 'chip__art'), 'Warm tea', 'Warm tea: keeps your Daily streak through a missed day'));
   if (r.foil) out.push(c('foil', '<i class="chip__foil" aria-hidden="true">金</i>', 'Gold leaf', 'A gold-leaf edition of a card in your album'));
   for (const k of r.items ?? []) out.push(c('ex', '<i class="chip__ex" aria-hidden="true">珍</i>', esc(exclusiveName(k)), `${exclusiveName(k)} (Flower Path exclusive)`));
   return out.join('');
@@ -144,7 +139,7 @@ export function pathResult(rep: BoardReport, at = 0): HTMLElement {
     el.append(frag(`<ul class="fp-res__ticks">${rep.missions.map((m, i) => `<li style="--i:${i}">${ICONS.check}<span>Mission complete · ${esc(m)}</span></li>`).join('')}</ul>`));
   }
   if (rep.tea) {
-    el.append(frag(`<p class="fp-res__tea">${ICON_TEA}<span>Warm tea kept your streak${rep.tea > 1 ? ` (${rep.tea} cups)` : ''}.</span></p>`));
+    el.append(frag(`<p class="fp-res__tea">${pathArt('i-tea', 'chip__art')}<span>Warm tea kept your streak${rep.tea > 1 ? ` (${rep.tea} cups)` : ''}.</span></p>`));
   }
   if (rep.foil != null) {
     el.append(frag(`<div class="fp-res__foil"><span class="fp-res__card">${cardSvg(rep.foil, 'card-art', { foil: true })}</span><span><b>A gold-leaf card</b><br><span class="muted">${esc(cardName(rep.foil))} · now gilded in your Album</span></span></div>`));
@@ -388,7 +383,7 @@ export function pathScreen(): Screen {
             : state === 'next'
               ? `<span class="road__next">${Math.round(rank().pct * 100)}%</span>`
               : '';
-      rows.push(`<li class="road__step road__step--${state}${ex ? ' road__step--ex' : ''}${k % 10 === 0 ? ' road__step--ten' : ''}" data-rank="${k}">
+      rows.push(`<li class="road__step road__step--${state}${ex ? ' road__step--ex' : ''}${k % 10 === 0 ? ' road__step--ten' : ''}" data-rank="${k}"${state === 'next' ? ` style="--p:${Math.round(rank().pct * 100)}%"` : ''}>
         <span class="road__node" aria-hidden="true"><b>${k}</b></span>
         <span class="road__body">
           <span class="road__label">Rank ${k}${ex ? ' · <span class="road__exlabel">Flower Path exclusive</span>' : ''}</span>
@@ -436,7 +431,7 @@ export function pathScreen(): Screen {
       ul.append(
         frag(`<li class="panel mcard${s.done ? ' is-done' : ''}${s.claimed ? ' is-claimed' : ''}">
           <div class="mcard__top">
-            <span class="tier" data-tier="${m.def.tier}" aria-label="${TIER_LABEL[m.def.tier]}"><i></i><i></i><i></i></span>
+            <span class="mcard__badge">${pathArt(`m-${m.def.go}`, 'mcard__art')}<span class="tier" data-tier="${m.def.tier}" aria-label="${TIER_LABEL[m.def.tier]}"><i></i><i></i><i></i></span></span>
             <span class="mcard__text">${esc(m.text)}</span>
           </div>
           <div class="mcard__prog"><span class="fp-bar"><i style="width:${pct}%"></i></span><span class="mcard__n">${fmt(Math.min(s.n, m.target))}<span class="muted">/${fmt(m.target)}</span></span></div>
@@ -458,7 +453,7 @@ export function pathScreen(): Screen {
     wrap.append(
       frag(`<div class="panel wchest${w.ready ? ' is-ready' : ''}${w.claimed ? ' is-claimed' : ''}">
         <div class="wchest__head">
-          <span class="wchest__icon" aria-hidden="true">${ICON_CHEST}</span>
+          <span class="wchest__icon" aria-hidden="true">${pathArt(w.claimed ? 'bandaji-open' : 'bandaji', 'wchest__art')}</span>
           <span class="wchest__titles"><b>Weekly chest</b><span class="muted"><span lang="ko">주간 상자</span> · <span class="ja" lang="ja">週の箱</span></span></span>
           <span class="wchest__count"><b>${w.count}</b>/${w.target}</span>
         </div>
@@ -485,7 +480,7 @@ export function pathScreen(): Screen {
           const state = c.claimed ? 'claimed' : c.ready ? 'ready' : 'locked';
           const label = `${c.step} blossom chest: ${state === 'claimed' ? 'opened' : state === 'ready' ? 'ready to open' : `${ch.stars} of ${c.step}`}`;
           return `<button class="chest chest--${state}" data-chest="${ch.chapter}" data-step="${c.step}" aria-label="${esc(label)}"${state === 'ready' ? '' : ' aria-disabled="true"'}>
-            <span class="chest__icon" aria-hidden="true">${state === 'claimed' ? ICONS.check : ICON_CHEST}</span>
+            <span class="chest__icon" aria-hidden="true">${pathArt(state === 'claimed' ? 'chest-empty' : 'chest', 'chest__art')}${state === 'claimed' ? `<i class="chest__done">${ICONS.check}</i>` : ''}</span>
             <span class="chest__step">${ICONS.blossom}${c.step}</span>
             <span class="chips chips--sm">${chips(c.reward, true)}</span>
             ${state === 'ready' ? '<span class="chest__open">Open</span>' : ''}
@@ -604,7 +599,7 @@ export function pathScreen(): Screen {
         haptic.success();
         refreshPetals();
         renderAll();
-        revealChest('Weekly chest', g);
+        revealChest('Weekly chest', g, true);
       }
       return;
     }
@@ -641,10 +636,10 @@ export function pathScreen(): Screen {
 }
 
 /** What came out of a chest. */
-function revealChest(name: string, g: Granted): void {
+function revealChest(name: string, g: Granted, weekly = false): void {
   const reward: Reward = { xp: g.xp, petals: g.petals, hints: g.hints, shuffles: g.shuffles, tea: g.tea };
   const content = frag(`<div class="fp-reveal">
-    <div class="fp-up__stage"><span class="fp-chest-big fp-stamp-in" aria-hidden="true">${ICON_CHEST}</span>${petalBurstHtml(10)}</div>
+    <div class="fp-up__stage"><span class="fp-chest-big fp-rise-in" aria-hidden="true">${pathArt(weekly ? 'bandaji-open' : 'chest-open', 'fp-chest-big__art')}</span>${petalBurstHtml(10)}</div>
     <div class="detail__kind">${esc(name)} · opened</div>
     <div class="chips chips--center">${chips(reward)}</div>
     ${

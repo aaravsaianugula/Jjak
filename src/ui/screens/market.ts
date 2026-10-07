@@ -6,6 +6,7 @@
  * effects, papers, garden, music. Rules live in services/market.ts.
  */
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
+import { art, deckle } from '../../art/market-art';
 import { GARDEN_ITEMS, gardenItemSvg } from '../../art/garden';
 import { cardBackPreviewSvg, cardPreviewSvg } from '../../art/styles';
 import { ECONOMY } from '../../config';
@@ -87,44 +88,50 @@ const monthHave = (m: number) => [0, 1, 2, 3].filter((v) => save.album.includes(
 
 // ── Previews ────────────────────────────────────────────────────────
 
-const TEA = `<svg class="mk-ill" viewBox="0 0 120 90" aria-hidden="true">
-  <path class="mk-ill__steam" d="M50 30c-5-6 5-9 0-16M62 28c-5-6 5-9 0-16M74 30c-5-6 5-9 0-16"/>
-  <ellipse class="mk-ill__fill2" cx="62" cy="76" rx="40" ry="6"/>
-  <path class="mk-ill__fill" d="M30 40h64c0 18-12 31-32 31S30 58 30 40z"/>
-  <path class="mk-ill__line" d="M30 40h64c0 18-12 31-32 31S30 58 30 40zM94 46c9 0 10 13-2 14"/>
-  <path class="mk-ill__accent" d="M42 50c6 3 14 3 20 0"/>
-</svg>`;
+const toolArt = (it: MarketItem): string => art(`tool-${it.id}`, 'mk-ill mk-ill--tool');
 
-const MUSIC_ART: Record<string, string> = {
-  default: `<path class="mk-ill__line" d="M12 50c12-22 24-22 36 0s24 22 36 0 18-18 24-8"/><circle class="mk-ill__dot" cx="22" cy="28" r="4"/><circle class="mk-ill__dot mk-ill__dot--2" cx="56" cy="22" r="4"/><circle class="mk-ill__dot mk-ill__dot--3" cx="86" cy="30" r="4"/><circle class="mk-ill__dot mk-ill__dot--4" cx="104" cy="62" r="4"/>`,
-  gayageum: `<path class="mk-ill__fill" d="M8 56c30-14 70-18 104-14l-2 9c-34-3-72 1-100 13z"/><path class="mk-ill__line" d="M8 56c30-14 70-18 104-14l-2 9c-34-3-72 1-100 13zM14 58l94-12M16 61l92-11"/><path class="mk-ill__accent" d="M30 54l3-6 3 6M46 51l3-6 3 6M62 49l3-6 3 6M78 47l3-6 3 6M94 46l3-6 3 6"/>`,
-  koto: `<path class="mk-ill__rain" d="M20 8l-4 10M40 4l-4 10M60 10l-4 10M80 4l-4 10M100 9l-4 10M30 22l-3 8M70 22l-3 8M92 24l-3 8"/><path class="mk-ill__fill" d="M10 62c32-10 66-12 100-8v8c-34-3-68-1-100 8z"/><path class="mk-ill__line" d="M10 62c32-10 66-12 100-8v8c-34-3-68-1-100 8zM16 64l90-8"/><path class="mk-ill__accent" d="M34 61l2-5 2 5M54 58l2-5 2 5M74 56l2-5 2 5M92 55l2-5 2 5"/>`,
-  flute: `<path class="mk-ill__steam" d="M10 34c6-4 10 2 16-2M8 44c7-3 11 3 18 0"/><rect class="mk-ill__fill" x="28" y="36" width="84" height="10" rx="5"/><path class="mk-ill__line" d="M33 36h74a5 5 0 0 1 0 10H33a5 5 0 0 1 0-10zM56 36v10M84 36v10"/><circle class="mk-ill__hole" cx="66" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="74" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="92" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="100" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="40" cy="41" r="2.4"/>`,
-  moonlight: `<circle class="mk-ill__moon" cx="70" cy="34" r="22"/><path class="mk-ill__line" d="M30 10v18"/><path class="mk-ill__fill" d="M22 40c0-8 4-12 8-12s8 4 8 12z"/><path class="mk-ill__line" d="M22 40c0-8 4-12 8-12s8 4 8 12zM20 40h20M30 40v6"/><path class="mk-ill__accent" d="M26 50h8"/><path class="mk-ill__steam" d="M10 70c20-6 40-6 60 0s30 4 44-2"/>`,
-};
-
-const toolArt = (it: MarketItem): string => {
-  if (it.key === TOOL.tea) return TEA;
-  if (it.key === TOOL.card)
-    return `<span class="mk-cards mk-cards--draw"><span class="mk-card">${cardSvg('back')}</span><span class="mk-card">${cardSvg('back')}</span><span class="mk-card mk-card--q">${cardSvg('back')}</span></span>`;
-  const icon = it.key === TOOL.hints ? ICONS.hint : ICONS.shuffle;
-  return `<span class="mk-tool"><span class="mk-tool__chip">${icon}</span><span class="mk-tool__chip">${icon}</span><span class="mk-tool__chip">${icon}</span></span>`;
-};
-
+/** Board papers: a deckle-edged sheet held by a brass weight, with close-up detail over the real board texture. */
 const paperArt = (it: MarketItem): string => {
+  const seed = it.id.split('').reduce((n, c) => n * 31 + c.charCodeAt(0), 7) >>> 0;
+  const clip = `style="clip-path:${deckle(seed)}"`;
+  let face: string;
   if (it.source?.kind === 'album') {
     const m = it.source.month;
-    return `<span class="mk-swatch"><span class="paper" style="--paper-tint:${MONTH_TINTS[m]}"><svg viewBox="0 0 100 140"><use href="#motif-${m}"/></svg></span></span>`;
-  }
-  if (it.id === 'plain') return '<span class="mk-swatch mk-swatch--plain"></span>';
-  return `<span class="mk-swatch"><span class="paper paper--market paper--${it.id}"></span></span>`;
+    face = `<span class="paper" style="--paper-tint:${MONTH_TINTS[m]}"><svg viewBox="0 0 100 140"><use href="#motif-${m}"/></svg></span>${art('paper-plain', 'mk-sheet__detail', ' preserveAspectRatio="xMidYMid slice"')}`;
+  } else if (it.id === 'plain') face = `<span class="paper paper--plainsheet"></span>${art('paper-plain', 'mk-sheet__detail', ' preserveAspectRatio="xMidYMid slice"')}`;
+  else face = `<span class="paper paper--market paper--${it.id}"></span>${art(`paper-${it.id}`, 'mk-sheet__detail', ' preserveAspectRatio="xMidYMid slice"')}`;
+  return `<span class="mk-swatch"><span class="mk-swatch__sheet" ${clip}>${face}<i class="mk-swatch__light"></i></span>${art('weight', 'mk-swatch__weight')}</span>`;
 };
 
-/** Two little cards with a stroke or burst between them (static, for tiles). */
-function miniStage(big: boolean): HTMLElement {
+const MUSIC_IDS = new Set(['default', 'gayageum', 'koto', 'flute', 'moonlight']);
+const musicArt = (it: MarketItem): string => art(`music-${MUSIC_IDS.has(it.id) ? it.id : 'default'}`, 'mk-ill mk-ill--music');
+
+/** The ink each brush leaves in the inkstone (follows the theme, like the stroke itself). */
+const BRUSH_INK: Record<string, string> = {
+  ink: 'var(--path)',
+  vermilion: 'var(--mk-vermilion)',
+  indigo: 'var(--mk-indigo)',
+  petals: 'var(--mk-rose)',
+  firefly: 'var(--mk-ff-mid)',
+  gold: 'var(--mk-gold)',
+};
+
+/**
+ * Two little cards with a stroke or burst between them. Brushes are shown on a
+ * small mounted scroll beside an inkstone; effects on a patch of board.
+ */
+function miniStage(it: MarketItem, big: boolean): HTMLElement {
   const stage = h('span', { class: `mk-demo${big ? ' mk-demo--big' : ''}`, 'aria-hidden': 'true' });
   stage.innerHTML = `<span class="mk-demo__card">${cardSvg(PAIR[0])}</span><span class="mk-demo__card">${cardSvg(PAIR[1])}</span>`;
-  return stage;
+  if (it.category === 'brush') {
+    const scroll = h('span', { class: 'mk-scroll', style: `--mka-ink:${BRUSH_INK[it.id] ?? BRUSH_INK.ink}` });
+    const paper = h('span', { class: 'mk-scroll__paper' }, stage);
+    scroll.append(paper);
+    scroll.insertAdjacentHTML('beforeend', `<i class="mk-scroll__rod"></i><i class="mk-scroll__rod mk-scroll__rod--r"></i>${art('inkstone', 'mk-scroll__stone')}`);
+    return scroll;
+  }
+  const board = h('span', { class: 'mk-board' }, stage);
+  return board;
 }
 
 /** Card width and path corners for a demo stage of width W (cards at 22% / 78%). */
@@ -178,8 +185,10 @@ function paintStill(stage: HTMLElement, it: MarketItem): void {
     brushStroke(demoLayer(stage), g.pts, it.id, { cw: g.cw, uid: `mkd-${++demoSeq}`, width: stage.clientWidth, height: stage.clientHeight, still: true, keep: true });
   } else {
     stage.classList.add('is-cleared');
-    burstFx(stage, g.ax, g.cy - g.ch * 0.08, it.id, { cw: g.cw * 1.2, still: true });
-    burstFx(stage, g.bx, g.cy - g.ch * 0.08, it.id, { cw: g.cw * 1.2, still: true });
+    // A frozen frame: the pair lifting away, the burst caught mid-flight (the same
+    // particles as the game, placed by a fixed seed so every tile is composed).
+    burstFx(stage, g.ax, g.cy - g.ch * 0.12, it.id, { cw: g.cw * 1.2, still: true, seed: 17 });
+    burstFx(stage, g.bx, g.cy - g.ch * 0.12, it.id, { cw: g.cw * 1.2, still: true, seed: 41 });
   }
 }
 
@@ -281,11 +290,11 @@ function itemArt(it: MarketItem, big = false): HTMLElement {
       wrap.innerHTML = paperArt(it);
       break;
     case 'music':
-      wrap.innerHTML = `<svg class="mk-ill mk-ill--music" viewBox="0 0 120 80" aria-hidden="true">${MUSIC_ART[it.id] ?? MUSIC_ART.default}</svg>`;
+      wrap.innerHTML = musicArt(it);
       break;
     case 'brush':
     case 'fx':
-      wrap.append(miniStage(big));
+      wrap.append(miniStage(it, big));
       break;
   }
   return wrap;
