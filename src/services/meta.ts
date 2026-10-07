@@ -48,6 +48,7 @@ function addXp(n: number): void {
   if (n <= 0) return;
   save.meta.xp += Math.round(n);
   if (board) board.xp += Math.round(n);
+  if (run) run.xp += Math.round(n);
 }
 
 export interface Granted {
@@ -256,6 +257,7 @@ function bump(metric: MissionMetric, amount = 1): void {
       ensureWeek();
       save.meta.week.count++;
       if (board) board.missions.push(missionText(def));
+      if (run) run.missions.push(missionText(def));
       notify(`Mission complete · ${missionText(def)}`);
     }
   }
@@ -361,6 +363,19 @@ interface BoardTrack {
 }
 let board: BoardTrack | null = null;
 
+/**
+ * A whole Rush run (every round is its own Session, so the per-board tracker
+ * can't see the run). Starts on the run's 'start' event, ends when another
+ * board starts; a "Keep going" continuation stays in the same run.
+ */
+interface RunTrack {
+  xp: number;
+  xpBefore: number;
+  missions: string[];
+  bonus: number[];
+}
+let run: RunTrack | null = null;
+
 function track(session: Session): BoardTrack {
   if (!board || board.session !== session) {
     const n = session.spec.mode === 'journey' ? session.spec.number : 0;
@@ -401,6 +416,23 @@ export function boardReport(session: Session): BoardReport | null {
     tea,
   };
 }
+
+/** What the Rush run added to the Flower Path so far (call after the run is recorded). */
+export function rushReport(): BoardReport | null {
+  if (!run) return null;
+  return {
+    xp: run.xp,
+    before: rankInfo(run.xpBefore),
+    after: rankInfo(save.meta.xp),
+    missions: run.missions.slice(),
+    foil: null,
+    bonus: run.bonus.slice(),
+    tea: 0,
+  };
+}
+
+/** Rush XP for a run score (capped). */
+const rushXp = (score: number) => Math.min(XP.rushCap, Math.floor(score / XP.rushPointsPerXp));
 
 /** Warm tea cups waiting to be announced (consumes the notice). */
 export function takeTeaNotice(): number {
@@ -444,6 +476,7 @@ export function grantSupporter(): boolean {
 
 on('start', ({ session }) => {
   track(session);
+  run = session.spec.mode === 'rush' ? { xp: 0, xpBefore: save.meta.xp, missions: [], bonus: [] } : null;
   ensureToday();
 });
 
@@ -470,6 +503,7 @@ on('pair', (e) => {
     if (fresh.length) {
       save.meta.bonus.push(...fresh);
       b.bonus.push(...fresh);
+      if (run) run.bonus.push(...fresh);
       persist();
       notify('Lucky cards added to your Album');
     }
@@ -520,8 +554,9 @@ on('clear', ({ session, summary }) => {
 });
 
 on('rush', (e) => {
-  addXp(Math.min(XP.rushCap, Math.floor(e.score / XP.rushPointsPerXp)));
-  bump('rushRuns');
+  // A "Keep going" continuation tops the run up to its new score; it isn't a new run.
+  addXp(rushXp(e.score) - (e.extends != null ? rushXp(e.extends) : 0));
+  if (e.extends == null) bump('rushRuns');
   bump('rushBest', e.score);
   persist();
 });

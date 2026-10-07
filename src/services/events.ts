@@ -12,8 +12,12 @@ export interface GameEvents {
   pair: { mode: ModeId; cards: [number, number]; combo: number; fever: boolean; yaku: string[]; session: Session };
   /** a Journey / Daily / Zen board was cleared and recorded */
   clear: { session: Session; summary: ClearSummary };
-  /** a Rush run ended and was recorded */
-  rush: { score: number; rounds: number; pairs: number; bestCombo: number };
+  /**
+   * a Rush run ended and was recorded. `extends` is set when a "Keep going"
+   * continuation ended: the score already recorded for this run, so listeners
+   * add only the difference and don't count a new run.
+   */
+  rush: { score: number; rounds: number; pairs: number; bestCombo: number; extends?: number };
   /** the player used a hint or a shuffle */
   tool: { kind: 'hint' | 'shuffle'; mode: ModeId };
   /** a board started (after any intro) */

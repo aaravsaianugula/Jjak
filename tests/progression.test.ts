@@ -7,14 +7,14 @@ import { BONUS_IDS } from '../src/data/deck';
 import {
   MAX_RANK, MISSIONS, PATH_EXCLUSIVES, TITLES, rankInfo, rankOf, rankReward, xpForRank, xpToNext,
 } from '../src/data/meta';
-import { dailyLevel, journeyLevel, localDateKey, zenLevel } from '../src/engine/levels';
+import { dailyLevel, journeyLevel, localDateKey, rushLevel, zenLevel } from '../src/engine/levels';
 import { Session } from '../src/engine/session';
 import { emit } from '../src/services/events';
 import {
   boardReport, claimChest, claimMission, claimRank, drawMissions, grant, grantPouch, grantSupporter, missions, pending,
-  ranksToClaim, rerollMission, starChests,
+  ranksToClaim, rerollMission, rushReport, starChests,
 } from '../src/services/meta';
-import { liveStreak, recordClear, teaToBridge } from '../src/services/progress';
+import { liveStreak, recordClear, recordRush, teaToBridge } from '../src/services/progress';
 import { defaultSave, save } from '../src/services/storage';
 import { checkSeals, SEALS } from '../src/services/achievements';
 
@@ -161,6 +161,38 @@ describe('XP from play', () => {
     emit('pair', { mode: 'zen', cards: [BONUS_IDS[0], BONUS_IDS[1]], combo: 1, fever: false, yaku: [], session: s });
     expect(save.meta.bonus.sort()).toEqual([48, 49]);
     expect(boardReport(s)!.bonus.length).toBe(2);
+  });
+
+  it('reports a whole Rush run across rounds, and a "Keep going" continuation tops it up without a second run', () => {
+    save.rush.best = 5000;
+    const r0 = new Session(rushLevel('rush-t', 0), 0);
+    emit('start', { session: r0 });
+    emit('pair', { mode: 'rush', cards: [0, 1], combo: 1, fever: false, yaku: [], session: r0 });
+    // The next round is a new Session without a 'start' event; the run report still covers it.
+    const r1 = new Session(rushLevel('rush-t', 1), 0);
+    emit('pair', { mode: 'rush', cards: [4, 5], combo: 1, fever: false, yaku: [], session: r1 });
+    const petals0 = save.petals;
+    const first = recordRush(4000, 2, 2, 1);
+    emit('rush', { score: 4000, rounds: 2, pairs: 2, bestCombo: 1 });
+    const rep = rushReport()!;
+    expect(rep.xp).toBe(save.meta.xp);
+    expect(rep.xp).toBeGreaterThanOrEqual(2 + 20);
+    expect(save.rush.runs).toBe(1);
+    expect(first.newBest).toBe(false);
+    const xp1 = save.meta.xp;
+    // Continued: 8000 points in all. Only the difference is added; it's still one run.
+    const second = recordRush(8000, 3, 5, 2, { score: 4000, pairs: 2, bestBefore: 5000 });
+    emit('rush', { score: 8000, rounds: 3, pairs: 5, bestCombo: 2, extends: 4000 });
+    expect(save.rush.runs).toBe(1);
+    expect(second.newBest).toBe(true);
+    expect(save.stats.pairs).toBe(5);
+    expect(save.petals - petals0).toBe(first.petals + second.petals);
+    expect(first.petals + second.petals).toBe(Math.min(25, Math.floor(8000 / 800)));
+    expect(save.meta.xp - xp1).toBe(20);
+    expect(rushReport()!.xp).toBe(save.meta.xp);
+    // A new board that isn't Rush ends the run report.
+    emit('start', { session: new Session(zenLevel('z'), 0) });
+    expect(rushReport()).toBeNull();
   });
 });
 

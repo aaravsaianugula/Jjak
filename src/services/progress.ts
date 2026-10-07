@@ -218,15 +218,29 @@ export interface RushSummary {
   rounds: number;
 }
 
-/** Record a finished Rush run. */
-export function recordRush(score: number, rounds: number, pairs: number, bestCombo: number): RushSummary {
-  const prevBest = save.rush.best;
-  save.rush.runs++;
-  save.rush.best = Math.max(prevBest, score);
+/** What a Rush run has already recorded (for a "Keep going" continuation). */
+export interface RushRecorded {
+  score: number;
+  pairs: number;
+  /** the personal best before this run */
+  bestBefore: number;
+}
+
+const rushPetals = (score: number) => Math.min(ECONOMY.rushPetalCap, Math.floor(score / ECONOMY.rushPointsPerPetal));
+
+/**
+ * Record a finished Rush run. When a run that was already recorded continues
+ * ("Keep going") and ends again, pass what was recorded as `prev`: only the
+ * difference is added (petals, pairs) and the run isn't counted twice.
+ */
+export function recordRush(score: number, rounds: number, pairs: number, bestCombo: number, prev?: RushRecorded): RushSummary {
+  const prevBest = prev ? prev.bestBefore : save.rush.best;
+  if (!prev) save.rush.runs++;
+  save.rush.best = Math.max(save.rush.best, score);
   save.rush.bestRound = Math.max(save.rush.bestRound, rounds);
-  save.stats.pairs += pairs;
+  save.stats.pairs += Math.max(0, pairs - (prev?.pairs ?? 0));
   save.stats.bestCombo = Math.max(save.stats.bestCombo, bestCombo);
-  const petals = Math.min(ECONOMY.rushPetalCap, Math.floor(score / ECONOMY.rushPointsPerPetal));
+  const petals = Math.max(0, rushPetals(score) - (prev ? rushPetals(prev.score) : 0));
   save.petals += petals;
   persist();
   return { score, best: save.rush.best, newBest: score > prevBest && prevBest > 0, petals, rounds };
