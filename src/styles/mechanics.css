@@ -376,3 +376,20 @@
   height: 12px;
   color: var(--gold-text);
 }
+
+/* On ink paper the dark roof needs a lit edge to hold its shape. */
+:root[data-theme='ink'] .gate__roof {
+  stroke: #9a8f80;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .gate__roof {
+    stroke: #9a8f80;
+  }
+}
+
+/* A narrow rhythm row with a goal chip keeps the combo count and drops its word. */
+@media (max-width: 400px) {
+  .rhythm:has(.goal-chip) .combo__word {
+    display: none;
+  }
+}

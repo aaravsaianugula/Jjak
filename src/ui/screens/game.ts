@@ -1,7 +1,7 @@
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
-import { type Point, STONE, cardsLeft, gateMonth, isCard, isGate, monthOf } from '../../engine/board';
+import { type Point, FENCE_DOWN, FENCE_RIGHT, STONE, cardsLeft, gateMonth, isCard, isGate, monthOf } from '../../engine/board';
 import { GOALS, type GoalId, straightNeed } from '../../engine/goals';
 import { legalMoves } from '../../engine/moves';
 import { findPath } from '../../engine/path';
@@ -240,6 +240,20 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     return `${m.en}, month ${m.index + 1}${d.kind === 'plain' ? '' : `, ${d.en}`}`;
   }
 
+  /** A card's label on the board: its face, plus any bamboo fence on its sides. */
+  function cellLabel(i: number, id: number) {
+    const w = session.board.walls;
+    if (!w) return faceLabel(id);
+    const c = i % spec.cols;
+    const sides = [
+      w[i] & FENCE_RIGHT ? 'right' : '',
+      c > 0 && w[i - 1] & FENCE_RIGHT ? 'left' : '',
+      w[i] & FENCE_DOWN ? 'below' : '',
+      i >= spec.cols && w[i - spec.cols] & FENCE_DOWN ? 'above' : '',
+    ].filter(Boolean);
+    return sides.length ? `${faceLabel(id)}, fence ${sides.join(' and ')}` : faceLabel(id);
+  }
+
   function renderBoard() {
     board.replaceChildren(paper);
     cardEls.clear();
@@ -257,7 +271,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         const c = h('button', {
           class: `card${snowy ? ' is-snow' : ''}${isBonus(v) ? ' is-lucky' : ''}`,
           'data-cell': i,
-          'aria-label': snowy ? 'Card under snow' : faceLabel(v),
+          'aria-label': snowy ? 'Card under snow' : cellLabel(i, v),
           'aria-pressed': 'false',
           html: cardSvg(snowy ? 'snow' : v),
         });
@@ -319,7 +333,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       const swap = () => {
         c.innerHTML = cardSvg(snowy ? 'snow' : v);
         c.classList.toggle('is-snow', snowy);
-        c.setAttribute('aria-label', snowy ? 'Card under snow' : faceLabel(v));
+        c.setAttribute('aria-label', snowy ? 'Card under snow' : cellLabel(i, v));
         c.classList.toggle('is-lucky', isBonus(v));
         setKnot(c, session.knots.has(i));
       };
@@ -522,7 +536,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       comboEl.classList.remove('is-on');
       return;
     }
-    comboEl.replaceChildren(h('b', {}, '짝'.repeat(n)), h('span', {}, `×${n} · ${COMBO_WORDS[n]}`));
+    comboEl.replaceChildren(h('b', {}, '짝'.repeat(n)), h('span', {}, `×${n}`, h('span', { class: 'combo__word' }, ` · ${COMBO_WORDS[n]}`)));
     comboEl.classList.toggle('is-max', n >= 5);
     comboEl.classList.add('is-on');
     retrigger(comboEl, 'is-pop');
@@ -860,7 +874,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           setTimeout(() => {
             c.innerHTML = cardSvg(v);
             c.classList.remove('is-snow');
-            c.setAttribute('aria-label', faceLabel(v));
+            c.setAttribute('aria-label', cellLabel(i, v));
           }, 200);
           setTimeout(() => c.classList.remove('is-flip'), 440);
         }

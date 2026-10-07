@@ -86,7 +86,7 @@ function frameMarkup(month: number): string {
     `<path d="M7 29.5H93" stroke="${VERMILION}" stroke-width="1.3" opacity=".7"/>` +
     `<path d="M7 38H93" stroke="${WOOD_LIGHT}" stroke-width="1.2" opacity=".7"/>` +
     // Roof and tiles.
-    `<path d="${roof}" fill="${ROOF}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` +
+    `<path class="gate__roof" d="${roof}" fill="${ROOF}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` +
     `<path d="${tiles}" stroke="#5c564e" stroke-width="1.6"/>` +
     `<path d="M14 12H86" stroke="#6c665d" stroke-width="2.4" stroke-linecap="round"/>` +
     `<path d="M1 21C7 21 11 18 14 12M99 21C93 21 89 18 86 12" fill="none" stroke="#6c665d" stroke-width="1.2"/>` +
