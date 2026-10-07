@@ -12,8 +12,9 @@ You're continuing work on **Jjak (짝)**, a calm pair-connecting puzzle game (Sh
 
 The previous session built a large launch expansion and was cut off by a usage limit midway
 through the final QA and polish pass. Fix Part A's bugs first, then think through, design and
-build the owner's new requests in Part C (adaptive difficulty, 100–200 fresh launch levels, new
-mechanics, show-don't-tell onboarding). Finish with Part B launch readiness on the final build.
+build the owner's new requests in Part C: the Level Director (a player-adaptive system that
+generates and validates all 600 launch levels and endless ones after), new mechanics, and
+show-don't-tell onboarding. Finish with Part B launch readiness on the final build.
 
 ## 0. Read first (in this order)
 1. `docs/EXPANSION_PLAN.md`: the expansion, the shared contracts and the 50-hour content budget
@@ -144,7 +145,7 @@ unfinished, and commit in logical steps.
    save hydration and migration of older saves, the IAP grant/consume/restore paths, the economy (no farming
    loops), and the mechanic solvability safety nets. Fix what's real.
 6. **Decisions for the owner.** Put them in the final summary, with a recommendation for each:
-   - **(a)** Lucky cards start at chapter 5, so festival boards 1–4 don't have them.
+   - **(a)** Lucky cards start at chapter 5, so festival boards 1–4 don't have them. (May be superseded by the Director.)
    - **(b)** On Wind boards, the automatic reshuffle doesn't cost the no-assist blossom.
    - **(c)** Lucky petals pay on replays too (10 per lucky board).
    - **(d)** Font payload grew to 4.4 MB. Consider trimming.
@@ -171,105 +172,161 @@ The owner's words, lightly edited:
 > For launch, have **100–200 levels**. Make sure each one is fun and that the algorithm ties into
 > them and changes them for each player. Add new mechanics and things to the game, but keep it fun
 > and nice to play. Don't fill it with gimmicks or anything that takes away from the core idea.
+>
+> **Update from the owner:** launch with **600 levels**, built by a system rather than by hand.
+> We author the mechanics and cards, player behaviour feeds in, controlled randomness is added,
+> and checks guarantee nothing is broken or unsolvable, giving effectively infinite levels.
+> Research how games achieve this.
 
 Treat this as the main work of the session, after Part A's must-fix bugs. Read the current code
 first: `src/engine/{levels,generate,session,moves,path}.ts`, `src/data/route.ts`,
 `src/ui/screens/{welcome,game}.ts`, `src/ui/journey-fx.ts` (the knots/wind "Try it" tips) and
 `showVariantTip` in `game.ts`.
 
-### C1. Adaptive difficulty ("the Gardener")
-**Think first.** Write the design into `docs/EXPANSION_PLAN.md` §C1 before coding.
+### C1 + C2. The Level Director: a system that builds every level (launch with 600, then endless)
 
-**Player model.** The data the game can collect on-device every board:
-- solve time vs par
-- think time before the first pair, and between pairs (median and long pauses)
-- the first cards touched and where (edge vs centre, rows/columns scanned)
-- mismatches and blocked-path taps
-- reselects
-- hints, shuffles and auto-shuffles
-- combo rate and Fever reached
-- restarts, quits mid-board, retries for stars
-- session length and boards per session, days active
-- per-mechanic performance (stones, leaves, snow, lucky, knots, wind)
+**Owner's decision:** launch with **600 levels**, and don't hand-make them. Build a system:
 
-Turn it into a small skill estimate, for example an Elo/Glicko-style rating per player, plus
-per-mechanic modifiers and a "frustration/boredom" signal from recent boards. Keep it robust to
-noise: rolling windows, and no swings from one bad board.
+1. **We author** the mechanics and the cards.
+2. **The player-behaviour model** feeds in.
+3. **Controlled randomness** is added.
+4. **Checks** guarantee nothing is broken or unsolvable.
+5. **Result:** effectively infinite levels. From then on we only build new mechanics, and the
+   system does the rest.
 
-**Difficulty model for a board.** Don't guess. **Measure** candidate boards with simulated solvers
-(greedy, random-legal and lookahead bots) and features such as:
-- branching factor: legal pairs available at each step, and its minimum along the solve
-- the share of pairs that need 2-turn paths
-- decoy density (same-flower pairs that are blocked)
-- dead-end probability for naive play
-- how buried the cards are
-- the mechanic load
+This is a known, proven pattern. Study it before designing (see "How games do this" below) and
+write the design into `docs/EXPANSION_PLAN.md` §C1 first.
 
-Calibrate a difficulty score against the bots and, later, real players.
+#### How games do this (research; read these and cite them in the spec)
+| Idea | Who did it, and what it means for Jjak | Source |
+|---|---|---|
+| **Templates + randomness + a guaranteed path** | Spelunky hand-authors room templates, randomises parts of them, and **first guarantees a solvable route** before decorating. For Jjak: authored chapter/role templates, randomised boards, solvable by construction (we already do the last part). | [GMTK: How and Why Spelunky Makes its Own Levels](https://amara.org/videos/p6MHlmreohsY/en-gb/3101319) |
+| **Constructive vs generate-and-test** | Togelius et al.'s taxonomy: constructive generators build once; generate-and-test builds candidates and scores them with an evaluation function (search-based PCG). For Jjak: a constructive solvable generator *inside* a generate-and-test loop. | [Togelius et al. 2011, Search-based PCG: a taxonomy and survey](https://course.ccs.neu.edu/cs5150f13/readings/togelius_sbpcg.pdf) |
+| **Experience-driven PCG** | Yannakakis & Togelius: generate content from a **computational model of the player's experience**, built from gameplay metrics and level parameters. This is exactly "player data → level". | [Yannakakis & Togelius, Experience-driven PCG](https://www.um.edu.mt/library/oar//bitstream/123456789/29714/1/Experience-driven_procedural_content_generation_%28extended_abstract%29_2015.pdf) |
+| **Dynamic difficulty adjustment** | Hunicke's Hamlet: an *evaluation function* (how is the player doing) plus an *adjustment policy* (what to change), adjusting both reactively and proactively to keep the player in flow. | [Hunicke, Hamlet (PDF)](https://users.cs.northwestern.edu/~hunicke/pubs/Hamlet.pdf) |
+| **Pacing director** | Left 4 Dead's AI Director: when things have been intense too long it schedules a break, and when quiet it raises tension. For Jjak: relief and stretch boards. | [Mike Booth (Wikipedia)](https://en.wikipedia.org/wiki/Mike_Booth), [Shacknews GDC write-up](https://www.shacknews.com/article/57892/left-4-dead-at-gdc) |
+| **Bot playtesting to measure difficulty** | King plays Candy Crush levels with **human-like bots** to predict difficulty before release. Their CNN beat MCTS in accuracy and speed and cut level iteration from days to minutes. Mugrai et al. used **MCTS "procedural personas"** (different playstyles) to playtest matching-tile games. For Jjak: solver bots with several personas score every candidate board. | [Gudmundsson et al. 2018, Human-Like Playtesting with Deep Learning (PDF)](https://www.Gwern.net/doc/reinforcement-learning/imitation-learning/2018-gudmundsson.pdf), [Mugrai et al. 2019, Automated Playtesting of Matching Tile Games](https://arxiv.org/abs/1907.06570v1) |
+| **Generated levels with a sawtooth curve, validated by players** | ELIMINATION generates all levels with a constrained evolutionary algorithm; play traces from about 1,000 users confirmed the intended sawtooth difficulty curve. | [ELIMINATION from Design to Analysis](https://paperswithcode.com/paper/elimination-from-design-to-analysis) |
+| **Hard constraints as a design space** | Smith & Mateas describe the design space declaratively and let a solver produce only valid content, which suits "must be solvable" style constraints. | [Smith & Mateas, ASP for PCG (PDF)](https://course.ccs.neu.edu/cs5150f14/readings/smith_asp4pcg.pdf) |
 
-**Generation loop.** For each level, keep its *identity* (place, mechanic focus, rhythm role, board
-shape range) but generate N candidate boards from the level seed plus a variant index. Pick the one
-whose measured difficulty is closest to the player's **target**.
-- Keep it deterministic per (level, player-tier), so a retry is the same board.
-- The **Daily stays identical for everyone.**
-- Rush and Zen can adapt too.
+These sources are academic papers and first-party talks or interviews. Treat the industry
+numbers (King's 7 days → 1 minute) as reported claims, not targets.
 
-**Target curve.** Aim for flow, not maximum hardness:
-- a sawtooth within each chapter (build → peak → breather → festival)
-- a ~75–85% "clear without assists" target for most boards
-- a relief board after a struggle and a stretch board after a streak of easy wins
+#### Architecture (recommended; challenge it if research suggests better)
 
-Hard boards must feel fair: they're solvable by construction, and the challenge comes from reading
-the board, not from luck.
+**Five layers:**
+1. **Authored layer (what we design by hand).**
+   - **A mechanic library:** each mechanic (stones, falling leaves, snow, lucky, knots, wind, plus
+     the C3 additions) is a module with:
+     - its parameters and legal ranges
+     - placement rules
+     - an engine hook
+     - a solvability safety net
+     - a difficulty contribution
+     - its intro demo (C4)
+     - the level it unlocks at
+   - **The deck.**
+   - **Level grammar:** the Flower Road's 50 places, the 12-slot chapter rhythm (warm-up → focus →
+     breather → peak → festival), allowed mechanic sets per chapter, board-shape ranges, goal types
+     (C3) and festival rules.
+   - **No per-level hand work.** A new mechanic means one new module plus where it may appear.
+2. **Player model, on-device** (the Hamlet-style evaluation function). Each board records, into a
+   capped `save.analytics` slice:
+   - solve time vs par
+   - think time before the first pair and between pairs
+   - the first cards touched and where (edge vs centre, scan pattern)
+   - mismatches and blocked-path taps, reselects
+   - hints, shuffles, auto-shuffles
+   - combos and Fever
+   - restarts and quits mid-board
+   - session length, days active
+   - per-mechanic results
 
-**Fix "later levels are too simple."** The current curve plateaus (8×6 maximum, gentle mechanic
-counts). Use the knobs, within phone-tappable limits:
-- months on the board and how many 4-variant flowers there are
+   These fold into:
+   - a skill rating (Elo/Glicko-style)
+   - per-mechanic proficiency
+   - an engagement signal (frustration vs boredom) from recent boards
+
+   Use rolling windows, so one bad board doesn't swing it.
+3. **Director** (the adjustment policy and pacing). It computes a **target difficulty** per level:
+   - the designed curve (sawtooth within chapters, rising across the road)
+   - plus the player's skill offset
+   - plus pacing: a relief board after struggle, a stretch board after an easy streak (the L4D
+     Director idea)
+
+   The aim is ~75–85% of boards cleared without assists, with real peaks.
+4. **Generator** (constructive inside generate-and-test).
+   - **Candidates.** For level *n*, the player tier and an attempt key, build K candidate boards
+     with the existing solvable-by-construction generator. Use seeded randomness from
+     `seed(level, tier)` so a retry is the same board, and the **Daily stays identical for
+     everyone**.
+   - **Variety.** Choose mechanics and goals with a **bag randomiser** (no repeats until the bag
+     empties), so neighbouring levels never feel the same.
+   - **Scoring.** Score each candidate with **bot personas** (greedy, random-legal, lookahead/MCTS-lite,
+     "human-like" heuristics such as edge-first scanning) to measure:
+     - legal pairs available along the solve (minimum and average)
+     - the share of pairs needing 2-turn paths
+     - blocked decoy pairs
+     - dead-end probability for naive play
+     - mechanic load
+     - an estimated solve time
+   - **Fitness** = closeness to the target + novelty vs the last levels (feature-vector distance) + fun
+     heuristics (an early foothold, a mid-board crunch, an ending that opens up for a combo finish).
+   - **Refinement.** Optionally hill-climb or evolve the best candidate a few steps (as ELIMINATION does).
+5. **Validators** (hard gates; reject and regenerate on failure):
+   - a full solver proves the board is clearable from its initial state, including mechanics
+   - no trivial boards (minimum branching and 2-turn share)
+   - dead-end risk inside the band
+   - safety nets present
+   - cards tappable at 360-wide (board ≤ the tested size)
+   - generation time within budget
+   - deterministic output
+   - Daily and Rush rules respected
+
+**Where the work runs (recommended hybrid, as King does offline with bots):**
+- **Offline, at build time** (a Node script in CI): run the heavy search for levels 1–600 at, say, 5
+  skill tiers. Ship a small **level bank** of seeds plus metrics as JSON (a few KB per level). On
+  the device, the Director just *selects* the bank entry for the player's tier, which is instant
+  and fully validated.
+- **On device** (a Web Worker, cheaper K and fast checks): levels 601+ (endless), and fallback.
+  Infinite levels with the same guarantees.
+
+**Fixing "later levels are too simple."** The current curve plateaus (8×6 maximum, gentle mechanic
+counts). Give the Director real knobs:
+- months and 4-variant density
 - stone count and placement that forces long paths
-- more decoys and fewer free moves early in a board
+- fewer free moves early and more decoys
 - tighter par
-- mechanic density and combinations (e.g. wind + knots, snow + stones)
-- **level goals** (see C3)
+- mechanic combinations (wind + knots, snow + stones, …)
+- level goals (C3)
 
-Test 9×6 or 8×7 on 360-wide screens before using it.
+Test 9×6 or 8×7 at 360 wide before allowing it.
 
-**Dopamine without manipulation** (13+ audience):
-- reward skill moments: combos, Fever, card sets, "perfect read" clears, near-miss saves
-- vary rewards a little
-- end boards on a high note (the last few pairs open up)
+**Dopamine without manipulation** (13+):
+- reward skill: combos, Fever, card sets, "perfect read" clears
+- small variable rewards
+- boards that end on a high note
 
-No dark patterns: no fake near-misses, no difficulty spikes to sell hints, no punishing streaks.
-Never make a board harder *because* the player has hints to spend.
+Never raise difficulty to sell hints, never fake near-misses, never punish streaks.
 
-**Privacy.** Keep all of this **on-device** (a new `save.analytics` slice with a capped history),
-so the Data safety form and privacy policy stay as they are. If you think remote analytics are
-needed later, write it up as an optional proposal (Firebase/Play Games: what's collected, the
-consent and policy changes). Don't add it now.
+**Privacy:** all on-device. The Data safety form and privacy policy stay as they are. Remote analytics
+(Firebase or Play Games) is a written proposal only.
 
 **Tests:**
-- simulated player personas (novice, average, expert, impatient, hint-heavy) converge to the
-  target success rate without oscillating
-- difficulty is monotonic in its knobs
+- personas converge to the target clear rate without oscillation
+- difficulty is monotonic in the knobs
 - determinism
-- all boards solvable
+- 100% of the 600-level bank plus a fuzz of endless levels validate
 - the Daily is unaffected
+- generation stays within budget
+- an **audit report** with the measured difficulty curve for all 600 levels per tier, flagging
+  "too similar to neighbours" and outliers
 
-Add a hidden dev panel (gated by `import.meta.env.DEV`) that shows the rating, the target and the
-chosen board's metrics.
+Publish the curve as a chart artifact, before and after. Add a dev panel (`import.meta.env.DEV`)
+showing the player rating, the target and the chosen board's metrics.
 
-### C2. Launch content: 100–200 levels that each feel fresh
-- The owner wants **100–200 launch levels**, each fun. Today there are 600 generated levels.
-- **Recommended:** curate the first **~180 levels (15 places × 12)** as the launch Journey, then
-  unlock further places in content updates. That makes a live-ops cadence and keeps every launch
-  level reviewed.
-- Give every level a hand-set identity: place, rhythm role, focus mechanic, an optional goal, a
-  par band, and a short title or postcard beat on festival levels. Let the Gardener tune the
-  board within that identity.
-- Write a level audit script that plays all launch levels with the bots at three skill tiers. It
-  should flag levels that are too easy (high branching, no 2-turn paths), too hard (dead-end rate),
-  or too similar to their neighbours (feature-vector distance).
-- Re-check the **50-hour budget** and the economy tests against the new level count. Fewer levels
-  means replay, goals, Daily, missions and the Garden carry more. Report the honest new estimate.
+**Migration:** existing saves keep their level number and stars. A level's place, role and
+mechanic identity stay stable; only the board within that identity adapts.
 
 ### C3. New mechanics and level goals that deepen the core
 The core is **finding a same-flower pair joined by a path with at most two turns**. New ideas must
@@ -311,20 +368,21 @@ solvability fuzz for each, and follow the knots/wind pattern in `journey-fx.ts`.
 1. Spec each of C1–C4 in `docs/EXPANSION_PLAN.md`: goal, options with trade-offs, recommendation,
    acceptance criteria.
 2. Build in parallel worktree agents with clear file ownership:
-   - engine and Gardener (C1)
-   - level curation and audit (C2)
-   - mechanics (C3)
-   - demos and intro (C4)
+   - Level Director core: player model, Director, generator loop, validators, bots (C1+C2)
+   - offline level-bank builder + audit + chart
+   - new mechanics as library modules (C3)
+   - the demo player + intro + mechanic demos (C4)
 
-   Then integrate.
+   Freeze the mechanic-module interface first, so C3 and C4 plug into the Director.
 3. Verify by actually playing the first 30 levels, plus sampled later ones, in the browser.
 4. Report the measured difficulty curve as a chart in an artifact, before and after.
 
 **Decisions to put to the owner** (with a recommendation for each):
-- the final launch level count
-- whether adaptive difficulty may *lower* difficulty below the designed floor for struggling players
-- whether star thresholds (par) adapt or stay fixed (recommended: fixed, so stars mean something)
+- whether the Director may go *below* the designed floor for struggling players
+- whether par (stars) stays fixed per level (recommended, so stars mean something) or adapts
 - whether level goals can fail a level, or only cost a star (recommended: only cost a star)
+- how many skill tiers the bank holds (recommended: 5)
+- whether to propose opt-in remote analytics later
 
 ## Definition of done
 - Every Part A flow has been walked, with no console errors and nothing clipped at 360×640 or 390×844, in
