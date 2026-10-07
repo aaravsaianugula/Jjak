@@ -526,7 +526,7 @@ function foliage(r: () => number, clumps: Clump[], n: number, size: number, dark
   const edge = dark.map(() => '');
   const lit = light.map(() => '');
   let tips = '';
-  const per = Math.min(9, Math.max(6, Math.round((n / clumps.length) * 0.6)));
+  const per = Math.min(8, Math.max(6, Math.round((n / clumps.length) * 0.6)));
   for (const [x, y, rx, ry] of clumps) {
     mass += blob(r, x, y + ry * 0.06, rx * 1.02, ry * 0.95, 9);
     shade += blob(r, x + rx * 0.16, y + ry * 0.38, rx * 0.7, ry * 0.46, 6);
@@ -541,7 +541,7 @@ function foliage(r: () => number, clumps: Clump[], n: number, size: number, dark
       edge[k % edge.length] += leaf(x + Math.cos(a) * rx * d * 0.8, y + Math.sin(a) * ry * d * 0.8, len, ang, size * 0.7);
     }
     // the lit side: toward the upper left
-    for (let k = 0; k < Math.ceil(per * 0.65); k++) {
+    for (let k = 0; k < Math.ceil(per * 0.55); k++) {
       const a = Math.PI * (0.9 + r() * 0.95);
       const d = 0.25 + r() * 0.7;
       const len = size * (1.3 + r() * 1);
@@ -744,8 +744,8 @@ function courtyard(c: C): string {
   o += `<path d="M178 117.5h36v4h-36Z" fill="${s === 3 ? '#d9dee4' : '#cdbfa8'}"/></g>`;
   if (!c.night) o += `<ellipse cx="200" cy="121" rx="190" ry="5" fill="${P.mist}" opacity=".55"/>`;
 
-  // the hedge along the back of the courtyard
-  {
+  // the hedge along the back of the courtyard (hidden behind the stone wall when there is one)
+  if (!c.has('wall')) {
     const r = rng(47 + s);
     // a clipped hedge in three washes: a dark body, a lit crown, leaf strokes along its top
     const top: Pt[] = [];
@@ -776,7 +776,7 @@ function courtyard(c: C): string {
     o += `<rect y="120" width="360" height="180" fill="${rad(c, 'gvig', [[0, '#ffffff', 0], [0.7, '#ffffff', 0], [1, '#5a4630', s === 3 ? 0.06 : 0.14]])}"/>`;
     // broom sweeps in little fans, finer with distance
     let sw = '';
-    for (let k = 0; k < 22; k++) {
+    for (let k = 0; k < 17; k++) {
       const y = 136 + r() ** 0.8 * 160;
       const depth = (y - 126) / 174;
       const x = -10 + r() * 380;
@@ -785,7 +785,7 @@ function courtyard(c: C): string {
       const tilt = (r() - 0.5) * 0.6;
       for (let j = 0; j < 3; j++) {
         const yy = y + j * h * 0.7;
-        sw += `M${n1(x - w / 2)} ${n1(yy + tilt * w)}Q${n1(x)} ${n1(yy - h)} ${n1(x + w / 2)} ${n1(yy - tilt * w)}`;
+        sw += `M${nums([x - w / 2, yy + tilt * w])}q${nums([w / 2, -h - tilt * w, w, -2 * tilt * w])}`;
       }
     }
     o += `<path d="${sw}" stroke="${P.rake}" stroke-width="${s === 3 ? 0.5 : 0.45}" fill="none" opacity="${s === 3 ? 0.55 : 0.6}" stroke-linecap="round"/>`;
@@ -822,16 +822,16 @@ function courtyard(c: C): string {
     o += scatter(r, cl, s === 1 ? 70 : 50, 1.6, 3.4, P.moss, 0.6, 0.45);
     // grass tufts: three tapered blades each
     let d = '';
-    for (let k = 0; k < (s === 1 ? 24 : 16); k++) {
+    for (let k = 0; k < (s === 1 ? 18 : 13); k++) {
       const [cx, cy, rx, ry] = cl[k % cl.length];
       const x = cx + (r() - 0.5) * rx * 1.6;
       const y = cy + (r() - 0.5) * ry * 1.4;
       const h = 3 + r() * 3 + (y - 126) / 60;
-      for (let j = 0; j < 3; j++) d += leaf(x + j * 0.8, y, h * (0.7 + j * 0.15), -90 + (j - 1) * 24 + (r() - 0.5) * 16, 0.45);
+      for (let j = 0; j < 2; j++) d += leaf(x + j * 1.1, y, h * (0.8 + j * 0.2), -102 + j * 26 + (r() - 0.5) * 16, 0.5);
     }
     o += `<path d="${d}" fill="${P.moss[2]}" opacity=".85"/>`;
   }
-  o += fence(c);
+  if (!c.has('wall')) o += fence(c);
   return o;
 }
 
@@ -950,7 +950,7 @@ function wall(c: C): string {
       const x0 = x + h + 0.3;
       const len = Math.max(0, w - 2 * h - 0.6);
       const tone = Math.floor(r() * 3);
-      const gr = r() < 0.5;
+      const gr = r() < 0.3;
       if (seen(c, x0) || seen(c, x0 + len)) {
         shade.push([x0 + 0.5, cy + 0.8, h + 0.2, len]);
         groups[tone].push([x0, cy, h, len]);
@@ -1021,8 +1021,8 @@ function bamboo(c: C): string {
       const t = (base - y) / (base - topY);
       const nx = x + lean * t;
       const dir = r() < 0.5 ? -1 : 1;
-      for (let j = 0; j < 5; j++) {
-        const ang = dir > 0 ? 18 + j * 22 + r() * 10 : 162 - j * 22 - r() * 10;
+      for (let j = 0; j < 4; j++) {
+        const ang = dir > 0 ? 18 + j * 28 + r() * 10 : 162 - j * 28 - r() * 10;
         lv[Math.floor(r() * 3)] += leaf(nx, y, 8 + r() * 5, ang, 1.4 + r() * 0.5);
       }
     }
@@ -1123,10 +1123,12 @@ function plum(c: C): string {
   } else if (c.s === 1) {
     const cl: [number, number, number, number][] = [[104, 76, 14, 9], [126, 64, 10, 9], [168, 86, 16, 9], [150, 104, 12, 7], [118, 92, 12, 6], [176, 110, 8, 5]];
     o += foliage(r, cl, 70, 1.8, ['#5f8a4f', '#729a5b'], ['#8ab56c', '#a3c47f']);
-    o += `<path d="${along(10).map(([x, y]) => ell(x, y + 2, 1.2, 1.2)).join('')}" fill="#b9c46a"/>`;
+    o += `<path d="${along(10).map(([x, y]) => ell(x, y + 2, 1.2, 1.2)).join('')}" fill="#b9c46a"${ol(0.25, 0.5)}/>`;
   } else if (c.s === 2) {
-    const cl: [number, number, number, number][] = [[104, 78, 12, 8], [168, 88, 14, 8], [140, 104, 12, 6], [126, 66, 8, 7]];
-    o += scatter(r, cl, 34, 1, 1.8, ['#c9a85a', '#b98d4a', '#a8a050'], 0.9, 0.6);
+    const lc = ['#c9a85a', '#b98d4a', '#a8a050'];
+    const lv = lc.map(() => '');
+    along(18).forEach(([x, y], k) => (lv[k % 3] += leaf(x, y, 3 + r() * 1.6, r() * 360, 1.1)));
+    o += lv.map((d, i) => `<path d="${d}" fill="${lc[i]}"${ol(0.2, 0.4)}/>`).join('');
   } else {
     const fl = plumDef(c);
     o += `<path d="${snowAlong(r, trunk, 6)}${limbs.map(([p, a]) => snowAlong(r, p, a)).join('')}"${SNOW_STROKE}/>`;
@@ -1348,8 +1350,12 @@ function deer(c: C): string {
   if (c.s < 3) {
     const r = rng(161);
     let sp = '';
-    for (let k = 0; k < 13; k++) sp += ell(x - 6 + r() * 17, y - 20 + r() * 4.5, 0.6, 0.45);
-    o += `<path d="${sp}" fill="#f6efe0" opacity="${c.s === 2 ? 0.45 : 0.85}"/>`;
+    for (let k = 0; k < 9; k++) {
+      const t = k / 8;
+      const row = k % 2;
+      sp += leaf(x - 6 + t * 16 + r() * 0.6, y - 19.4 + row * 2.4 + Math.sin(t * 3) * 0.5, 1.4, -4 + r() * 8, 0.42);
+    }
+    o += `<path d="${sp}" fill="#f6efe0" opacity="${c.s === 2 ? 0.4 : 0.7}"/>`;
   }
   // near legs
   o += `<path d="M${T(-8, -13)}L${T(-9, -0.6)}M${T(7, -12)}C${T(9.6, -8)} ${T(7.6, -5)} ${T(8.6, -0.6)}" stroke="${coat}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`;
@@ -1834,9 +1840,17 @@ function wisteria(c: C): string {
   o += `<path d="${raft}" stroke="${wood}" stroke-width="1.8" stroke-linecap="round"/><path d="${raft}" stroke="${woodL}" stroke-width=".5" opacity=".6" transform="translate(-.5 -.4)"/>`;
   // foliage across the top
   const top: [number, number, number, number][] = [[300, 193, 12, 4], [322, 190, 14, 5], [344, 187, 14, 5], [362, 184, 8, 4]];
-  if (s === 0) o += scatter(r, top, 44, 1.2, 2, ['#9cba7c', '#b6cc8f'], 0.95, 0.6);
+  const spray = (cols: string[], n: number) => {
+    const g = cols.map(() => '');
+    for (let k = 0; k < n; k++) {
+      const [cx, cy, rx, ry] = top[k % top.length];
+      g[k % cols.length] += leaf(cx + (r() - 0.5) * rx * 2, cy + (r() - 0.5) * ry * 1.6, 3.4 + r() * 2, 90 + (r() - 0.5) * 160, 1.1);
+    }
+    return g.map((d, i) => `<path d="${d}" fill="${cols[i]}"/>`).join('');
+  };
+  if (s === 0) o += spray(['#8fb070', '#a9c487', '#c2d69e'], 36);
   else if (s === 1) o += foliage(r, top, 70, 1.8, ['#4f7a4f', '#5f8a58'], ['#77a06a', '#8fb47a']);
-  else if (s === 2) o += scatter(r, top, 60, 1.2, 2.2, ['#d4b04e', '#c99a3e', '#e0c46a', '#b98a3a'], 0.95, 0.6);
+  else if (s === 2) o += spray(['#d4b04e', '#c99a3e', '#e0c46a', '#b98a3a'], 40);
   // front beam
   o += `<path d="M${FB[0][0]} ${FB[0][1]}L${FB[1][0]} ${FB[1][1]}V${FB[1][1] + 3.6}L${FB[0][0]} ${FB[0][1] + 3.6}Z" fill="${wood}"${ol(0.45, 0.7)}/><path d="M${FB[0][0]} ${FB[0][1]}L${FB[1][0]} ${FB[1][1]}" stroke="${woodL}" stroke-width=".6"/>`;
   // hanging sprays (spring) or leaves and pods
@@ -2249,7 +2263,7 @@ const VIGNETTE: Record<string, [number, number, number, number, Ground]> = {
   maple: [54, 176, 140, 200, 'earth'],
   persimmon: [320, 92, 136, 146, 'earth'],
   bonsai: [34, 270, 64, 282, 'maru'],
-  wisteria: [323, 240, 104, 214, 'earth'],
+  wisteria: [324, 232, 98, 214, 'earth'],
   irises: [229, 226, 52, 222, 'bank'],
   wall: [180, 112, 64, 132, 'earth'],
   onggi: [316, 160, 76, 160, 'earth'],
