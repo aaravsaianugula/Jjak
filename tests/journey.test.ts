@@ -141,8 +141,9 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 700; n++) {
       const sp = journeyLevel(n);
       expect(sp.number).toBe(n);
+      // 8 rows × 7 columns at most (8×7 only on late peak and festival boards): tappable at 360 wide.
       expect(sp.rows).toBeLessThanOrEqual(8);
-      expect(sp.cols).toBeLessThanOrEqual(6);
+      expect(sp.cols).toBeLessThanOrEqual(sp.festival || routeOf(n).slot === 10 ? 7 : 6);
       expect(sp.stones).toBeLessThanOrEqual(maxStones(sp.rows, sp.cols));
       expect(sp.stones % 2).toBe(0);
       expect((sp.rows * sp.cols - sp.stones) % 2).toBe(0);
@@ -160,7 +161,7 @@ describe('journey level curve', () => {
     for (let ch = 0; ch < 60; ch++) {
       const sp = journeyLevel((ch + 1) * 12);
       expect(sp.festival).toBe(true);
-      expect(sp.rows * sp.cols).toBe(48);
+      expect(sp.rows * sp.cols).toBeGreaterThanOrEqual(48);
       expect(!!sp.lucky).toBe(ch >= MECHANIC_INTRO.lucky);
       const regular = journeyLevel((ch + 1) * 12 - 1);
       expect(sp.par).toBeGreaterThan(regular.par - 20);

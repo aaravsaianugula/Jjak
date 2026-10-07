@@ -59,7 +59,10 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 ## 4. Level curve
 
 Levels 1–6 teach the basics (unchanged); from level 7 the Journey follows the
-Flower Road (`src/data/route.ts`, `journeyLevel` in `src/engine/levels.ts`).
+Flower Road (`src/data/route.ts`). The grammar lives in the Level Director's plan
+(`levelPlan` in `src/director/plan.ts`; `journeyLevel` returns its middle tier), and
+the board each player gets comes from the offline-built bank at their tier
+(`src/director/bank.ts`, `npm run bank`; audit in `docs/level-audit.md`).
 
 | Levels | Board | Variants | Teaches |
 |---|---|---|---|
@@ -73,13 +76,18 @@ Flower Road (`src/data/route.ts`, `journeyLevel` in `src/engine/levels.ts`).
 | Chapter 5 | | yes | **Lucky cards**: a bonus pair (보너스패) worth +500 points and +10 petals |
 | Chapter 7 | | yes | **Knots (매듭)**: a tied card can't be picked until a card beside it clears (tip with practice) |
 | Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair (tip with practice) |
-| Chapters 10–50 | | yes | Each place features one idea or a mix |
+| Chapter 11 | | yes | **Gates (門)**: a gate opens when its flower is paired |
+| Chapter 14 | | yes | **Fences (울타리)**: paths can't cross a bamboo fence |
+| Chapters 6–50 | | yes | Each place features one idea or a mix; level goals on about one board in four |
 | 601+ (Wanderer) | | yes | The same road, fuller boards, slightly tighter par |
 
 **Inside every chapter** the 12 slots follow a rhythm: a warm-up, the chapter's idea, a
 plain board, a mix, a smaller breather in the middle, a peak, and the **festival board**
-(8×6 with +15 s par). Boards never exceed 8×6 so cards stay tappable on phones. Snow never
-shares a board with falling leaves or wind.
+(8×6 with +15 s par; 8×7 for peaks and festivals from place 20). Boards never exceed
+8 rows × 7 columns, so cards stay tappable at 360 px wide. Designed difficulty is a
+sawtooth inside each chapter (open and rest boards dip, the peak tops it) on a road that
+rises; partner ideas and goals come from bag randomisers so neighbours don't repeat.
+Snow and fences never share a board with falling leaves or wind.
 
 **Mechanic safety nets** (never the player's fault, never a penalty): if snow or knots are
 the only reason a board is stuck, they clear for free; if a board is still stuck it
