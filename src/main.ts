@@ -19,6 +19,7 @@ import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
 import { prepareLevel } from './director';
+import { trackSessions } from './services/analytics';
 import { albumScreen } from './ui/screens/album';
 import { gameScreen } from './ui/screens/game';
 import { homeScreen } from './ui/screens/home';
@@ -58,6 +59,8 @@ document.addEventListener('jjak:petals', () => {
 
 async function boot() {
   await loadSave();
+  trackSessions();
+  if (import.meta.env.DEV) void import('./director/dev-panel').then((m) => m.mountDevPanel());
   applyTheme();
   installCardSprite();
   applyCosmetics();
