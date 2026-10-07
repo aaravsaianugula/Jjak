@@ -178,6 +178,10 @@ export async function flush(): Promise<void> {
 export async function resetSave(): Promise<void> {
   // A purchase is never lost by resetting progress.
   const keep = { onboarded: save.onboarded, settings: save.settings, adFree: save.adFree };
+  // Purchase receipts survive too, so a restore can't grant one-time petals twice.
+  const paid = { supporter: save.meta.supporter, iapTokens: save.meta.iapTokens };
   save = { ...defaultSave(), ...keep };
+  save.meta = { ...save.meta, ...paid };
+  if (paid.supporter) save.market.owned.push('back:clouds');
   await flush();
 }
