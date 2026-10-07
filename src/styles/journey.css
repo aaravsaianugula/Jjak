@@ -882,19 +882,53 @@
 
 /* ───────────────────────────── The road goes on (after level 600) ───────────────────────────── */
 .reveal {
+  /* Ink-wash palette for the scene, built from the theme so both themes work. */
+  --rv-sky-top: color-mix(in srgb, var(--ink) 7%, var(--bg));
+  --rv-sky-low: color-mix(in srgb, #f4d6b4 45%, var(--bg));
+  --rv-sun: #e2895e;
+  --rv-mist: var(--bg);
+  --rv-l1: color-mix(in srgb, #7d8ba3 18%, var(--bg));
+  --rv-l2: color-mix(in srgb, #66738a 27%, var(--bg));
+  --rv-l3: color-mix(in srgb, #5b5a52 30%, var(--bg));
+  --rv-l4: color-mix(in srgb, #6e6a58 34%, var(--bg));
+  --rv-line: color-mix(in srgb, var(--ink) 82%, var(--bg));
+  --rv-road: color-mix(in srgb, #fff8ea 88%, var(--bg));
+  --rv-road-far: color-mix(in srgb, #f6d7b3 70%, var(--bg));
   position: fixed;
   inset: 0;
   z-index: 60;
-  display: grid;
-  grid-template-rows: 1fr auto auto auto;
-  justify-items: center;
-  gap: 10px;
-  padding: calc(var(--safe-top) + 16px) 24px calc(var(--safe-bottom) + 20px);
+  overflow: hidden;
   background: var(--bg);
   color: var(--ink);
-  overflow: hidden;
   opacity: 0;
-  transition: opacity 420ms var(--ease-out);
+  transition: opacity 500ms var(--ease-out);
+}
+:root[data-theme='ink'] .reveal,
+:root[data-theme='dark'] .reveal {
+  --rv-sky-top: #121218;
+  --rv-sky-low: #3a2b26;
+  --rv-sun: #d9774c;
+  --rv-l1: #2f3440;
+  --rv-l2: #292d36;
+  --rv-l3: #22252b;
+  --rv-l4: #1a1b1f;
+  --rv-line: #0e0f12;
+  --rv-road: #b9a88d;
+  --rv-road-far: #e3a374;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .reveal {
+    --rv-sky-top: #121218;
+    --rv-sky-low: #3a2b26;
+    --rv-sun: #d9774c;
+    --rv-l1: #2f3440;
+    --rv-l2: #292d36;
+    --rv-l3: #22252b;
+    --rv-l4: #1a1b1f;
+    --rv-line: #0e0f12;
+    --rv-road: #b9a88d;
+    --rv-road-far: #e3a374;
+  }
 }
 .reveal.is-on {
   opacity: 1;
@@ -902,172 +936,414 @@
 .reveal.is-out {
   opacity: 0;
 }
-.reveal__land {
+
+/* The scene: layers rise out of the mist one after another. */
+.rv-land {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
-.reveal__hill {
+.rv-sun {
+  fill: var(--rv-sun);
+  opacity: 0.85;
+}
+.rv-sunwrap {
   opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 900ms var(--ease-out), transform 1200ms var(--ease-out);
+  transform: translateY(14px);
+  transform-origin: 262px 292px;
+  transition: opacity 1600ms ease 600ms, transform 2600ms var(--ease-out) 600ms;
 }
-.reveal__hill--far {
-  fill: color-mix(in srgb, var(--ink) 9%, var(--bg));
-  transition-delay: 300ms;
+.rv-glow {
+  transform-origin: 262px 292px;
+  transform: scale(0.6);
+  transition: transform 2400ms var(--ease-out) 2000ms;
 }
-.reveal__hill--mid {
-  fill: color-mix(in srgb, var(--ink) 15%, var(--bg));
+.rv-layer {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 1200ms var(--ease-out), transform 1600ms var(--ease-out);
+}
+.rv-layer--1 {
+  fill: var(--rv-l1);
+  transition-delay: 150ms;
+}
+.rv-layer--2 {
+  fill: var(--rv-l2);
+  transition-delay: 350ms;
+}
+.rv-layer--3 {
+  fill: var(--rv-l3);
   transition-delay: 550ms;
 }
-.reveal__hill--near {
-  fill: color-mix(in srgb, var(--ink) 22%, var(--bg));
-  transition-delay: 800ms;
+.rv-layer--4 {
+  fill: var(--rv-l4);
+  transition-delay: 750ms;
 }
-.reveal__moon {
-  fill: color-mix(in srgb, var(--gold) 55%, var(--bg));
+.rv-ink {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 1.4;
+  stroke-linecap: round;
   opacity: 0;
-  transition: opacity 1400ms ease 1500ms;
+  transition: opacity 900ms ease 1100ms;
 }
-.reveal.is-on .reveal__hill {
+.rv-mist {
+  opacity: 0;
+  transition: opacity 1600ms ease 900ms;
+}
+.rv-pine__branch {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-linecap: round;
+}
+.rv-pine__crown {
+  fill: color-mix(in srgb, var(--rv-line) 70%, var(--bg));
+}
+.rv-pine {
+  fill: var(--rv-line);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 900ms ease 1000ms, transform 1200ms var(--ease-out) 1000ms;
+}
+.rv-pine__trunk {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-linecap: round;
+}
+.rv-grass path {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+.rv-grass {
+  opacity: 0;
+  transition: opacity 900ms ease 900ms;
+}
+.reveal.is-on .rv-sunwrap,
+.reveal.is-on .rv-layer,
+.reveal.is-on .rv-pine {
   opacity: 1;
   transform: none;
 }
-.reveal.is-on .reveal__moon {
+.reveal.is-on .rv-glow {
+  transform: none;
+}
+.reveal.is-on .rv-mist {
+  opacity: 0.7;
+}
+.reveal.is-on .rv-grass {
+  opacity: 1;
+}
+.reveal.is-on .rv-ink--3 {
+  opacity: 0.35;
+}
+.reveal.is-on .rv-ink--4 {
+  opacity: 0.55;
+}
+
+/* The road draws itself from the stamp to the horizon. */
+.rv-road__ribbon {
+  stroke: none;
+}
+.rv-road__edge {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-dasharray: 26 3 9 2;
   opacity: 0.8;
 }
-.reveal__road {
+.rv-road__edge--far {
+  stroke-dasharray: 18 4 30 2;
+}
+.rv-draw {
   fill: none;
-  stroke: var(--ink);
-  stroke-width: 4.5;
+  stroke: #fff;
+  stroke-width: 96;
   stroke-linecap: round;
   stroke-dasharray: 1 1;
   stroke-dashoffset: 1;
-  transition: stroke-dashoffset 1500ms cubic-bezier(0.45, 0.05, 0.3, 1) 700ms;
+  transition: stroke-dashoffset 2000ms cubic-bezier(0.45, 0.05, 0.25, 1) 1100ms;
 }
-.reveal__road--wash {
-  stroke-width: 11;
-  opacity: 0.12;
-}
-.reveal.is-on .reveal__road {
+.reveal.is-on .rv-draw {
   stroke-dashoffset: 0;
 }
-.reveal__last {
-  position: absolute;
-  left: 7%;
-  bottom: 9%;
-  width: 92px;
-  transform: rotate(-6deg);
-  opacity: 0;
-  transition: opacity 500ms ease 200ms;
-}
-.reveal.is-on .reveal__last {
-  opacity: 1;
-}
-/* An empty stamp outline waits where the road leads. */
-.reveal__next {
+/* Waypoints: places walked are inked; past the stamp they are only outlines. */
+.rv-mark ellipse {
   fill: none;
-  stroke: color-mix(in srgb, var(--accent) 75%, transparent);
-  stroke-width: 2;
-  stroke-dasharray: 5 4;
-  opacity: 0;
-  transform: scale(1.6);
-  transform-origin: 292px 184px;
-  transition: opacity 400ms ease 2200ms, transform 500ms cubic-bezier(0.2, 1.4, 0.4, 1) 2200ms;
+  stroke: var(--rv-line);
+  stroke-width: 1.3;
+  stroke-dasharray: 3 2.2;
 }
-.reveal.is-on .reveal__next {
+.rv-mark.is-done ellipse {
+  fill: var(--rv-line);
+  stroke-dasharray: none;
+}
+.rv-mark {
+  opacity: 0;
+  transition: opacity 500ms ease var(--rv-at, 1500ms);
+}
+.reveal.is-on .rv-mark {
+  opacity: 0.85;
+}
+.rv-stamp {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 600ms ease 300ms, transform 900ms var(--ease-out) 300ms;
+}
+.rv-stamp {
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.25));
+}
+.reveal.is-on .rv-stamp {
   opacity: 1;
   transform: none;
 }
+/* Three cranes, far off, flying toward the gap in the hills. */
+.rv-crane path {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rv-cranes {
+  opacity: 0;
+  transition: opacity 1200ms ease 1600ms;
+}
+.reveal.is-on .rv-cranes {
+  opacity: 0.75;
+  animation: rv-fly 14s linear 1600ms both;
+}
+.rv-crane {
+  animation: rv-flap 1.6s ease-in-out var(--rv-d, 0ms) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes rv-fly {
+  to {
+    transform: translate(70px, 46px) scale(0.86);
+  }
+}
+@keyframes rv-flap {
+  50% {
+    scale: 1 0.55;
+  }
+}
+/* Petals drift down across the whole scene. */
+.reveal__petals {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.reveal__petals i {
+  position: absolute;
+  top: -12px;
+  width: 7px;
+  height: 5px;
+  border-radius: 60% 40% 60% 40%;
+  background: #e8a7b2;
+  opacity: 0;
+}
+.reveal.is-on .reveal__petals i {
+  animation: rv-petal var(--dur, 8s) linear var(--d, 0s) infinite;
+}
+@keyframes rv-petal {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  10% {
+    opacity: 0.85;
+  }
+  90% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--sway, 0), 105vh) rotate(540deg);
+  }
+}
+
+/* Words in the sky. */
 .reveal__words {
-  position: relative;
-  grid-row: 2;
-  padding: 10px 26px;
+  position: absolute;
+  top: calc(var(--safe-top) + clamp(44px, 9vh, 88px));
+  left: 0;
+  right: 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 0 24px;
   text-align: center;
-  /* A soft paper halo keeps the words clear of the road behind them. */
-  background: radial-gradient(closest-side, var(--bg) 62%, color-mix(in srgb, var(--bg) 0%, transparent));
   opacity: 0;
   transform: translateY(10px);
-  transition: opacity 700ms var(--ease-out) 2600ms, transform 700ms var(--ease-out) 2600ms;
+  transition: opacity 900ms var(--ease-out) 2700ms, transform 900ms var(--ease-out) 2700ms;
 }
 .reveal__words h2 {
   margin: 0;
-  font-family: var(--font-display, 'Gowun Batang', serif);
-  font-size: 28px;
+  font-family: var(--font-serif);
+  font-size: clamp(28px, 8.4vw, 36px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+.reveal__rule {
+  width: 120px;
+  height: 8px;
+  fill: var(--accent);
+  opacity: 0.85;
 }
 .reveal__native {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--muted);
+  font-size: 15px;
 }
 .reveal.is-on .reveal__words {
   opacity: 1;
   transform: none;
 }
-/* A fresh passport page turns over. */
-.reveal__page {
-  position: relative;
-  grid-row: 3;
-  perspective: 600px;
-}
-.reveal__leaf {
-  display: grid;
-  grid-template-columns: repeat(4, 22px);
-  grid-template-rows: auto auto 22px;
-  gap: 4px 10px;
-  justify-content: center;
-  padding: 12px 18px 14px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--gold) 10%, var(--bg));
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 12%, transparent), 0 8px 20px -12px rgb(0 0 0 / 0.4);
-  transform-origin: left center;
-  transform: rotateY(-100deg);
+
+/* The passport booklet opens on the next year's first page. */
+.reveal__book {
+  position: absolute;
+  right: 18px;
+  bottom: calc(var(--safe-bottom) + 92px);
+  width: 176px;
+  height: 116px;
+  perspective: 700px;
   opacity: 0;
-  transition: transform 800ms var(--ease-out) 3300ms, opacity 300ms ease 3300ms;
+  transform: translateY(14px);
+  transition: opacity 600ms ease 3200ms, transform 800ms var(--ease-out) 3200ms;
 }
-.reveal__leaf b,
-.reveal__leaf span {
-  grid-column: 1 / -1;
-  text-align: center;
+.reveal.is-on .reveal__book {
+  opacity: 1;
+  transform: none;
 }
-.reveal__leaf span {
-  color: var(--muted);
+.reveal__page,
+.reveal__cover {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px 10px 10px 6px;
+}
+.reveal__page {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 10px 12px 10px 16px;
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--gold) 9%, transparent) 0 1px, transparent 1px 7px),
+    color-mix(in srgb, var(--gold) 8%, var(--surface, var(--bg)));
+  box-shadow: inset 6px 0 8px -6px rgb(0 0 0 / 0.25), 0 10px 24px -14px rgb(0 0 0 / 0.55);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.reveal__year {
   font-size: 13px;
+  color: var(--muted);
 }
-.reveal__leaf i {
-  border: 1.5px dashed color-mix(in srgb, var(--ink) 30%, transparent);
+.reveal__year b {
+  font-family: var(--font-serif);
+  color: var(--ink);
+  font-size: 15px;
+}
+.reveal__slot {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.reveal__slot i {
+  width: 44px;
+  height: 44px;
+  border: 1.6px dashed color-mix(in srgb, var(--accent) 70%, transparent);
   border-radius: 50%;
 }
-.reveal.is-on .reveal__leaf {
-  transform: none;
-  opacity: 1;
+.reveal__slot b {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 15px;
 }
+.reveal__slot small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.reveal__cover {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  background:
+    radial-gradient(circle at 30% 20%, rgb(255 255 255 / 0.08), transparent 60%),
+    #2f4a6d;
+  color: #e8cf96;
+  border: 1px solid #1f3350;
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.6);
+  transform-origin: left center;
+  backface-visibility: hidden;
+  transition: transform 900ms cubic-bezier(0.55, 0.1, 0.3, 1) 3700ms;
+}
+.reveal__crest {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--font-serif);
+  font-size: 17px;
+}
+.reveal__title {
+  margin-top: 4px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.reveal__title2 {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.reveal.is-on .reveal__cover {
+  transform: rotateY(-168deg);
+}
+
 .reveal__go {
-  position: relative;
-  grid-row: 4;
-  width: min(320px, 100%);
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 20px);
+  max-width: 420px;
+  margin: 0 auto;
   opacity: 0;
-  transition: opacity 400ms ease;
+  transform: translateY(8px);
+  transition: opacity 500ms ease, transform 500ms var(--ease-out);
   pointer-events: none;
 }
 .reveal.is-done .reveal__go {
   opacity: 1;
+  transform: none;
   pointer-events: auto;
 }
+
+/* Skipping or reduced motion: everything in its final place, at once. */
 .reveal.is-skip *,
 .reveal.is-still * {
   transition-delay: 0ms !important;
   transition-duration: 0ms !important;
 }
+.reveal.is-still .reveal__petals,
+.reveal.is-still .rv-cranes {
+  display: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .reveal * {
     transition-delay: 0ms !important;
     transition-duration: 200ms !important;
+    animation: none !important;
   }
-  .reveal__hill,
-  .reveal__leaf,
-  .reveal__words,
-  .reveal__next {
-    transform: none !important;
+  .reveal__petals {
+    display: none;
   }
 }
