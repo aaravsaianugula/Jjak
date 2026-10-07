@@ -6,6 +6,7 @@ html,body{margin:0}
 /* spring landscape from the Home screen, dissolving into paper toward the text */
 .scene{position:absolute;right:0;top:0;width:780px;height:500px;-webkit-mask-image:linear-gradient(to right,transparent 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,transparent 0,rgba(0,0,0,.55) 22%,#000 46%)}
 .scene svg{width:100%;height:100%;display:block}
+.scene .scene__veil{display:none}
 .scene::after{content:'';position:absolute;inset:auto 0 0;height:46%;background:linear-gradient(to bottom,rgba(243,236,223,0),rgba(243,236,223,.85))}
 .paper{position:absolute;inset:0;pointer-events:none}
 .left{position:absolute;left:62px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:16px;z-index:3}
