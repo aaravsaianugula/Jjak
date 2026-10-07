@@ -22,6 +22,8 @@ import { esc, frag, h, toast, wait } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
 import { showHowToPlay } from './settings';
+import { boardReport } from '../../services/meta';
+import { pathResult, rankUpMoment } from './path';
 import { nav } from '../nav';
 
 const MARGIN = 0.32; // outer lane for paths, in card widths
@@ -1283,6 +1285,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       stagger(frag(`<div class="lantern"><span class="lantern__icon" aria-hidden="true">${ICONS.lantern}</span><span><b>Lantern gift</b><br><span class="muted">+${l.petals} petals${l.hints ? ' · +1 hint' : ''}${l.shuffles ? ' · +1 shuffle' : ''}</span></span></div>`));
     }
     if (newPaper) stagger(frag(`<p class="unlock">A flower is complete — a new board paper is ready in Settings.</p>`));
+    // Flower Path: XP, the rank bar and any missions this board completed.
+    const fp = boardReport(session);
+    if (fp && (fp.xp > 0 || fp.missions.length || fp.tea || fp.foil != null)) stagger(pathResult(fp, rewardAt));
     if (seals.length) stagger(sealRow(seals));
     if (rewards.childElementCount) content.append(rewards);
 
@@ -1300,6 +1305,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const actions = h('div', { class: 'sheet__actions result__actions' });
     content.append(actions);
     const sheet = openSheet(content, { dismissible: false, label: heading });
+    if (fp && fp.after.rank > fp.before.rank) setTimeout(() => content.isConnected && rankUpMoment(fp), (rm ? 0 : rewardAt) + 2400);
 
     const nextSpec = (): LevelSpec | null =>
       spec.mode === 'journey' ? journeyLevel(spec.number + 1) : spec.mode === 'zen' ? zenLevel(`zen-${Date.now()}`) : null;

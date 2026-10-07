@@ -14,6 +14,7 @@ const GLYPH: Record<string, string> = {
   spring: '春', summer: '夏', autumn: '秋', winter: '冬', stars100: '百', perfect12: '極',
   daily1: '朝', streak3: '三', streak7: '週', streak30: '月',
   month: '花', hongdan: '赤', cheongdan: '青', chodan: '草', godori: '鳥', inoshikacho: '猪', tsukimi: '見', hanami: '桜', ogwang: '光', album48: '札',
+  rank10: '蕾', rank50: '庭', rank100: '匠', missions10: '務', missions100: '勤', weekly1: '箱', chest36: '宝', foil1: '金', foil12: '箔', bonus2: '福', tea1: '茶', supporter: '援',
 };
 
 /** The seal book: achievements plus lifetime stats. */

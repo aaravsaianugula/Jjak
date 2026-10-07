@@ -1,5 +1,5 @@
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
-import { KIND_LABEL, MONTHS, cardDef, monthDef } from '../../data/deck';
+import { BONUS_IDS, BONUS_MONTH, KIND_LABEL, MONTHS, cardDef, monthDef } from '../../data/deck';
 import { SEALS } from '../../services/achievements';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
@@ -15,6 +15,8 @@ export function albumScreen(): Screen {
   const fullMonths = MONTHS.filter((m) => [0, 1, 2, 3].every((v) => owned.has(m.index * 4 + v))).length;
   const setsDone = CARD_SETS.filter((s) => s.cards!.every((c) => owned.has(c))).length;
   const pct = Math.round((owned.size / 48) * 100);
+  // Gold-leaf (foil) editions and the two lucky bonus cards (Flower Path).
+  const foiled = new Set(save.meta.foil.filter((id) => owned.has(id)));
 
   const months = MONTHS.map((m) => {
     const have = [0, 1, 2, 3].filter((v) => owned.has(m.index * 4 + v)).length;
@@ -36,7 +38,7 @@ export function albumScreen(): Screen {
           const d = cardDef(id);
           const has = owned.has(id);
           const name = d.kind === 'plain' ? `${m.en}, plain card` : `${m.en}, ${d.en}`;
-          return `<button data-id="${id}" class="${has ? '' : 'locked'}" data-kind="${esc(KIND_LABEL[d.kind].en)}" aria-label="${esc(has ? name : `Not yet collected: ${m.en} ${KIND_LABEL[d.kind].en.toLowerCase()} card`)}">${cardSvg(id)}</button>`;
+          return `<button data-id="${id}" class="${has ? '' : 'locked'}${foiled.has(id) ? ' is-foil' : ''}" data-kind="${esc(KIND_LABEL[d.kind].en)}" aria-label="${esc(has ? `${name}${foiled.has(id) ? ', gold leaf' : ''}` : `Not yet collected: ${m.en} ${KIND_LABEL[d.kind].en.toLowerCase()} card`)}">${cardSvg(id, 'card-art', { foil: foiled.has(id) })}</button>`;
         })
         .join('')}</div>
     </section>`;
@@ -55,17 +57,21 @@ export function albumScreen(): Screen {
           <div class="album-sum__facts">
             <span><b>${fullMonths}</b> of 12 flowers complete</span>
             <span><b>${setsDone}</b> of ${CARD_SETS.length} card sets</span>
+            <span class="album-sum__foil">Gold leaf <b>${foiled.size}</b>/48</span>
           </div>
         </div>
         <span class="meter meter--accent" role="progressbar" aria-label="Album" aria-valuemin="0" aria-valuemax="48" aria-valuenow="${owned.size}"><i style="width:${pct}%"></i></span>
         <p class="album-sum__note">The same 48 cards are played in Korea as <b>Hwatu</b> and in Japan as <b>Hanafuda</b>. Clear new Journey levels and Dailies to collect them.</p>
       </div>
       ${months}
+      ${bonusSection()}
     </div>
   </section>`);
 
   el.querySelector('[data-back]')!.addEventListener('click', () => nav.home());
   el.querySelector('.album__list')!.addEventListener('click', (e) => {
+    const bonus = (e.target as HTMLElement).closest<HTMLElement>('[data-bonus]');
+    if (bonus) return openBonus(Number(bonus.dataset.bonus));
     const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-id]');
     if (!btn) return;
     const id = Number(btn.dataset.id);
@@ -111,7 +117,61 @@ function openDetail(id: number, have: boolean) {
         <p class="detail__note">Clear a new Journey level or today’s Daily to draw a card. This one belongs to <b>${esc(m.en)}</b>, <span class="serif" lang="ko">${m.ko}</span> · <span class="ja" lang="ja">${m.ja}</span>.</p>
         ${sets(id)}
       </div>`);
+  if (have && save.meta.foil.includes(id)) addFoilToggle(content, id);
   openSheet(content, { label: have ? `${title}, ${m.en}` : `${m.en}, not yet collected`, close: true });
+}
+
+/** Card detail: switch between the printed card and its gold-leaf edition. */
+function addFoilToggle(content: HTMLElement, id: number) {
+  const card = content.querySelector<HTMLElement>('.detail__card');
+  if (!card) return;
+  const seg = frag(`<div class="foil-toggle" role="group" aria-label="Edition">
+    <div class="seg"><button aria-pressed="false" data-ed="plain">Printed</button><button aria-pressed="true" data-ed="foil">Gold leaf <span class="ja" aria-hidden="true">金</span></button></div>
+  </div>`);
+  const set = (foil: boolean) => {
+    card.innerHTML = cardSvg(id, 'card-art', { foil });
+    card.classList.toggle('is-foil', foil);
+    seg.querySelectorAll<HTMLElement>('[data-ed]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.ed === 'foil') === foil)));
+  };
+  seg.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ed]');
+    if (b) set(b.dataset.ed === 'foil');
+  });
+  card.closest('.detail__stage')?.after(seg);
+  set(true);
+}
+
+/** The two lucky bonus cards (보너스패): collected the first time you pair them. Not part of the 48. */
+function bonusSection(): string {
+  const have = new Set(save.meta.bonus);
+  const n = BONUS_IDS.filter((id) => have.has(id)).length;
+  return `<section class="panel month month--bonus${n === BONUS_IDS.length ? ' is-complete' : ''}" aria-labelledby="month-bonus">
+    <div class="month__head">
+      <span class="month__num" aria-hidden="true">福</span>
+      <span class="month__titles">
+        <span class="month__name" id="month-bonus">Bonus</span>
+        <span class="month__langs"><span class="serif" lang="ko">${BONUS_MONTH.ko}패</span> · <span class="ja" lang="ja">${BONUS_MONTH.ja}</span> · Lucky cards</span>
+      </span>
+      <span class="month__progress" aria-label="${n} of 2 collected">${n}/2</span>
+    </div>
+    <div class="month__cards month__cards--bonus">${BONUS_IDS.map((id) => {
+      const ok = have.has(id);
+      return `<button data-bonus="${id}" class="${ok ? '' : 'locked'}" aria-label="${ok ? esc(cardDef(id).en) : 'Lucky card, not yet found'}">${cardSvg(ok ? id : 'back')}</button>`;
+    }).join('')}<p class="month__bonus-note">${n ? 'Pair the lucky cards on the Journey road for a small gift.' : 'Two lucky cards hide on later Journey boards. Pair them to keep them here.'}</p></div>
+  </section>`;
+}
+
+function openBonus(id: number) {
+  const have = save.meta.bonus.includes(id);
+  const d = cardDef(id);
+  const content = frag(`<div class="detail">
+    <div class="detail__stage" style="--tint:#c9a24a"><div class="detail__card${have ? '' : ' is-ghost'}">${cardSvg(have ? id : 'back')}</div></div>
+    <div class="detail__kind">Bonus card · <span lang="ko">보너스패</span> · <span class="ja" lang="ja">${BONUS_MONTH.ja}</span></div>
+    <h2>${have ? esc(d.en) : 'A lucky card'}</h2>
+    <div class="detail__sub">${have ? `<span class="serif" lang="ko">${d.ko ?? ''}</span> · not part of the 48` : 'Not yet found'}</div>
+    <p class="detail__note">${esc(BONUS_MONTH.note)}</p>
+  </div>`);
+  openSheet(content, { label: have ? d.en : 'Lucky card, not yet found', close: true });
 }
 
 /** Card-set seals this card belongs to (Go-Stop / Koi-Koi yaku). */

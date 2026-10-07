@@ -16,6 +16,7 @@ import { esc, frag, h, toast } from '../dom';
 import { openSheet } from '../modal';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
+import { pathStrip } from './path';
 
 /** Last petal total shown on Home, to animate gains. */
 let shownPetals: number | null = null;
@@ -75,6 +76,7 @@ export function homeScreen(): Screen {
         <button class="icon-btn" data-go="settings" aria-label="Settings">${ICONS.gear}</button>
       </span>
     </header>
+    ${pathStrip()}
     <div class="scene" data-season="${season}">
       ${sceneSvg(season)}
       <div class="scene__particles" aria-hidden="true">${sceneParticles(season)}</div>
@@ -137,6 +139,7 @@ export function homeScreen(): Screen {
     if (go === 'album') nav.album();
     if (go === 'seals') nav.seals();
     if (go === 'settings') nav.settings();
+    if (go === 'path') nav.path();
   });
   if (pendingGift() && !giftShownThisSession) {
     giftShownThisSession = true;
