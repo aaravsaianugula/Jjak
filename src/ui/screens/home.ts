@@ -5,8 +5,10 @@ import { ads } from '../../services/ads';
 import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
-import { CHAPTERS, LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
+import { LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
 import { formatTime } from '../../engine/session';
+import { ROUTE_CHAPTERS, routeOf } from '../../data/route';
+import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
 import { SEALS } from '../../services/achievements';
 import { unlockAudio } from '../../services/audio';
 import { claimGift, formatCountdown, lastWeek, levelsToLantern, liveStreak, msToNextDaily, pendingGift } from '../../services/progress';
@@ -31,9 +33,8 @@ export function homeScreen(): Screen {
   const level = save.level;
   const chapter = chapterOf(level);
   const chapterIndex = Math.floor((level - 1) / LEVELS_PER_CHAPTER);
-  const season = chapterIndex % 4;
+  const season = routeOf(level).chapter.season;
   const slot = (level - 1) % LEVELS_PER_CHAPTER;
-  const loop = Math.floor(chapterIndex / CHAPTERS.length);
   const chapterStart = chapterIndex * LEVELS_PER_CHAPTER + 1;
   // Twelve segments for the chapter; upcoming lantern levels carry a small gold mark.
   const dots = Array.from({ length: LEVELS_PER_CHAPTER }, (_, i) => {
@@ -42,7 +43,11 @@ export function homeScreen(): Screen {
   }).join('');
   const spec = journeyLevel(level);
   music.setSeason(season);
-  const twist = spec.gravity ? 'Falling leaves' : spec.snow ? 'First snow' : spec.stones ? 'Stones' : '';
+  // Where the road has reached: the place, its season, and the board's twist.
+  const road = routeOf(level);
+  const wind = windOf(spec);
+  const twist = `${mechanicLabel(spec)}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}`;
+  const roadPlace = `<div class="journey__place"><b>${esc(road.chapter.en)}</b><span class="journey__place-native"><span lang="ko">${road.chapter.ko}</span> · <span class="ja" lang="${road.chapter.country === 'JP' ? 'ja' : 'ko'}">${road.chapter.ja}</span></span></div>`;
   const toLantern = levelsToLantern();
   const lanternText = toLantern === 0 ? 'This level hangs a lantern gift' : `Lantern gift in ${toLantern} level${toLantern > 1 ? 's' : ''}`;
 
@@ -91,9 +96,10 @@ export function homeScreen(): Screen {
     <div class="panel journey">
       <span class="journey__season ja" aria-hidden="true">${chapter.ja}</span>
       <div class="journey__top">
-        <span class="eyebrow">Journey · ${esc(chapter.name)}${loop > 0 ? ` · Year ${loop + 1}` : ''}</span>
+        <span class="eyebrow">Journey · ${esc(chapter.name)} · ${road.year > 0 ? `Wanderer ${road.year}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
         <button class="chip-btn journey__map" data-go="map" aria-label="Journey map">${ICONS.map}<span>Map</span></button>
       </div>
+      ${roadPlace}
       <div class="journey__title"><span>Level ${level}</span>${twist ? `<span class="journey__twist">${twist}</span>` : ''}</div>
       <div class="journey__progress">
         <span class="chapter-dots" role="progressbar" aria-label="${esc(chapter.name)} chapter" aria-valuemin="0" aria-valuemax="${LEVELS_PER_CHAPTER}" aria-valuenow="${slot}" aria-valuetext="Level ${slot + 1} of ${LEVELS_PER_CHAPTER} in ${esc(chapter.name)}">${dots}</span>

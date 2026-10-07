@@ -12,7 +12,7 @@ import {
   MISSION_REWARD, type MissionDef, type MissionMetric, type MissionNeed, type RankTitle, type Reward, STAR_CHESTS,
   TEA_FALLBACK_PETALS, WEEKLY, XP, isTitleRank, missionDef, rankInfo, rankReward, titleFor,
 } from '../data/meta';
-import { type LevelSpec, LEVELS_PER_CHAPTER, dailyLevel, journeyLevel, localDateKey } from '../engine/levels';
+import { type LevelSpec, LEVELS_PER_CHAPTER, dailyLevel, journeyLevel, localDateKey, windOf } from '../engine/levels';
 import { createRng } from '../engine/rng';
 import type { Session } from '../engine/session';
 import { toast } from '../ui/dom';
@@ -21,8 +21,12 @@ import { on } from './events';
 import type { MissionState } from './save-meta';
 import { persist, save } from './storage';
 
-/** LevelSpec fields the Journey feature is adding (knots, wind, lucky cards). Read defensively. */
-type SpecX = LevelSpec & { knots?: unknown; wind?: unknown; lucky?: unknown };
+/** Mechanic flags as missions see them: Falling leaves is wind 'down'; any other direction is Wind. */
+type SpecX = LevelSpec & { wind?: boolean };
+const specX = (s: LevelSpec): SpecX => {
+  const w = windOf(s);
+  return { ...s, gravity: w === 'down', wind: !!w && w !== 'down' };
+};
 
 /** A quiet toast (skipped where there's no DOM, e.g. in tests). */
 const notify = (text: string) => {
@@ -146,9 +150,9 @@ function mechanicReached(need: MissionNeed): boolean {
   const has = (s: SpecX) =>
     need === 'gravity' ? !!s.gravity : need === 'snow' ? s.snow > 0 : need === 'stones' ? s.stones > 0 : !!s[need];
   let hit = false;
-  for (let n = 1; n <= save.level && !hit; n++) hit = has(journeyLevel(n) as SpecX);
+  for (let n = 1; n <= save.level && !hit; n++) hit = has(specX(journeyLevel(n)));
   const t = today();
-  if (!hit && !save.daily.results[t]) hit = has(dailyLevel(t) as SpecX);
+  if (!hit && !save.daily.results[t]) hit = has(specX(dailyLevel(t)));
   reachedCache.out[need] = hit;
   return hit;
 }
@@ -506,11 +510,12 @@ on('clear', ({ session, summary }) => {
     bump('daily');
     if (summary.stars >= 3) bump('dailyPerfect');
   }
-  if (spec.gravity) bump('gravity');
+  const mx = specX(spec);
+  if (mx.gravity) bump('gravity');
   if (spec.snow > 0) bump('snow');
   if (spec.stones > 0) bump('stones');
   if (spec.knots) bump('knots');
-  if (spec.wind) bump('wind');
+  if (mx.wind) bump('wind');
   persist();
 });
 

@@ -3,7 +3,11 @@ import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
 import { type Point, STONE, cardsLeft, isCard } from '../../engine/board';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, journeyLevel, rushLevel, zenLevel } from '../../engine/levels';
-import { COMBO_WINDOW_MS, FEVER_MS, Session, formatTime } from '../../engine/session';
+import { isBonus } from '../../data/deck';
+import { SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
+import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
+import { breeze, knotTip, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windTip, windVane } from '../journey-fx';
+import { COMBO_WINDOW_MS, FEVER_MS, LUCKY_PETALS, Session, formatTime } from '../../engine/session';
 import { type Yaku, possibleYaku } from '../../engine/yaku';
 import { checkSeals, type Seal } from '../../services/achievements';
 import { emit } from '../../services/events';
@@ -68,7 +72,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   let total = cardsLeft(session.board);
   const gid = ++uid;
   // Journey plays its chapter's season; other modes follow the real calendar.
-  music.setSeason(spec.mode === 'journey' ? Math.floor((spec.number - 1) / 12) % 4 : [3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3][new Date().getMonth()]);
+  music.setSeason(spec.mode === 'journey' ? routeOf(spec.number).chapter.season : [3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3][new Date().getMonth()]);
   /** Rush run state (null in other modes). */
   const rush =
     spec.mode === 'rush'
@@ -112,10 +116,16 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   );
   const restartBtn = h('button', { class: 'tool tool--quiet', 'aria-label': 'Restart', html: ICONS.restart }, h('span', { class: 'tool__label' }, 'Restart'));
 
-  const twist = spec.gravity ? ' · Falling leaves' : spec.snow ? ' · First snow' : '';
+  // Journey boards belong to a place on the Flower Road; wind boards name their direction.
+  const place = spec.mode === 'journey' ? routeOf(spec.number).chapter : null;
+  const wind = windOf(spec);
+  const twistName = wind || spec.snow || spec.knots ? mechanicLabel(spec) : '';
+  const twist = twistName ? ` · ${twistName}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}` : '';
   const sub =
     spec.mode === 'journey'
-      ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ja}${twist}`
+      ? place && spec.festival
+        ? `${festivalTitle(place)}${twist}`
+        : `${place ? place.en : chapterOf(spec.number).name} · ${place ? SEASON_NAMES[place.season].ja : chapterOf(spec.number).ja}${twist}`
       : spec.mode === 'daily'
         ? `${dailyTheme(spec.seed.replace('daily-', '')).name} · same board worldwide`
         : rush
@@ -130,6 +140,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   const feverTag = h('div', { class: 'fever-tag', 'aria-hidden': 'true' }, h('b', {}, '만개'), h('span', {}, '×2'));
   feverTag.style.setProperty('--fever-ms', `${FEVER_MS}ms`);
   const rhythm = h('div', { class: 'rhythm' }, comboEl, comboBar, feverTag);
+  if (wind && wind !== 'down') rhythm.append(windVane(wind));
 
   const topTitle = h(
     'div',
@@ -225,12 +236,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       } else if (isCard(v)) {
         const snowy = session.hidden.has(i);
         const c = h('button', {
-          class: `card${snowy ? ' is-snow' : ''}`,
+          class: `card${snowy ? ' is-snow' : ''}${isBonus(v) ? ' is-lucky' : ''}`,
           'data-cell': i,
           'aria-label': snowy ? 'Card under snow' : faceLabel(v),
           'aria-pressed': 'false',
           html: cardSvg(snowy ? 'snow' : v),
         });
+        if (session.knots.has(i)) setKnot(c, true);
         cardEls.set(i, c);
         board.append(c);
       }
@@ -267,6 +279,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         c.innerHTML = cardSvg(snowy ? 'snow' : v);
         c.classList.toggle('is-snow', snowy);
         c.setAttribute('aria-label', snowy ? 'Card under snow' : faceLabel(v));
+        c.classList.toggle('is-lucky', isBonus(v));
+        setKnot(c, session.knots.has(i));
       };
       if (flip && !rm) {
         // A quick riffle: each card turns a beat after its neighbour.
@@ -638,6 +652,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         sfx.deselect();
         setCoach('This card is under snow. Clear a card next to it to reveal it.');
         break;
+      case 'knotted':
+        retrigger(target, 'is-shake');
+        tugKnot(target);
+        sfx.deselect();
+        live('This card is tied with a cord. Clear a card next to it first.');
+        setCoach('This card is tied with a silk cord (매듭). Clear a card next to it to untie it.');
+        break;
     }
   }
 
@@ -702,12 +723,26 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         cardEls.delete(from);
         cardEls.set(to, c);
         c.dataset.cell = String(to);
-        c.classList.add('is-falling');
+        c.classList.add(wind && wind !== 'down' ? 'is-drift' : 'is-falling');
       }
       setTimeout(() => {
         layout();
-        setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-falling')), 320);
+        if (wind) breeze(stage, wind);
+        setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-falling', 'is-drift')), 380);
       }, 200);
+    }
+    // Knots: a freed card's cord slips off once it has settled.
+    if (res.untied.length) {
+      setTimeout(() => {
+        for (const i of res.untied) untieKnot(cardEls.get(i));
+        sfx.deselect();
+      }, res.moved.length ? 460 : 180);
+    }
+    if (res.lucky) {
+      const p1 = cellXY(res.a);
+      const p2 = cellXY(res.b);
+      luckyMoment(stage, board.offsetLeft + (p1.x + p2.x) / 2, board.offsetTop + (p1.y + p2.y) / 2);
+      live(`Lucky pair! Plus ${LUCKY_PETALS} petals when you clear the board.`);
     }
     if (res.revealed.length) {
       setTimeout(() => {
@@ -1038,10 +1073,15 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       }
     }
     if (spec.number === 6 && !save.seenTips.includes('variants')) showVariantTip();
-    if (spec.gravity && !save.seenTips.includes('gravity'))
+    if (wind === 'down' && !save.seenTips.includes('gravity'))
       showMechanicTip('gravity', 'Falling leaves', '낙엽 · 落葉', 'From now on, cards drop down to fill the gaps after every pair — like leaves settling. Plan from the bottom up, and watch new pairs line up as things fall.', [36, 37, 38, 39]);
     else if (spec.snow > 0 && !save.seenTips.includes('snow'))
       showMechanicTip('snow', 'First snow', '첫눈 · 初雪', 'Some cards start under snow. They can’t be picked until a card next to them is cleared. Snowy cards still block paths.', ['snow', 44, 'snow', 45]);
+    else if (wind && wind !== 'down' && !save.seenTips.includes('wind')) showRuleTip('wind');
+    else if (spec.knots && !save.seenTips.includes('knots')) showRuleTip('knots');
+    else if (spec.lucky && !save.seenTips.includes('lucky'))
+      showMechanicTip('lucky', 'Lucky cards', '보너스패 · おまけ札', `This board hides a pair of lucky bonus cards. They pair with each other like any flower. Make that pair for +${LUCKY_PETALS} petals and bonus points.`, [48, 49]);
+    if (wind && wind !== 'down') setTimeout(() => breeze(stage, wind, true), 250);
     if (spec.stones > 0 && !save.seenTips.includes('stones')) {
       save.seenTips.push('stones');
       persist();
@@ -1129,6 +1169,18 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     pausedAt = performance.now();
     const sheet = openSheet(content, { label: 'New rule: match the flower' });
     btn.addEventListener('click', () => sheet.close());
+    void sheet.closed.then(resume);
+  }
+
+  /** Knots and Wind get a rule tip like Level 6's: one bold line, a picture and a "Try it". */
+  function showRuleTip(id: 'knots' | 'wind') {
+    save.seenTips.push(id);
+    persist();
+    const tip = id === 'wind' ? windTip(wind ?? 'right', spec.number) : knotTip(spec.number);
+    paused = true;
+    pausedAt = performance.now();
+    const sheet = openSheet(tip.content, { label: id === 'wind' ? 'New: wind' : 'New: knots' });
+    tip.button.addEventListener('click', () => sheet.close());
     void sheet.closed.then(resume);
   }
 
@@ -1223,7 +1275,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           ? `${summary.daily.streak}-day streak`
           : 'Practice round — today’s result is already saved'
         : spec.mode === 'journey'
-          ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}`
+          ? place
+            ? placeLine(place)
+            : `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}`
           : 'Breathe in, breathe out';
     // Blossoms bloom one by one; then the numbers count up.
     const STAR_AT = 380;
@@ -1291,6 +1345,15 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (summary.lantern) {
       const l = summary.lantern;
       stagger(frag(`<div class="lantern"><span class="lantern__icon" aria-hidden="true">${ICONS.lantern}</span><span><b>Lantern gift</b><br><span class="muted">+${l.petals} petals${l.hints ? ' · +1 hint' : ''}${l.shuffles ? ' · +1 shuffle' : ''}</span></span></div>`));
+    }
+    if (summary.lucky) {
+      stagger(frag(`<div class="lucky-reward"><span class="lucky-reward__mark ja" aria-hidden="true">福</span><span><b>Lucky pair</b><br><span class="muted">+${summary.lucky} petals</span></span></div>`));
+    }
+    if (summary.stamp) {
+      // The passport stamp gets its own beat: it lands after everything else has settled.
+      const at = rewardAt + 260;
+      stagger(stampMoment(summary.stamp.id, summary.stamp.date, at));
+      rewardAt += 260;
     }
     if (newPaper) stagger(frag(`<p class="unlock">A flower is complete — a new board paper is ready in the Market.</p>`));
     // Flower Path: XP, the rank bar and any missions this board completed.
@@ -1561,9 +1624,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const setNote = sets.length ? `<div class="intro__set">This board holds a card set: <b>${esc(sets[0].native)}</b></div>` : '';
     const twistNote = rush
       ? `${RUSH.startMs / 1000} seconds · pairs add time`
-      : spec.gravity ? 'Cards fall to fill the gaps' : spec.snow ? 'Some cards start under snow' : spec.stones ? 'Stones block the way' : '';
-    const card = frag(`<div class="intro" aria-hidden="true">
-      <div class="intro__kicker">${esc(spec.mode === 'journey' ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}` : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : 'Zen · 禅')}</div>
+      : wind === 'down' ? 'Cards fall to fill the gaps' : wind ? `Wind ${windArrow(wind)} · cards drift after each pair` : spec.snow ? 'Some cards start under snow' : spec.knots ? 'Some cards are tied with a cord' : spec.stones ? 'Stones block the way' : spec.lucky ? 'A lucky pair is hidden here' : '';
+    const card = frag(`<div class="intro${spec.festival ? ' intro--festival' : ''}" aria-hidden="true">
+      <div class="intro__kicker">${esc(spec.mode === 'journey' ? (place ? (spec.festival ? `${festivalTitle(place)} · 祭` : placeLine(place)) : `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}`) : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : 'Zen · 禅')}</div>
       <div class="intro__title">${esc(titleFor(spec))}</div>
       <svg class="intro__rule" viewBox="0 0 120 8" preserveAspectRatio="none"><path d="M1 4.6C20 2.6 52 2.4 80 3.1S112 4.2 119 3.6C110 5.4 84 5.7 58 5.8S14 6.3 1 4.6Z"/></svg>
       <div class="intro__sub">${esc([rush ? '' : `${total / 2} pairs`, twistNote].filter(Boolean).join(' · '))}</div>

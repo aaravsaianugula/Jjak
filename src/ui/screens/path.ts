@@ -13,6 +13,7 @@ import { cardDef, monthDef } from '../../data/deck';
 import {
   MAX_RANK, PATH_EXCLUSIVES, type RankTitle, type Reward, TITLES, WEEKLY, exclusiveName, isTitleRank, nextTitle, rankReward, titleFor,
 } from '../../data/meta';
+import { routeOf } from '../../data/route';
 import { CHAPTERS, LEVELS_PER_CHAPTER, dailyLevel, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
 import {
   type BoardReport, type Granted, claimChest, claimMission, claimRank, claimWeekly, missions, missionsDone, pending, rank,
@@ -440,6 +441,7 @@ export function pathScreen(): Screen {
     const ul = h('ul', { class: 'chaps' });
     for (const ch of starChests()) {
       const season = CHAPTERS[ch.chapter % CHAPTERS.length];
+      const place = routeOf(ch.first).chapter;
       const last = ch.first + LEVELS_PER_CHAPTER - 1;
       const pct = Math.round((ch.stars / 36) * 100);
       const chestsHtml = ch.chests
@@ -458,7 +460,7 @@ export function pathScreen(): Screen {
         frag(`<li class="panel chap${ch.chests.some((c) => c.ready) ? ' is-ready' : ''}">
           <div class="chap__head">
             <span class="chap__season ja" aria-hidden="true">${season.ja}</span>
-            <span class="chap__titles"><span class="eyebrow">Chapter ${ch.chapter + 1} · ${esc(season.name)}</span><b>Levels ${ch.first}–${last}</b></span>
+            <span class="chap__titles"><span class="eyebrow">${esc(season.name)} · Levels ${ch.first}–${last}</span><b>${esc(place.en)} <span class="muted">${esc(place.ko)} · ${esc(place.ja)}</span></b></span>
             <span class="chap__stars">${ICONS.blossom}<b>${ch.stars}</b><span class="muted">/36</span></span>
           </div>
           <div class="chap__track"><span class="fp-bar"><i style="width:${pct}%"></i></span><span class="chap__ticks" aria-hidden="true"><i style="left:33.33%"></i><i style="left:66.66%"></i></span></div>
