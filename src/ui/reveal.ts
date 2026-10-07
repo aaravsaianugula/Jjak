@@ -38,7 +38,7 @@ export function roadGoesOn(): Promise<void> {
     '</svg>',
     `<g class="rv-stamp"><g transform="rotate(-7 ${cx} ${cy})">${stamp}</g></g></svg>`,
   );
-  const petals = Array.from({ length: 12 }, (_, k) => {
+  const petals = Array.from({ length: 8 }, (_, k) => {
     const x = (k * 37) % 100;
     const d = ((k * 53) % 70) / 10;
     const dur = 7 + ((k * 29) % 50) / 10;

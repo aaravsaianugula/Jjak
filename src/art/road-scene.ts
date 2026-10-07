@@ -166,8 +166,9 @@ const offset = (s: Stretch, k: number, extra = (_t: number) => 0): Pt[] =>
 
 /**
  * Paint a stretch of road as an ink-wash path: a darker verge wash, the packed
- * earth with a lighter crown, faint cart ruts, worn paving stones laid in
- * perspective, tapered brush edges, and grass and pebbles along the verges.
+ * earth with a lighter crown, a shaded verge and long dry-brush strokes that
+ * follow the road (painted, never stippled), tapered brush edges, and grass
+ * along the verges.
  */
 function paintRoad(s: Stretch, uid: string, seed: number, detail: number): string {
   const r = rng(seed);
@@ -178,58 +179,38 @@ function paintRoad(s: Stretch, uid: string, seed: number, detail: number): strin
   out += `<path class="rv-road__base" d="${closed(L(1), L(-1))}" fill="url(#${uid}-road)"/>`;
   out += `<path class="rv-road__packed" d="${closed(L(0.74), L(-0.74))}"/>`;
   out += `<path class="rv-road__crown" d="${closed(L(0.32), L(-0.26))}"/>`;
-  // Cart ruts: two faint lines that converge with the road.
-  if (detail > 0.5) {
-    for (const k of [0.42, -0.36]) {
-      const line = L(k).filter((_, i) => s.t[i] < 0.72 && i % 2 === 0);
-      if (line.length > 2) out += `<path class="rv-road__rut" d="${smoothPath(line)}"/>`;
-    }
+  // Dry-brush texture: long tapered strokes that follow the road, darker toward one
+  // verge (the road's shaded side) and a few pale ones on the crown, the way a
+  // path is painted in ink, never stippled.
+  const streak = (k: number, from: number, to: number, weight: number, cls: string) => {
+    const idx: number[] = [];
+    for (let i = 0; i < s.c.length; i++) if (s.t[i] >= from && s.t[i] <= to) idx.push(i);
+    if (idx.length < 4) return '';
+    const a: Pt[] = [];
+    const b: Pt[] = [];
+    idx.forEach((i, j) => {
+      const u = j / (idx.length - 1);
+      const t = s.t[i];
+      const half = roadWidth(t) / 2;
+      const w = weight * Math.sin(Math.PI * u) ** 0.7 * (0.25 + 1.6 * (1 - t) ** 1.4) * (0.8 + 0.2 * Math.sin(j * 1.7 + seed));
+      const off = half * k;
+      a.push([s.c[i][0] + s.n[i][0] * (off + w / 2), s.c[i][1] + s.n[i][1] * (off + w / 2)]);
+      b.push([s.c[i][0] + s.n[i][0] * (off - w / 2), s.c[i][1] + s.n[i][1] * (off - w / 2)]);
+    });
+    return `<path class="${cls}" d="${closed(a, b)}"/>`;
+  };
+  // The shaded verge: a broad, soft wash along the inside of one edge.
+  out += streak(0.62, 0, 0.98, 7 * detail + 1, 'rv-road__shade');
+  let brush = '';
+  const count = Math.round(5 + 5 * detail);
+  for (let q = 0; q < count; q++) {
+    const k = -0.75 + 1.5 * r();
+    const from = r() * 0.35;
+    const to = Math.min(0.97, from + 0.25 + r() * 0.5);
+    brush += streak(k, from, to, 0.6 + 1.3 * r(), k > 0.2 ? 'rv-road__dry' : 'rv-road__dry rv-road__dry--soft');
   }
-  // Paving stones in rows across the road, spaced by the road's own width.
-  let stones = '';
-  let acc = 0;
-  let next = 0;
-  for (let i = 1; i < s.c.length; i++) {
-    acc += Math.hypot(s.c[i][0] - s.c[i - 1][0], s.c[i][1] - s.c[i - 1][1]);
-    if (acc < next) continue;
-    const t = s.t[i];
-    const w = roadWidth(t);
-    next = acc + w * 0.3 + 1.5;
-    if (w < 4) continue;
-    const k = w > 46 ? 4 : w > 26 ? 3 : w > 12 ? 2 : 1;
-    const ang = (Math.atan2(s.n[i][1], s.n[i][0]) * 180) / Math.PI;
-    for (let j = 0; j < k; j++) {
-      if (r() < 0.16) continue; // a missing stone here and there
-      const u = ((j + 0.5) / k - 0.5) * 0.82 + (r() - 0.5) * 0.08;
-      const cx = s.c[i][0] + s.n[i][0] * u * w;
-      const cy = s.c[i][1] + s.n[i][1] * u * w;
-      // An irregular, worn flagstone: a few corners at uneven radii, rounded, flattened by distance.
-      const rx = (w / k) * (0.3 + 0.08 * r());
-      const ry = rx * (0.42 + 0.12 * r());
-      const a0 = ((ang + (r() - 0.5) * 20) * Math.PI) / 180;
-      const corners: Pt[] = [];
-      const m = 5 + Math.floor(r() * 2);
-      for (let q = 0; q < m; q++) {
-        const th = (q / m) * Math.PI * 2 + r() * 0.5;
-        const rr = 0.78 + 0.3 * r();
-        const ux = Math.cos(th) * rx * rr;
-        const uy = Math.sin(th) * ry * rr;
-        corners.push([cx + ux * Math.cos(a0) - uy * Math.sin(a0), cy + ux * Math.sin(a0) + uy * Math.cos(a0)]);
-      }
-      let d = '';
-      for (let q = 0; q < m; q++) {
-        const a = corners[q];
-        const b = corners[(q + 1) % m];
-        const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        d += q ? `Q${f(a[0])} ${f(a[1])} ${f(mid[0])} ${f(mid[1])}` : `M${f(mid[0])} ${f(mid[1])}`;
-      }
-      const a = corners[0];
-      const b = corners[1];
-      d += `Q${f(a[0])} ${f(a[1])} ${f((a[0] + b[0]) / 2)} ${f((a[1] + b[1]) / 2)}Z`;
-      stones += `<path d="${d}"/>`;
-    }
-  }
-  out += `<g class="rv-road__stones">${stones}</g>`;
+  for (let q = 0; q < 3; q++) brush += streak(-0.2 + 0.3 * r(), 0.02 + 0.1 * q, 0.5 + 0.15 * q, 1.4, 'rv-road__glint');
+  out += `<g class="rv-road__brush">${brush}</g>`;
   // Tapered brush edges: thick near the viewer, a hair at the horizon, breathing as they go.
   for (const side of [1, -1]) {
     const outer = offset(s, side);
@@ -241,9 +222,8 @@ function paintRoad(s: Stretch, uid: string, seed: number, detail: number): strin
     });
     out += `<path class="rv-road__edge" d="${closed(outer, inner)}"/>`;
   }
-  // Grass tufts and pebbles along both verges, sized by depth.
+  // Grass tufts along both verges, sized by depth.
   let tufts = '';
-  let pebbles = '';
   for (let i = 2; i < s.c.length - 2; i += 2) {
     const t = s.t[i];
     if (t > 0.85) break;
@@ -253,15 +233,13 @@ function paintRoad(s: Stretch, uid: string, seed: number, detail: number): strin
       const w = roadWidth(t) / 2 + (1 + 4 * r()) * sc;
       const x = s.c[i][0] + s.n[i][0] * w * side;
       const y = s.c[i][1] + s.n[i][1] * w * side;
-      if (r() < 0.7) {
+      {
         const hgt = (5 + 6 * r()) * sc;
         tufts += `<path d="M${f(x)} ${f(y)}q${f(-1.2 * sc)} ${f(-hgt * 0.6)} ${f(-3 * sc)} ${f(-hgt)}M${f(x + 1 * sc)} ${f(y)}q${f(0.2 * sc)} ${f(-hgt * 0.7)} ${f(0.6 * sc)} ${f(-hgt * 1.15)}M${f(x + 2 * sc)} ${f(y)}q${f(1.4 * sc)} ${f(-hgt * 0.5)} ${f(3.4 * sc)} ${f(-hgt * 0.85)}"/>`;
-      } else {
-        pebbles += `<ellipse cx="${f(x)}" cy="${f(y)}" rx="${f((1.4 + r()) * sc)}" ry="${f((0.9 + 0.5 * r()) * sc)}"/>`;
       }
     }
   }
-  out += `<g class="rv-road__tufts">${tufts}</g><g class="rv-road__pebbles">${pebbles}</g>`;
+  out += `<g class="rv-road__tufts">${tufts}</g>`;
   return out;
 }
 
@@ -413,7 +391,7 @@ export function roadSceneSvg(uid = 'rv'): string {
   </defs>
   <rect class="rv-sky" x="-40" y="-40" width="440" height="800" fill="url(#${uid}-sky)"/>
   <g class="rv-sunwrap"><circle class="rv-glow" cx="262" cy="292" r="120" fill="url(#${uid}-sun)"/><circle class="rv-sun" cx="262" cy="276" r="21"/></g>
-  <g class="rv-cranes">${crane(118, 186, 0.9, 0)}${crane(146, 204, 0.7, 180)}${crane(96, 210, 0.6, 320)}</g>
+  <g class="rv-cranes">${crane(112, 232, 0.9, 0)}${crane(140, 248, 0.7, 180)}${crane(90, 256, 0.6, 320)}</g>
   <path class="rv-layer rv-layer--1" d="${ridge(318, 62, 11, [70, 196, 330], 0.6)}"/>
   <path class="rv-layer rv-layer--2" d="${ridge(...R2)}"/>
   ${treeLine(r2, 0, 200, 61, 0.8)}${treeLine(r2, 286, 360, 67, 0.8)}
