@@ -905,6 +905,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   /** What this Rush run has recorded so far (a "Keep going" continuation records only the rest). */
   let rushRecorded: (RushRecorded & { petals: number }) | null = null;
+  let rushRankShown = 0;
 
   async function endRush() {
     if (!rush || rush.over) return;
@@ -957,7 +958,15 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     content.append(actions);
     const sheet = openSheet(content, { dismissible: false, label: 'Rush over' });
     live(`Time! Score ${score}.${runPetals ? ` Plus ${runPetals} petals.` : ''}${fp?.xp ? ` Plus ${fp.xp} XP.` : ''}`);
-    const rankUp = fp && fp.after.rank > fp.before.rank ? setTimeout(() => content.isConnected && rankUpMoment(fp), (rm ? 0 : rewardAt) + 2400) : null;
+    // A rank reached in this run gets its moment once (a continued run doesn't repeat it).
+    const rankUp =
+      fp && fp.after.rank > Math.max(fp.before.rank, rushRankShown)
+        ? setTimeout(() => {
+            if (!content.isConnected) return;
+            rushRankShown = fp.after.rank;
+            rankUpMoment(fp);
+          }, (rm ? 0 : rewardAt) + 2400)
+        : null;
 
     const finishRun = async (again: boolean) => {
       sheet.close();
