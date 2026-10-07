@@ -225,8 +225,9 @@ function plume(pts: Pt[], w: number, fill: string, rib: string, eyeC: [string, s
     { d: taper(pts, (t) => w * (0.25 + 0.75 * Math.pow(t, 0.7))), fill, halo: 3.6 },
     { d: barbs, stroke: fill, sw: 0.5, noHalo: true, opacity: 0.85 },
     { d: curve(pts.slice(0, -1).concat([[ex, ey]])), stroke: rib, sw: 0.45, noHalo: true, opacity: 0.85 },
-    { d: tear, fill: eyeC[0], t: `translate(${r1(ex)} ${r1(ey)}) rotate(${r1(ang)}) scale(${r1(w * 0.68)})`, halo: 0.8 },
-    { d: tear, fill: eyeC[1], t: `translate(${r1(ex)} ${r1(ey)}) rotate(${r1(ang)}) scale(${r1(w * 0.34)})`, noHalo: true },
+    // the eye-spot: a light tear ringed in the plume colour, with a small soft centre
+    { d: tear, fill: eyeC[0], t: `translate(${r1(ex)} ${r1(ey)}) rotate(${r1(ang)}) scale(${r1(w * 0.46)})`, noHalo: true },
+    { d: tear, fill: eyeC[1], t: `translate(${r1(ex)} ${r1(ey + 0.3)}) rotate(${r1(ang)}) scale(${r1(w * 0.2)})`, noHalo: true, opacity: 0.8 },
   ];
 }
 
@@ -599,10 +600,10 @@ export const SPECIALS: Record<number, Special> = {
       ...featherFan(60, 40, -78, -28, 6, (i) => 28 - i * 2, 5.4, ['#d9a441', '#c58f30'], -0.1),
       ...featherFan(60, 40, -70, -36, 4, (i) => 16 - i, 5, ['#3f6a50', '#4f7d5f'], -0.08),
       // long tail plumes
-      ...plume([[52, 52], [40, 56], [27, 60], [15, 68], [9, 80], [12, 90]], 4.6, '#3f6a50', '#86b08f', ['#d9a441', '#2f4a6d']),
-      ...plume([[52, 54], [42, 64], [30, 74], [20, 88], [18, 102], [24, 110]], 4.8, '#d9a441', '#f3d58c', ['#c4472f', '#f3ead2']),
-      ...plume([[54, 55], [48, 70], [40, 86], [34, 102], [36, 116], [44, 122]], 4.6, '#2f4a6d', '#6f8db8', ['#d9a441', '#c4472f']),
-      ...plume([[56, 55], [57, 68], [54, 82], [52, 96], [56, 106]], 4, VERMILION, '#ec9a7e', ['#3f6a50', '#f3d58c']),
+      ...plume([[52, 52], [40, 56], [27, 60], [15, 68], [9, 80], [12, 90]], 4.6, '#3f6a50', '#86b08f', ['#e2bd62', '#4f7d5f']),
+      ...plume([[52, 54], [42, 64], [30, 74], [20, 88], [18, 102], [24, 110]], 4.8, '#d9a441', '#f3d58c', ['#f3e3b4', '#c4472f']),
+      ...plume([[54, 55], [48, 70], [40, 86], [34, 102], [36, 116], [44, 122]], 4.6, '#2f4a6d', '#6f8db8', ['#c9d6ea', '#d9a441']),
+      ...plume([[56, 55], [57, 68], [54, 82], [52, 96], [56, 106]], 4, VERMILION, '#ec9a7e', ['#f3d58c', '#a8352a']),
       // near wing: big fan sweeping up and left, coverts on top
       ...featherFan(55, 44, -168, -100, 8, (i) => 30 - Math.abs(i - 2) * 1.6, 6, ['#d9a441', '#e2b55a'], 0.1),
       ...featherFan(55, 44, -160, -108, 6, (i) => 18 - Math.abs(i - 2), 5.6, [VERMILION, '#d65a3e'], 0.08),

@@ -1,28 +1,93 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><title>Card gallery</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Card gallery</title>
 <!--
   Card gallery for checking the art.
-  ?w=60            card width in CSS px (default 110)
-  ?only=3,7,back   render just these ids (numbers, "back", "snow")
+  Default: every section (all faces, lucky cards, foil, deck styles, backs).
+  ?w=60            card width in CSS px for the main grid (default 110)
+  ?only=3,7,back   render just these ids in a single grid (numbers, "back", "snow")
   ?cols=8          grid columns
   ?bg=dark         dark table background
+  ?style=sumi      install a deck style into the sprite first (applyDeckStyle)
+  ?back=dancheong  install a card back first (applyCardBack)
+  ?view=boards     a phone-size 8×6 board (55px cards) in every deck style
+  ?view=styles     every deck style at ?w size (&ids=3,7 &styles=sumi,gilded)
+  ?view=backs      every card back at ?w size
+  ?view=bench      time applyDeckStyle / applyCardBack and print the sprite size
 -->
-<style>body{background:#efe8da;margin:0;padding:16px;font-family:sans-serif}
-body.dark{background:#24252b}
+<style>
+body{background:#efe8da;margin:0;padding:16px;font-family:system-ui,sans-serif;color:#2a2724}
+body.dark{background:#24252b;color:#e8e2d4}
+h2{font:600 15px/1.2 system-ui,sans-serif;margin:26px 0 10px;letter-spacing:.02em}
+h2 small{font-weight:400;opacity:.6;margin-left:8px}
 .g{display:grid;grid-template-columns:repeat(var(--cols,8),var(--w,110px));gap:calc(var(--w,110px) * .09)}
-.g svg{width:var(--w,110px);height:calc(var(--w,110px) * 1.4);display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}</style></head>
-<body><div class="g" id="g"></div>
+.g svg{width:var(--w,110px);height:calc(var(--w,110px) * 1.4);display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.row svg{display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}
+.lbl{font-size:12px;opacity:.7;width:86px;flex:none;align-self:center}
+.board{display:grid;grid-template-columns:repeat(8,55px);gap:4px;padding:10px;background:#e4dccb;border-radius:10px;width:max-content}
+.board svg{width:55px;height:77px;display:block;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.2))}
+.boards{display:flex;flex-wrap:wrap;gap:18px}
+pre{font:12px/1.5 ui-monospace,monospace}
+</style></head>
+<body><div id="out"></div>
 <script type="module">
 import '../src/styles/fonts.css';
+import '../src/styles/cards-extra.css';
 import { installCardSprite, cardSvg } from '../src/art/cards.ts';
+import { DECK_STYLES, CARD_BACKS, applyDeckStyle, applyCardBack, cardPreviewSvg, cardBackPreviewSvg } from '../src/art/styles.ts';
 installCardSprite();
 const q = new URLSearchParams(location.search);
-const g = document.getElementById('g');
-if (q.get('w')) g.style.setProperty('--w', q.get('w') + 'px');
-if (q.get('cols')) g.style.setProperty('--cols', q.get('cols'));
+const out = document.getElementById('out');
 if (q.get('bg') === 'dark') document.body.classList.add('dark');
-const ids = q.get('only')
-  ? q.get('only').split(',').map((s) => (/^\d+$/.test(s) ? +s : s))
-  : [...Array.from({ length: 48 }, (_, i) => i), 'back', 'snow'];
-g.innerHTML = ids.map((i) => cardSvg(i)).join('');
+if (q.get('style')) applyDeckStyle(q.get('style'));
+if (q.get('back')) applyCardBack(q.get('back'));
+const W = q.get('w') ?? '110';
+const grid = (cards, w = W, cols = q.get('cols') ?? 8) => `<div class="g" style="--w:${w}px;--cols:${cols}">${cards.join('')}</div>`;
+const sized = (svg, w) => svg.replace('<svg ', `<svg style="width:${w}px;height:${w * 1.4}px" `);
+const ALL = [...Array.from({ length: 50 }, (_, i) => i), 'back', 'snow'];
+const STARS = [3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47];
+const view = q.get('view');
+
+if (q.get('only')) {
+  const ids = q.get('only').split(',').map((s) => (/^\d+$/.test(s) ? +s : s));
+  out.innerHTML = grid(ids.map((i) => cardSvg(i, 'card-art', { foil: q.get('foil') === '1' })));
+} else if (view === 'boards') {
+  // 48 cards in a scrambled order, as on a phone board
+  const order = Array.from({ length: 48 }, (_, i) => i).sort((a, b) => ((a * 37) % 48) - ((b * 37) % 48));
+  out.innerHTML = `<div class="boards">${DECK_STYLES.map((s) => `<div><h2>${s.name}<small>${s.id}</small></h2><div class="board">${order.map((id) => cardPreviewSvg(id, s.id)).join('')}</div></div>`).join('')}</div>`;
+} else if (view === 'styles') {
+  // ?view=styles&w=150&ids=3,7  every deck style at a larger size
+  const ids = (q.get('ids') ?? '3,11,23,31,39,47,48,44').split(',').map(Number);
+  const only = q.get('styles')?.split(',');
+  out.innerHTML = DECK_STYLES.filter((s) => !only || only.includes(s.id)).map((s) => `<div class="row" style="margin-bottom:10px"><span class="lbl">${s.name}</span>${ids.map((i) => sized(cardPreviewSvg(i, s.id), +W)).join('')}</div>`).join('');
+} else if (view === 'backs') {
+  // ?view=backs&w=200  every card back, plus the snow card for comparison
+  out.innerHTML = `<div class="row">${CARD_BACKS.map((b) => sized(cardBackPreviewSvg(b.id), +W)).join('')}${sized(cardSvg('snow'), +W)}</div>`;
+} else if (view === 'bench') {
+  const sprite = document.getElementById('card-sprite');
+  const lines = [`sprite (classic): ${sprite.innerHTML.length.toLocaleString()} chars`];
+  for (const s of [...DECK_STYLES.slice(1), DECK_STYLES[0], ...DECK_STYLES.slice(1)]) {
+    const t0 = performance.now();
+    applyDeckStyle(s.id);
+    const t1 = performance.now();
+    sprite.getBoundingClientRect();
+    lines.push(`applyDeckStyle(${s.id}): ${(t1 - t0).toFixed(1)} ms  sprite ${sprite.innerHTML.length.toLocaleString()} chars`);
+  }
+  for (const b of [...CARD_BACKS.slice(1), CARD_BACKS[0]]) {
+    const t0 = performance.now();
+    applyCardBack(b.id);
+    lines.push(`applyCardBack(${b.id}): ${(performance.now() - t0).toFixed(1)} ms  back ${document.getElementById('card-back').innerHTML.length.toLocaleString()} chars`);
+  }
+  applyDeckStyle('classic');
+  out.innerHTML = `<pre id="bench">${lines.join('\n')}</pre>`;
+} else {
+  let h = `<h2>All faces, back and snow<small>sprite: ${q.get('style') ?? 'classic'} deck</small></h2>` + grid(ALL.map((i) => cardSvg(i)));
+  h += `<h2>Lucky cards<small>48 · 49, detail size</small></h2><div class="row">${[48, 49].map((i) => sized(cardSvg(i), 260)).join('')}${[48, 49].map((i) => sized(cardSvg(i), 55)).join('')}</div>`;
+  h += `<h2>Gold-leaf foil<small>album 90px and detail 260px</small></h2><div class="row">${[3, 23, 31, 47, 48].map((i) => sized(cardSvg(i, 'card-art', { foil: true }), 90)).join('')}</div>`;
+  h += `<div class="row" style="margin-top:10px">${[3, 31].map((i) => sized(cardSvg(i, 'card-art', { foil: true }), 260)).join('')}${sized(cardSvg(3), 260)}</div>`;
+  h += `<h2>Deck styles<small>standalone previews (cardPreviewSvg), bright/animal card of every month + lucky cards</small></h2>`;
+  for (const s of DECK_STYLES) h += `<div class="row" style="margin-bottom:8px"><span class="lbl">${s.name}<br><small>${s.id}</small></span>${[...STARS, 48, 2].map((i) => sized(cardPreviewSvg(i, s.id), 72)).join('')}</div>`;
+  h += `<h2>Card backs<small>cardBackPreviewSvg</small></h2><div class="row">${CARD_BACKS.map((b) => `<div>${sized(cardBackPreviewSvg(b.id), 110)}<div class="lbl" style="width:auto">${b.name}</div></div>`).join('')}</div>`;
+  out.innerHTML = h;
+}
 </script></body></html>
