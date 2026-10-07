@@ -430,13 +430,13 @@
 }
 
 /* The rank road: a vertical ink line threading numbered stones. */
-.road {
+ol.road {
   position: relative;
   margin: 0;
   padding: 4px 0 8px;
   list-style: none;
 }
-.road::before {
+ol.road::before {
   content: '';
   position: absolute;
   left: 21px;

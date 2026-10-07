@@ -252,6 +252,7 @@
 .mk-body {
   padding-top: 6px;
   padding-bottom: 32px;
+  overflow-x: hidden;
 }
 .mk-lede {
   margin: 6px 2px 14px;
@@ -320,6 +321,22 @@
 }
 
 /* Tiles */
+/* Tab switch: the section's parts slide in from the tapped side, one after another. */
+.mk-body.is-switching > * {
+  animation: mk-tab-in 300ms var(--ease-out) backwards;
+}
+.mk-body.is-switching > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.mk-body.is-switching > :nth-child(n + 3) {
+  animation-delay: 80ms;
+}
+@keyframes mk-tab-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--tab-dir, 1) * 16px));
+  }
+}
 .mk-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -474,6 +491,23 @@
 .mk-card svg {
   width: 100%;
   height: 100%;
+}
+/* Grid previews are painted lazily (market.ts lazyArt): a blank card holds the place. */
+.mk-card:empty {
+  background: color-mix(in srgb, var(--surface) 70%, var(--line));
+}
+.is-painted .mk-card svg {
+  animation: mk-paint-in 260ms ease-out both;
+}
+@keyframes mk-paint-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-painted .mk-card svg {
+    animation: none;
+  }
 }
 .mk-cards {
   position: relative;

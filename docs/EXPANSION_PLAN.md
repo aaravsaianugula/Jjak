@@ -156,7 +156,7 @@ challenging; each player gets boards near their flow zone; nothing is ever unsol
 5. **Validators** (`src/director/validate.ts`, hard gates: reject and regenerate). The solver
    (`src/engine/solve.ts`) proves a full clear through the real rules; not trivial (minimum
    branching and 2-bend share by tier); dead-end risk inside the band; safety nets present; board
-   ≤ 8×6 (tappable at 360 wide); generation time within budget; deterministic; Daily and Rush
+   ≤ 8 rows × 7 columns (tappable at 360 wide, measured above); generation time within budget; deterministic; Daily and Rush
    untouched.
 
 **Where it runs.** Levels 1–600: `npm run bank` (bundled with rolldown, run on Node worker
@@ -168,8 +168,12 @@ stale the bank. Past 600: the same search with a smaller K, in a Web Worker (C5)
 **Fixing "later levels are too simple".** The old curve plateaued at 8×6 with gentle counts.
 The Director's knobs: months and 4-variant density; stone count and layout (*lines* that force
 long paths, *clusters* with open lanes); fewer free opening moves and more decoys; gate and fence
-counts; mechanic combinations (wind + knots, snow + stones, gates + fences); level goals. Shapes
-stay ≤ 8×6 (see C1 acceptance), so difficulty comes from the arrangement, not smaller cards.
+counts; mechanic combinations (wind + knots, snow + stones, gates + fences); level goals.
+**Board size, measured** in Chromium: at 360×640 the play area is 344×421 px and boards are
+height-bound, so **8×7** (8 rows, 7 columns) keeps the same ~33×47 px cards as 8×6, while **9×6**
+shrinks them to ~31 px. At 390×844: 8×6 = 51 px, 8×7 = 48 px, 9×6 = 46 px. So 8×7 is allowed for
+peak and festival boards later on the road; 9 rows never. Difficulty comes mainly from the
+arrangement, not smaller cards.
 
 **Dopamine without manipulation (13+).** Reward skill (combos, Fever, card sets, "clean read"
 clears); boards that end opening up so a combo finish is possible; small variable rewards that

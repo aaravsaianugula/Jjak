@@ -1298,9 +1298,11 @@ function koi(_c: C): string {
       `<path d="${tail}${fins}" fill="${f.fin}" opacity=".85"/><path d="${body}" fill="${f.base}"/><path d="${f.marks}" fill="${f.mark}"/>` +
       `<path d="M5.6 -1.2a.6 .6 0 1 0 .01 0Z" fill="#1f1a17" opacity=".6"/></g>`;
   }
-  return `<g transform="translate(240 206) scale(1.2 .5)" opacity=".95"><g class="ga ga-koi">${g}</g></g>` +
-    `<path d="M210 205h12M238 199h14M226 212h10" stroke="#ffffff" stroke-width=".5" opacity=".35"/>` +
-    `<ellipse cx="240" cy="206" rx="30" ry="12" fill="transparent"/>`;
+  // The tap target is the ring the koi swim on (a transparent stroke), so open
+  // water in the middle and the rest of the pond still open the pond.
+  return `<g transform="translate(240 206) scale(1.2 .5)" opacity=".95"><g class="ga ga-koi">${g}</g>` +
+    `<circle r="29" fill="none" stroke="transparent" stroke-width="12"/></g>` +
+    `<path d="M210 205h12M238 199h14M226 212h10" stroke="#ffffff" stroke-width=".5" opacity=".35"/>`;
 }
 
 function bridge(c: C): string {

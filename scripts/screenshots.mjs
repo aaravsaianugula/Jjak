@@ -76,8 +76,9 @@ const base17 = {
 
 // 1. First launch
 await open(null);
+await page.waitForTimeout(2200); // the first-minute intro: the brush mid-demo
 await shot('01-welcome');
-await page.click('[data-begin]');
+await page.click('[data-first="skip"]');
 await page.waitForTimeout(500);
 await shot('02a-intro');
 await page.waitForTimeout(900);

@@ -687,7 +687,8 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* three across on phones so every name fits on one line; more on wider screens */
+  grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
   gap: 8px;
 }
 .gd-piece {
@@ -709,7 +710,7 @@
 .gd-piece__art {
   display: block;
   width: 100%;
-  max-width: 76px;
+  max-width: 84px;
   aspect-ratio: 1;
 }
 .gd-piece__art svg {
@@ -718,12 +719,12 @@
   display: block;
 }
 .gd-piece__name {
-  font-size: 12px;
+  max-width: 100%;
+  margin-top: 2px;
+  font-size: 12.5px;
   font-weight: 700;
-  line-height: 1.2;
-  min-height: 2.4em;
-  display: flex;
-  align-items: center;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 .gd-piece__state {
   font-size: 10.5px;

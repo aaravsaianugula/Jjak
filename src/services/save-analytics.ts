@@ -111,6 +111,54 @@ export const defaultAnalytics = (): AnalyticsSave => ({
 const num = (v: unknown, d: number, lo = -Infinity, hi = Infinity) =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
 
+const MODES: readonly BoardRecord['mode'][] = ['journey', 'daily', 'zen', 'rush'];
+const trio = (v: unknown): [number, number, number] =>
+  Array.isArray(v) && v.length === 3 ? [num(v[0], 0, 0), num(v[1], 0, 0), num(v[2], 0, 0)] : [0, 0, 0];
+
+/** One stored record with every field coerced to its type, or null if it isn't a record at all. */
+export function hydrateRecord(raw: unknown): BoardRecord | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Partial<BoardRecord>;
+  if (!MODES.includes(r.mode as BoardRecord['mode'])) return null;
+  const cleared = r.cleared === true;
+  const ended = cleared ? 'clear' : r.ended === 'restart' ? 'restart' : 'quit';
+  return {
+    mode: r.mode as BoardRecord['mode'],
+    n: num(r.n, 0, 0),
+    tier: num(r.tier, -1, -1, 4),
+    d: num(r.d, -1, -1, 1),
+    mech: Array.isArray(r.mech) ? r.mech.filter((m): m is string => typeof m === 'string') : [],
+    ...(typeof r.goal === 'string' ? { goal: r.goal } : {}),
+    ms: num(r.ms, 0, 0),
+    par: num(r.par, 0, 0),
+    pairs: num(r.pairs, 0, 0),
+    made: num(r.made, 0, 0),
+    cleared,
+    ended,
+    stars: num(r.stars, 0, 0, 3),
+    firstMs: num(r.firstMs, -1, -1),
+    gapMs: num(r.gapMs, 0, 0),
+    blocked: num(r.blocked, 0, 0),
+    reselects: num(r.reselects, 0, 0),
+    hints: num(r.hints, 0, 0),
+    shuffles: num(r.shuffles, 0, 0),
+    autoShuffles: num(r.autoShuffles, 0, 0),
+    bestCombo: num(r.bestCombo, 0, 0),
+    fever: num(r.fever, 0, 0),
+    turns: trio(r.turns),
+    turnMs: trio(r.turnMs),
+    firstTaps: Array.isArray(r.firstTaps)
+      ? r.firstTaps
+          .filter((t) => Array.isArray(t) && t.length === 2)
+          .slice(0, 3)
+          .map((t) => [num(t[0], 0.5, 0, 1), num(t[1], 0.5, 0, 1)] as [number, number])
+      : [],
+    hintAfterMs: num(r.hintAfterMs, -1, -1),
+    date: typeof r.date === 'string' ? r.date : '',
+    hour: num(r.hour, -1, -1, 23),
+  };
+}
+
 /** Merge a stored slice over the defaults; drop anything malformed. */
 export function hydrateAnalytics(raw: unknown): AnalyticsSave {
   const base = defaultAnalytics();
@@ -128,12 +176,23 @@ export function hydrateAnalytics(raw: unknown): AnalyticsSave {
     rating: num(r.rating, base.rating, 0, 1.5),
     dev: num(r.dev, base.dev, 0.02, 0.5),
     boards: num(r.boards, 0, 0),
-    recent: Array.isArray(r.recent) ? r.recent.filter((x) => x && typeof x === 'object').slice(0, RECENT_CAP) : [],
+    recent: Array.isArray(r.recent)
+      ? r.recent.map(hydrateRecord).filter((x): x is BoardRecord => x !== null).slice(0, RECENT_CAP)
+      : [],
     mech,
     tiers: typeof r.tiers === 'string' ? r.tiers.replace(/[^0-4.]/g, '.') : '',
     tries: r.tries && typeof r.tries === 'object' ? { n: num(r.tries.n, 0, 0), count: num(r.tries.count, 0, 0) } : base.tries,
     days: Array.isArray(r.days) ? r.days.filter((d) => typeof d === 'string').slice(0, DAYS_CAP) : [],
     sessions: r.sessions && typeof r.sessions === 'object' ? { count: num(r.sessions.count, 0, 0), ms: num(r.sessions.ms, 0, 0) } : base.sessions,
-    last: r.last && typeof r.last === 'object' ? r.last : undefined,
+    last:
+      r.last && typeof r.last === 'object'
+        ? {
+            n: num(r.last.n, 0, 0),
+            tier: num(r.last.tier, 2, 0, 4),
+            target: num(r.last.target, 0.5, 0, 1),
+            d: num(r.last.d, 0.5, -1, 1),
+            reason: typeof r.last.reason === 'string' ? r.last.reason : '',
+          }
+        : undefined,
   };
 }

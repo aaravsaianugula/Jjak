@@ -190,6 +190,9 @@ export type MissionMetric =
   | 'stones'
   | 'knots'
   | 'wind'
+  | 'gates'
+  | 'fences'
+  | 'goal'
   | 'lucky'
   | 'zen'
   | 'boards'
@@ -199,7 +202,7 @@ export type MissionMetric =
 export const BEST_METRICS: MissionMetric[] = ['rushBest', 'score'];
 
 /** Mechanic a mission needs the player to have met first. */
-export type MissionNeed = 'gravity' | 'snow' | 'stones' | 'knots' | 'wind' | 'lucky';
+export type MissionNeed = 'gravity' | 'snow' | 'stones' | 'knots' | 'wind' | 'lucky' | 'gates' | 'fences' | 'goal';
 
 export interface MissionDef {
   id: string;
@@ -215,7 +218,7 @@ export interface MissionDef {
   minLevel?: number;
 }
 
-/** 40 templates across every mode. Three are drawn each day: one per tier. */
+/** 43 templates across every mode. Three are drawn each day: one per tier. */
 export const MISSIONS: MissionDef[] = [
   // ── Tier 1: a few minutes ──
   { id: 'pairs40', tier: 1, metric: 'pairs', target: 40, text: 'Make {n} pairs', go: 'journey' },
@@ -250,6 +253,9 @@ export const MISSIONS: MissionDef[] = [
   { id: 'snow1', tier: 2, metric: 'snow', target: 1, text: 'Clear a First-snow board', go: 'journey', needs: 'snow' },
   { id: 'knots1', tier: 2, metric: 'knots', target: 1, text: 'Clear a board with knots', go: 'journey', needs: 'knots' },
   { id: 'wind1', tier: 2, metric: 'wind', target: 1, text: 'Clear a Wind board', go: 'journey', needs: 'wind' },
+  { id: 'gates1', tier: 2, metric: 'gates', target: 1, text: 'Clear a board with gates', go: 'journey', needs: 'gates' },
+  { id: 'fences1', tier: 2, metric: 'fences', target: 1, text: 'Clear a board with bamboo fences', go: 'journey', needs: 'fences' },
+  { id: 'goal2', tier: 2, metric: 'goal', target: 2, text: 'Meet the goal on {n} goal boards', go: 'journey', needs: 'goal' },
   { id: 'score8k', tier: 2, metric: 'score', target: 8000, text: 'Score {n} on one board', go: 'journey', minLevel: 8 },
 
   // ── Tier 3: a proper sit-down ──

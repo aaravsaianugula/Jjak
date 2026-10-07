@@ -36,6 +36,7 @@ import { brushStroke, burstFx, type Pt } from '../brush-fx';
 import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { type SheetHandle, openSheet } from '../modal';
+import { petalBump } from '../motion';
 import { nav } from '../nav';
 
 // ── Extension points ────────────────────────────────────────────────
@@ -208,18 +209,71 @@ function playDemo(stage: HTMLElement, it: MarketItem, brush: string, fx: string)
   return rm ? 1200 : 2600;
 }
 
+/*
+ * Card previews in the grid are painted lazily: a tile gets blank cards first
+ * and its art once it's on screen, a few tiles per frame. Opening a tab never
+ * waits on the card art, and tiles below the fold cost nothing until reached.
+ */
+const lazyFills = new WeakMap<Element, () => string>();
+const lazyQueue: Element[] = [];
+let lazyRaf = 0;
+const lazyIo =
+  typeof IntersectionObserver === 'undefined'
+    ? null
+    : new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            lazyIo!.unobserve(e.target);
+            lazyQueue.push(e.target);
+          }
+          pumpLazy();
+        },
+        { rootMargin: '160px 0px' },
+      );
+function pumpLazy() {
+  if (lazyRaf || !lazyQueue.length) return;
+  lazyRaf = requestAnimationFrame(() => {
+    lazyRaf = 0;
+    // One tile per frame: most of a preview's cost is the browser styling and
+    // painting its art after this returns, so that's the unit that fits a frame.
+    while (lazyQueue.length) {
+      const el = lazyQueue.shift()!;
+      const fill = lazyFills.get(el);
+      if (!fill || !el.isConnected) continue;
+      el.innerHTML = fill();
+      el.classList.add('is-painted');
+      break;
+    }
+    pumpLazy();
+  });
+}
+function lazyArt(wrap: HTMLElement, blank: string, fill: () => string, now: boolean) {
+  if (now || !lazyIo) {
+    wrap.innerHTML = fill();
+    return;
+  }
+  wrap.innerHTML = blank;
+  lazyFills.set(wrap, fill);
+  lazyIo.observe(wrap);
+}
+
 function itemArt(it: MarketItem, big = false): HTMLElement {
   const wrap = h('span', { class: `mk-art mk-art--${it.category}${big ? ' mk-art--big' : ''}`, 'aria-hidden': 'true' });
   switch (it.category) {
     case 'tool':
       wrap.innerHTML = toolArt(it);
       break;
-    case 'deck':
-      wrap.innerHTML = `<span class="mk-cards mk-cards--fan">${DECK_CARDS.map((id) => `<span class="mk-card">${cardPreviewSvg(id, it.id)}</span>`).join('')}</span>`;
+    case 'deck': {
+      const fan = (art: (id: number) => string) => `<span class="mk-cards mk-cards--fan">${DECK_CARDS.map((id) => `<span class="mk-card">${art(id)}</span>`).join('')}</span>`;
+      lazyArt(wrap, fan(() => ''), () => fan((id) => cardPreviewSvg(id, it.id)), big);
       break;
-    case 'back':
-      wrap.innerHTML = `<span class="mk-cards mk-cards--pair"><span class="mk-card">${cardBackPreviewSvg(it.id)}</span><span class="mk-card">${cardBackPreviewSvg(it.id)}</span></span>`;
+    }
+    case 'back': {
+      const pair = (a: string, b: string) => `<span class="mk-cards mk-cards--pair"><span class="mk-card">${a}</span><span class="mk-card">${b}</span></span>`;
+      lazyArt(wrap, pair('', ''), () => pair(cardBackPreviewSvg(it.id), cardBackPreviewSvg(it.id)), big);
       break;
+    }
     case 'garden':
       wrap.innerHTML = `<span class="mk-garden">${gardenItemSvg(it.id)}</span>`;
       break;
@@ -297,9 +351,12 @@ export function marketScreen(tab?: string): Screen {
   const balanceN = h('span', { class: 'petals__n num' }, fmt(save.petals));
   const balance = h('span', { class: 'petals mk-balance', role: 'status', 'aria-label': `${save.petals} petals`, html: ICONS.petal });
   balance.append(balanceN);
+  let shownBalance = save.petals;
+  /** Show the balance; a change counts over and bumps the pill (the purchase ghost already counted down). */
   const setBalance = (n = save.petals) => {
-    balanceN.textContent = fmt(n);
-    balance.setAttribute('aria-label', `${n} petals`);
+    if (n === shownBalance) return;
+    petalBump(balance, shownBalance, n, { format: fmt, ms: 360 });
+    shownBalance = n;
   };
 
   const rail = h('div', { class: 'mk-rail scroll', role: 'tablist', 'aria-label': 'Market sections' });
@@ -368,6 +425,10 @@ export function marketScreen(tab?: string): Screen {
   function showTab(id: string, keepScroll = false) {
     const t = MARKET_TABS.find((x) => x.id === id) ?? MARKET_TABS[0];
     const changed = t.id !== current;
+    // The new section slides in from the side of the tab that was tapped.
+    const dir = MARKET_TABS.findIndex((x) => x.id === t.id) > MARKET_TABS.findIndex((x) => x.id === current) ? 1 : -1;
+    body.style.setProperty('--tab-dir', String(dir));
+    body.classList.toggle('is-switching', changed);
     current = lastTab = t.id;
     renderRail();
     const btn = rail.querySelector<HTMLElement>(`[data-tab="${t.id}"]`);
@@ -745,10 +806,24 @@ export function marketScreen(tab?: string): Screen {
   }
 
   showTab(startTab);
+  // While the player looks around, prepare the deck previews in idle time (one
+  // card per idle slot), so the Decks tab opens warm.
+  const warm = itemsIn('deck').flatMap((it) => DECK_CARDS.map((id) => [id, it.id] as const));
+  let warmId = 0;
+  const idle = (fn: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 2000 }) : window.setTimeout(fn, 120));
+  const unidle = (n: number) => (typeof cancelIdleCallback === 'function' ? cancelIdleCallback(n) : clearTimeout(n));
+  const warmNext = () => {
+    const next = warm.shift();
+    if (!next || !el.isConnected) return;
+    cardPreviewSvg(next[0], next[1]);
+    warmId = idle(warmNext);
+  };
+  warmId = idle(warmNext);
   return {
     name: 'market',
     el,
     destroy() {
+      unidle(warmId);
       music.stopPreview();
       openDemo?.stop();
     },

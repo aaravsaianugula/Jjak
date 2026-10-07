@@ -26,11 +26,14 @@ export function show(next: Screen): void {
   current = next;
   const back = !!prev && next.name === 'home';
   next.el.classList.toggle('screen--back', back);
+  // Into a board the table rises; out of one it settles back.
+  next.el.classList.toggle('screen--rise', !!prev && next.name === 'game');
   if (prev) {
     prev.destroy?.();
     prev.el.classList.add('screen--leaving');
-    if (back) prev.el.classList.add('screen--leaving-back');
-    setTimeout(() => prev.el.remove(), 200);
+    if (prev.name === 'game') prev.el.classList.add('screen--leaving-sink');
+    else if (back) prev.el.classList.add('screen--leaving-back');
+    setTimeout(() => prev.el.remove(), 190);
   }
   root().append(next.el);
   if (AD_POLICY.bannerScreens.includes(next.name) && save.onboarded) void ads.showBanner();

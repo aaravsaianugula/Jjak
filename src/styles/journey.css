@@ -327,13 +327,15 @@
 .stop__body {
   padding: 0 12px 14px;
 }
+/* Opening a chapter: the stops below glide down (map.ts, FLIP) and the levels
+   fade in a beat later, as if the card unfolds. */
 .stop__body.is-in {
-  animation: road-open 300ms var(--ease-out) both;
+  animation: road-open 340ms var(--ease-out) 60ms backwards;
 }
 @keyframes road-open {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-8px);
   }
 }
 .stop__postcard {
@@ -607,19 +609,7 @@
 }
 
 /* ───────────────────────────── Game: lucky cards ───────────────────────────── */
-/* Until the bonus card faces arrive, a warm gold slip stands in behind the art. */
-.game .card.is-lucky {
-  background:
-    radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--luck) 30%, #fbf3e2) 0 22%, transparent 23%),
-    linear-gradient(160deg, #fbf3e2, color-mix(in srgb, var(--luck) 22%, #fbf3e2));
-  box-shadow: var(--card-shadow), inset 0 0 0 1.5px color-mix(in srgb, var(--luck) 70%, transparent);
-}
-.tip__cards > div:has(use[href='#card-48']),
-.tip__cards > div:has(use[href='#card-49']) {
-  border-radius: 7%/5%;
-  background: linear-gradient(160deg, #fbf3e2, color-mix(in srgb, var(--luck) 26%, #fbf3e2));
-  box-shadow: var(--card-shadow), inset 0 0 0 1.5px color-mix(in srgb, var(--luck) 70%, transparent);
-}
+/* The lucky faces (ids 48/49) are real card art (src/art/bonus.ts); no slip or rim. */
 .lucky-float {
   position: absolute;
   z-index: 9;
@@ -850,87 +840,6 @@
   line-height: 1.4;
 }
 
-/* ───────────────────────────── Tips: knots and wind practice ───────────────────────────── */
-.tip--knots .tip__caption,
-.tip--wind .tip__caption {
-  margin: 10px 2px 0;
-  text-align: left;
-  line-height: 1.5;
-}
-.quiz__board {
-  position: relative;
-  margin: 16px 4px 8px;
-}
-/* A one-row mini board with four slots; cards can leave or slide. */
-.mini {
-  position: relative;
-  aspect-ratio: 100 / 30.8;
-}
-.mini__card {
-  position: absolute;
-  top: 0;
-  left: calc(var(--slot) * 26%);
-  width: 22%;
-  aspect-ratio: 1 / 1.4;
-  border-radius: 7%/5%;
-  transition:
-    left 420ms cubic-bezier(0.3, 0.7, 0.3, 1.08),
-    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    opacity 260ms ease;
-}
-.mini__card svg.card-art {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  box-shadow: var(--card-shadow);
-}
-.mini__card::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 11%/8%;
-  border: 3px solid transparent;
-  transition: border-color 140ms;
-}
-.mini__card.is-picked {
-  transform: translateY(-5px) scale(1.04);
-}
-.mini__card.is-picked::after {
-  border-color: var(--accent);
-}
-.mini__card.is-wrong {
-  animation: shake 420ms;
-}
-.mini__card.is-wrong::after {
-  border-color: #b5523a;
-}
-.mini__card.is-gone {
-  opacity: 0;
-  transform: translateY(-14px) scale(0.8) rotate(6deg);
-  pointer-events: none;
-}
-.mini .breeze {
-  inset: -6px 0;
-}
-.mini__wind {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -14px;
-  text-align: center;
-  font-size: 11px;
-  letter-spacing: 0.6em;
-  color: var(--muted);
-  pointer-events: none;
-}
-.mini--wind {
-  margin-top: 14px;
-}
-.quiz.is-solved .mini__card:not(.is-gone)::after {
-  border-color: var(--good);
-}
-
 /* ───────────────────────────── Reduced motion ───────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .stop.is-here .stop__node::after,
@@ -966,8 +875,7 @@
   .passport__bleed {
     display: none;
   }
-  .game .card.is-drift,
-  .mini__card {
+  .game .card.is-drift {
     transition: none;
   }
 }

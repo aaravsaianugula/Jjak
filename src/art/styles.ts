@@ -130,6 +130,9 @@ const LOOKS: Record<string, DeckLook> = {
     color: (hex, [L, C, h], ground) => {
       if (hex === CARD_PAPER) return '#1b2140';
       if (ground) return lchToHex(0.285 + (L - 0.93) * 0.8, 0.034 + C * 0.45, mixHue(h, 274, 0.72));
+      // Near-black ink (the hills of Silver grass, a magpie's coat) stays a night
+      // silhouette, a shade deeper than the paper; everything else lifts to silver.
+      if (L < 0.34 && C < 0.04) return lchToHex(0.1 + L * 0.2, 0.03, 272);
       return lchToHex(clamp(0.47 + L * 0.51, 0, 0.985), C * 0.4, mixHue(h, 258, 0.14));
     },
     defs: () =>
@@ -417,13 +420,8 @@ const instance = (tpl: string) => {
 };
 
 const previewCache = new Map<string, string>();
-/**
- * Standalone preview of one card painted in any deck style (for the Market),
- * independent of the sprite currently installed. Every call gets fresh ids, so
- * previews never collide with each other or with the sprite.
- */
-export function cardPreviewSvg(id: number, styleId: string): string {
-  const style = LOOKS[styleId] ? styleId : 'classic';
+/** Standalone markup (fresh ids per call): used where there's no document to hold a sprite. */
+function standalonePreview(id: number, style: string): string {
   const key = `${style}:${id}`;
   let tpl = previewCache.get(key);
   if (tpl === undefined) {
@@ -436,6 +434,56 @@ export function cardPreviewSvg(id: number, styleId: string): string {
     previewCache.set(key, tpl);
   }
   return instance(tpl);
+}
+
+/**
+ * The preview sprite: a hidden <svg> holding, per deck style, the painted
+ * defs, motifs and faces that previews have asked for (ids `pv-<style>-…`).
+ * Previews are then a two-node `<use>`: the motifs (10–40 KB each) are parsed
+ * once instead of once per preview. Built lazily, one symbol at a time.
+ */
+const PV_SPRITE = 'pv-sprite';
+const pvHave = new Set<string>();
+function previewSprite(): Element | null {
+  if (typeof document === 'undefined' || !document.body) return null;
+  const found = document.getElementById(PV_SPRITE);
+  if (found) return found;
+  const sprite = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  sprite.id = PV_SPRITE;
+  sprite.setAttribute('aria-hidden', 'true');
+  sprite.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  document.body.prepend(sprite);
+  pvHave.clear();
+  return sprite;
+}
+
+/** Make sure the preview sprite holds card `id` in `style`; false if there's no document. */
+function ensurePreview(id: number, style: string): boolean {
+  const sprite = previewSprite();
+  if (!sprite) return false;
+  const want = [style, id < 48 ? `${style}:m${id >> 2}` : '', `${style}:c${id}`].filter((k) => k && !pvHave.has(k));
+  if (!want.length) return true;
+  const b = buildLook(style);
+  let markup = '';
+  for (const k of want) {
+    if (k === style) markup += `<defs>${b.paint(spriteDefs().replace(/^<defs>|<\/defs>$/g, ''))}${b.defs}</defs>`;
+    else if (k.includes(':m')) markup += `<symbol id="motif-${id >> 2}" viewBox="0 0 100 140">${b.paint(motifMarkup(id >> 2))}</symbol>`;
+    else markup += `<symbol id="card-${id}" viewBox="0 0 100 140">${b.paint(cardInner(id, b.look))}</symbol>`;
+    pvHave.add(k);
+  }
+  sprite.insertAdjacentHTML('beforeend', markup.replace(ID_RX, `$1pv-${style}-`));
+  return true;
+}
+
+/**
+ * Preview of one card painted in any deck style (for the Market), independent
+ * of the deck currently installed in the card sprite. In the app it's a `<use>`
+ * of the preview sprite; without a document it's standalone markup with fresh ids.
+ */
+export function cardPreviewSvg(id: number, styleId: string): string {
+  const style = LOOKS[styleId] ? styleId : 'classic';
+  if (!ensurePreview(id, style)) return standalonePreview(id, style);
+  return `<svg class="card-art" viewBox="0 0 100 140" aria-hidden="true"><use href="#pv-${style}-card-${id}"/></svg>`;
 }
 
 const backPreviewCache = new Map<string, string>();
