@@ -187,36 +187,46 @@ because it's the authoritative source. At the time of writing, typical answers a
 | Tags | Puzzle, Matching, Relaxing, Brain games, Offline |
 | Contact | your email; the website that hosts app-ads.txt |
 
-**Full description:**
+**Full description** (about 2,300 characters; the limit is 4,000):
 
 ```
-Jjak (짝) means "pair" in Korean — and that's the whole idea.
+Jjak (짝) means "pair" in Korean, and that's the whole idea.
 
 Find two cards of the same flower and connect them with a line of up to three strokes.
-Clear the board, chain combos (짝짝짝!), and travel through spring, summer, autumn and
-winter.
+Clear the board, chain combos (짝짝짝!), and travel the Flower Road through Korea and
+Japan, one season at a time.
 
 The cards come from the 48-card flower deck that Korea (Hwatu 화투) and Japan
-(Hanafuda 花札) share — redrawn from scratch in a calm, paper-and-ink style.
+(Hanafuda 花札) share, redrawn from scratch in a calm paper-and-ink style.
 
-◆ JOURNEY — endless, always-solvable boards across four seasons. Stones in summer,
-  falling leaves in autumn, first snow in winter
-◆ DAILY JJAK — one board for the whole world each day, with a new theme every weekday.
-  Keep your streak, share your time
-◆ RUSH — a 60-second score attack. Chain combos into Full Bloom for double points
-◆ ZEN — endless boards with no clock at all, with gentle generative music that changes with the seasons
-◆ CARD SETS — clear Godori, the red ribbons or the Five Brights on one board for a bonus
-◆ ALBUM — collect all 48 cards and learn each flower's name in Korean and Japanese,
-  with little stories behind them (why is the October deer looking away?)
-◆ SEALS — 28 achievements, including the classic card sets players in Korea and Japan
-  know by heart: Five Brights, Godori, Boar-Deer-Butterfly
-◆ BOARD PAPERS — complete a flower to unlock its paper for your board
-◆ Paper and Ink themes, gentle sound design, satisfying haptics
+◆ THE FLOWER ROAD: 600 levels across 50 real places, from Gyeongju's cherry blossoms
+  to Kyoto's maples and Shirakawa-go's snow. Every place ends with a festival board
+  and a passport stamp for your collection
+◆ NEW IDEAS AS YOU TRAVEL: stones, falling leaves, first snow, lucky cards, silk
+  knots and wind that slides the cards. Every board can be solved
+◆ FLOWER PATH: a free 100-rank journey with a reward on every rank and exclusive
+  decks, brushes and garden pieces you can only earn
+◆ DAILY JJAK: one board for the whole world each day, three daily missions and a
+  weekly chest. Keep your streak (a cup of Warm tea saves it on a busy day)
+◆ THE MARKET: spend the petals you earn on deck styles (ink wash, moonlit,
+  celadon, woodblock), card backs, path brushes, match effects, board papers and music
+◆ YOUR GARDEN: build a quiet courtyard piece by piece (koi pond, stone lantern,
+  pavilion, a sleeping cat) in all four seasons, by day and by night. A visitor
+  drops by every day
+◆ ALBUM: collect all 48 cards plus rare gold-leaf editions, and learn each flower's
+  name in Korean and Japanese with the little stories behind them
+◆ RUSH and ZEN: a 60-second score attack, or endless boards with no clock at all
+◆ CARD SETS and SEALS: clear Godori, the red ribbons or the Five Brights on one
+  board for a bonus, and earn seals for the classic sets
+◆ Paper and Ink themes, gentle generative music, satisfying haptics
 ◆ Plays offline. Short sessions. No account needed.
 
 Fair ads, promised: never in the middle of a puzzle, never in your first levels, and
-rewarded ads are always your choice.
+rewarded ads are always your choice. A one-time purchase removes the rest.
 ```
+
+**In-app products** (shown on the listing automatically): Remove ads, the Supporter
+pack and petal pouches. In the IARC questionnaire, answer **Yes** to "digital purchases".
 
 **Graphics** (in `store/`):
 
@@ -238,7 +248,15 @@ rewarded ads are always your choice.
 ## 8. Pre-launch QA checklist
 
 - [ ] First launch: welcome (three rules) → Level 1 tutorial shows a hint and coach text
-- [ ] Level 6 shows the "Match the flower" tip with its tap-the-pair practice (wrong pick explains, right pick turns the button into "Start Level 6"); Level 27 shows Falling leaves; Level 38 shows First snow
+- [ ] Level 6 shows the "Match the flower" tip with its tap-the-pair practice (wrong pick explains, right pick turns the button into "Start Level 6")
+- [ ] First appearances show their tip once: Stones L14 · Falling leaves L26 · First snow L38 · Lucky cards L50 · Knots L74 (with practice) · Wind L98 (with practice). Level 12 is the first festival board and stamps the Gyeongju passport page
+- [ ] Map: the route scrolls to the current place; opening a place lists its 12 levels and any unlocked level replays
+- [ ] Flower Path: XP shows on the result sheet and the Rush end sheet; claiming a rank stamps it and pays out; Claim all works; exclusives appear as owned in the Market
+- [ ] Missions: 3 a day, reroll once each, progress ticks during play, the weekly chest opens at 15
+- [ ] Market: buy, equip and unequip in each tab; "can't afford" shows how many petals are missing; Warm tea stops at 2; Album card hides when the album is complete
+- [ ] Deck style and card back persist after a restart; every deck style keeps the 12 months distinguishable on an 8×6 board
+- [ ] Garden: pieces appear where expected, put-away works, night mode by the clock, the daily visitor pays once a day
+- [ ] Petal pouches (license tester): petals credited once, purchase consumed (buy the same pouch twice). Supporter pack: ads off, 1,500 petals once, Lucky-clouds back owned, "Restore purchase" after reinstall restores ads-off and the back without paying petals again
 - [ ] Seals: earning one shows it on the result sheet and adds petals
 - [ ] Settings → Board paper: locked papers can't be picked; a completed flower unlocks its paper
 - [ ] EU test (UMP debug geography EEA): consent form appears, and Settings shows "Ad privacy choices"

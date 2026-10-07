@@ -37,12 +37,19 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 
 | Loop | Cadence | Hook |
 |---|---|---|
-| **Journey** | Session | Endless levels in 4 seasonal chapters × 12 levels, then "Year 2" with more stones. |
+| **Journey: the Flower Road** | Session | 600 levels across 50 real places in Korea and Japan (12 per place), each in the season it's famous for, with a postcard line and a festival board at slot 12. After 600, "Wanderer" years revisit the road with fuller boards. |
+| **Passport stamps** | Per chapter | Clearing a place's festival board stamps your passport: hand-drawn seals in four shapes and six inks, dated. 50 to collect. |
+| **Flower Path 꽃길 · 花道** | Weeks | Free 100-rank track fed by XP from every mode. A reward on every rank, a new title every 10 (Seedling → Master of Flowers), and exclusives you can only earn: Harvest-moon back r25, Gold-thread brush r40, Crane r55, Gold-leaf deck r70, Gold-dust effect r85, Moonlight music r100. Tuned so rank 100 lands near 50 hours. |
+| **Missions** | Daily / weekly | 3 missions a day (one light, one steady, one long) from a pool of 40, one free reroll each; 15 completions a week open the weekly chest. |
+| **Star chests** | Per chapter | Chests at 12 / 24 / 36 blossoms per place. |
+| **Market 장터 · 市** | Any time | Spend petals on tools, Warm tea (streak freeze), album cards, 5 deck styles, 5 card backs, path brushes, match effects, board papers, garden pieces and music. Every price is shown up front: no loot boxes, timers or fake discounts. |
+| **Garden 정원 · 庭** | Daily | A courtyard that fills with the 24 pieces you buy, in four seasons, by day and night. A daily visitor (magpie, heron, tanuki…) leaves a short verse and a few petals. |
+| **Gold leaf** | Months | Rare gilded editions of the 48 cards from rank rewards, chests and the occasional 3-blossom clear. A second album to finish. |
 | **Daily Jjak** | Daily | One worldwide board per date with a weekday theme (Stone Monday, Snowy Tuesday, Leaf-fall Wednesday…). Streak counter, a 7-day strip on Home, a countdown to the next board, and an emoji share card. |
 | **Album** | Weeks | 48 collectible cards with KR/JP names, romanization, and culture notes. One new card per first clear and per Daily. Each card shows which real card sets (yaku) it belongs to. |
-| **Seals 印** | Weeks–months | 33 achievements in four groups (Play, Journey, Daily, Album sets), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
-| **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif) under Settings. 12 to collect. |
-| **Journey map** | Any time | Every unlocked level with its blossoms, so you can replay for missing ones. |
+| **Seals 印** | Weeks–months | More than 40 achievements in five groups (Play, Journey, Daily, Album sets, Flower Path), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
+| **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif), equipped in the Market. 12 to collect, plus 6 to buy. |
+| **Flower Road map** | Any time | A winding route through all 50 places with blossoms and stamps; open a place to replay any of its levels. |
 | **Zen** | Any time | Endless, untimed, no stars. |
 | **Rush** | Minutes | 60-second score attack: pairs add time, cleared boards add more, boards grow. Personal best, plus an optional rewarded "keep going +20 s" once per run. |
 | **Fever** | Seconds | A ×5 combo starts 6 s of 만개 · 満開 "full bloom": double points and a glowing board. |
@@ -51,21 +58,37 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 
 ## 4. Level curve
 
-| Levels | Board | Months | Variants | Stones | Teaches |
-|---|---|---|---|---|---|
-| 1 | 4×4 | 4 | identical | 0 | Tapping pairs, path bends |
-| 2–5 | 4×4 → 6×5 | 6 → 12 | identical | 0 | Scanning bigger boards |
-| 6 | 6×4 | 12 | **4 per flower** | 0 | "Match the flower, not the picture" (tip sheet) |
-| 7–12 (Spring) | 6×5 → 8×6 | 12 | yes | 0 | Full 48-card boards |
-| 13–24 (Summer) | as above | 12 | yes | 2 from slot 4 | **Stones** block paths |
-| 25–36 (Autumn) | as above | 12 | yes | 2–4 | **Falling leaves** on every other level from 27: cards drop to fill gaps after each pair |
-| 37–48 (Winter) | as above | 12 | yes | 2–6 | **First snow** on every other level from 38: ~20% of cards start face-down and are revealed when a neighbour clears |
-| 49+ (Year 2…) | loops | 12 | yes | up to `maxStones` | All three ideas mixed (never falling leaves and snow on the same board) |
+Levels 1–6 teach the basics (unchanged); from level 7 the Journey follows the
+Flower Road (`src/data/route.ts`, `journeyLevel` in `src/engine/levels.ts`).
 
-Falling-leaves and snow boards get +10 s of par time. If snow is the only reason a board is stuck, all snow melts for free; if it's still stuck, the board reshuffles.
+| Levels | Board | Variants | Teaches |
+|---|---|---|---|
+| 1 | 4×4 | identical | Tapping pairs, path bends |
+| 2–5 | 4×4 → 6×5 | identical | Scanning bigger boards |
+| 6 | 6×4 | **4 per flower** | "Match the flower, not the picture" (tip with a tap-the-pair practice) |
+| Chapter 1 (levels 1–12) | up to 8×6 | yes | Full 48-card boards |
+| Chapter 2 | | yes | **Stones** block paths |
+| Chapter 3 | | yes | **Falling leaves**: cards drop to fill gaps after each pair |
+| Chapter 4 | | yes | **First snow**: some cards start face-down and turn over when a neighbour clears |
+| Chapter 5 | | yes | **Lucky cards**: a bonus pair (보너스패) worth +500 points and +10 petals |
+| Chapter 7 | | yes | **Knots (매듭)**: a tied card can't be picked until a card beside it clears (tip with practice) |
+| Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair (tip with practice) |
+| Chapters 10–50 | | yes | Each place features one idea or a mix |
+| 601+ (Wanderer) | | yes | The same road, fuller boards, slightly tighter par |
+
+**Inside every chapter** the 12 slots follow a rhythm: a warm-up, the chapter's idea, a
+plain board, a mix, a smaller breather in the middle, a peak, and the **festival board**
+(8×6 with +15 s par). Boards never exceed 8×6 so cards stay tappable on phones. Snow never
+shares a board with falling leaves or wind.
+
+**Mechanic safety nets** (never the player's fault, never a penalty): if snow or knots are
+the only reason a board is stuck, they clear for free; if a board is still stuck it
+reshuffles (and re-deals onto open cells if a card is walled in by stones). On Wind
+boards the automatic reshuffle doesn't cost the no-assist blossom.
 
 `maxStones(rows, cols) = floor(interior / 4)` (rounded down to an even number) keeps
-boards open. **Par time** = `ceil((pairs × 4.5 + 10) / 5) × 5` seconds.
+boards open. **Par time** = `ceil((pairs × 4.5 + 10) / 5) × 5` seconds, +10 s for moving
+or covered boards, +15 s for festival boards.
 
 ## 5. Generation (solvable by construction)
 
@@ -86,7 +109,7 @@ which is why the Daily is identical worldwide.
 
 | Item | Source | Sink |
 |---|---|---|
-| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board | Hint (20), Shuffle (15) |
+| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board, lanterns, Rush, lucky pairs, missions, rank rewards, chests, garden visitors. Simulated at **≈ 315 per hour** of steady play (`tests/economy.test.ts`) | Hint (20), Shuffle (15), the Market (≈ 12,200 of cosmetics and garden pieces) |
 | **Hints/Shuffles** | 3 / 2 at start, +1 each per chapter finished, rewarded ad (+1) | Using them |
 | **Album cards** | First clear of each level, each Daily, optional rewarded "draw one more" | — |
 
@@ -139,11 +162,10 @@ label on each card names its flower and month, and sound/haptics can be toggled.
 
 ## 9. Roadmap (post-launch)
 
-1. Localize the UI (ko, ja, es, pt-BR, id). The card names are already trilingual.
-2. Play Games Services: Daily leaderboard and achievements ("Complete the Album").
-3. "Remove ads" in-app purchase and cosmetic card backs and board papers.
-4. Weekly "Festival" boards tied to real seasonal events (Seollal, Hanami, Chuseok, Tsukimi).
-5. Optional "Yaku" sets (Korean *Godori*, red/blue ribbons) as bonus objectives, with no wagering.
-
+1. Localize the UI (ko, ja, es, pt-BR, id). The card and place names are already trilingual.
+2. Play Games Services: Daily leaderboard and achievements.
+3. Seasonal festival events tied to real dates (Seollal, Hanami, Dano, Tanabata, Chuseok, Tsukimi) with limited garden pieces earned by play.
+4. Cloud save (Play Games saved games) so progress moves with the player.
+5. More places on the Flower Road (Taiwan, and more of rural Korea and Japan), keeping the 12-level chapter rhythm.
 
 See [`MONETIZATION.md`](MONETIZATION.md) for the full ad and engagement strategy.

@@ -20,10 +20,11 @@ and collect every card with its Korean and Japanese name.
 
 | | |
 |---|---|
-| **Modes** | Journey (4 seasonal chapters, endless, with a level map), Rush (60 s score attack), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed), Album (48 collectible cards) |
-| **Mechanics** | Stones (Summer), Falling leaves (Autumn), First snow (Winter), mixed from Year 2 |
-| **Meta** | Card-set (yaku) bonuses on the board, generative seasonal music, opt-in Daily reminders, Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, 44 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
-| **Flower Path 꽃길 · 花道** | Free 100-rank track (~50 h) with a title every 10 ranks and a reward on every rank, 3 daily missions from 40 templates + a weekly chest, chapter star chests at 12/24/36 blossoms, gold-leaf (foil) editions of the 48 cards, a Bonus page for the two lucky cards, and Warm tea streak freezes. Tuned by `tests/economy.test.ts` (~315 petals/h, rank 100 at ~50 h) |
+| **Modes** | Journey: **the Flower Road**, 600 levels across 50 real places in Korea and Japan, then endless Wanderer years. Rush (60 s score attack), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed) |
+| **Mechanics** | Stones, Falling leaves, First snow, Lucky cards, Knots (매듭) and Wind, introduced one at a time and then mixed. Festival boards end every chapter |
+| **Progression** | Flower Path (100 free ranks with exclusives), 3 daily missions + weekly chest, star chests, passport stamps, 40+ Seals (incl. real Go-Stop / Koi-Koi card sets), Album of 48 cards + 2 lucky cards + gold-leaf editions |
+| **Market & Garden** | Petal shop: 5 deck styles, 5 card backs, path brushes, match effects, board papers, generative music styles, tools, Warm tea (streak freeze). A seasonal courtyard with 24 pieces, day/night and daily visitors |
+| **Meta** | Generative seasonal music, opt-in Daily reminders, Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, lifetime stats. ≈ 50 hours of launch content (see `docs/EXPANSION_PLAN.md`) |
 | **Engine** | Shisen-sho path rule (≤ 2 turns, edge routing), boards that are **solvable by construction**, deterministic seeds, auto-reshuffle on dead ends |
 | **Monetization** | See [`docs/MONETIZATION.md`](docs/MONETIZATION.md). Rewarded-first ads, smart interstitials (cooldown after rewarded, "short break" notice), menu-only banners, a one-time Remove ads purchase, petal pouches (consumable) and a Supporter pack (Google Play Billing). No timers, fake discounts or loot boxes. |
 | **Ads (detail)** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, ads capped at PG content (13+ audience) |
@@ -34,6 +35,7 @@ and collect every card with its Korean and Japanese name.
 
 * [`docs/RESEARCH.md`](docs/RESEARCH.md): the 2026 puzzle market, what players like and hate, and why this concept
 * [`docs/GAME_DESIGN.md`](docs/GAME_DESIGN.md): loops, level curve, economy, ad rules, art direction
+* [`docs/EXPANSION_PLAN.md`](docs/EXPANSION_PLAN.md): the launch expansion, the 50-hour content budget and the economy simulation
 * [`docs/MONETIZATION.md`](docs/MONETIZATION.md): ad placements, frequency rules, remove-ads purchase, KPIs and A/B tests
 * [`docs/PLAY_STORE_RELEASE.md`](docs/PLAY_STORE_RELEASE.md): **step-by-step publishing checklist** (AdMob IDs, signing, Play Console answers, listing copy)
 * [`docs/CLAUDE_BUILD_PROMPT.md`](docs/CLAUDE_BUILD_PROMPT.md): the prompt for Claude to plan, rebuild, or extend the game
@@ -77,10 +79,10 @@ automatically when the keystore secrets exist (see the release doc).
 ```
 src/
   engine/     pure game logic: board, path finder, generator, levels, session (unit-tested)
-  data/       the 48-card deck with KR/JP names and culture notes
+  data/       the deck (KR/JP names, culture notes), the Flower Road route, Market catalog, ranks and missions
   art/        SVG card renderer + sprite
   services/   ads (AdMob + UMP), storage, audio, haptics, progress/economy, share
-  ui/         screens (welcome, home, game, album, settings), modal sheets, router
+  ui/         screens (welcome, home, game, map, market, garden, path, album, seals, settings), modal sheets, router
   styles/     design tokens (Paper / Ink themes), subset fonts
 android/      Capacitor Android project (signing, AdMob app id, icons)
 resources/    icon & splash sources → `npm run assets`
