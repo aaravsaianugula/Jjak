@@ -19,6 +19,12 @@ const WOOD_LIGHT = '#94683f';
 const ROOF = '#3a3530';
 const PAPER = '#f7f1e6';
 const VERMILION = '#b4442e';
+/** Red-ochre posts (석간주), the dancheong green of the beam, the eaves' shaded underside. */
+const POST = '#7a3a28';
+const POST_LIGHT = '#a65a3e';
+const DANCHEONG = '#3e6e61';
+const SOFFIT = '#5a4a3c';
+const BRONZE = '#9a7a3e';
 
 /** The doors' painted area, in card units. */
 const DOOR = { x: 19, y: 44, w: 62, h: 89 };
@@ -50,9 +56,10 @@ function doorLeaf(side: -1 | 1): string {
     `<path d="M${x0 + 5} ${DOOR.y + DOOR.h - 13}h${w - 10}" stroke="${WOOD_LIGHT}" stroke-width="1.1" opacity=".7"/>` +
     // Iron hinge straps.
     `<path d="M${hinge} ${DOOR.y + 10}h8M${hinge} ${DOOR.y + DOOR.h - 26}h8" stroke="${INK}" stroke-width="2.6" stroke-linecap="round"/>` +
-    // Ring pull.
-    `<circle cx="${ring}" cy="${DOOR.y + 47}" r="3.6" fill="none" stroke="${INK}" stroke-width="1.6"/>` +
-    `<circle cx="${ring}" cy="${DOOR.y + 43.6}" r="1.3" fill="${INK}"/>`
+    // Door pull (문고리): a bronze lozenge plate with a slim ring hanging from it.
+    `<path d="M${ring} ${DOOR.y + 39.6}L${ring + 2.6} ${DOOR.y + 43}L${ring} ${DOOR.y + 46.4}L${ring - 2.6} ${DOOR.y + 43}Z" fill="${BRONZE}" stroke="${INK}" stroke-width=".8"/>` +
+    `<ellipse cx="${ring}" cy="${DOOR.y + 48.6}" rx="2.4" ry="3" fill="none" stroke="${BRONZE}" stroke-width="1.3"/>` +
+    `<ellipse cx="${ring}" cy="${DOOR.y + 48.6}" rx="2.4" ry="3" fill="none" stroke="${INK}" stroke-width=".4" opacity=".6"/>`
   );
 }
 
@@ -62,41 +69,62 @@ function doorSvg(month: number, side: -1 | 1): string {
   return `<svg viewBox="${x} ${DOOR.y} ${DOOR.w / 2} ${DOOR.h}" preserveAspectRatio="none" aria-hidden="true">${doorPainting(month)}${doorLeaf(side)}</svg>`;
 }
 
-/** Roof, posts, beam, plaque and threshold. */
+/**
+ * Roof, posts, beam, plaque and threshold. The posts are red ochre (석간주)
+ * on stone footings; the beam carries a painted dancheong band (green with red
+ * rules and a bracketed end motif); the tiled roof sweeps up at both eaves
+ * (처마) under a ridge with raised ends, with lit tile ribs and a pale soffit.
+ */
 function frameMarkup(month: number): string {
   const n = String(month + 1);
   const pw = n.length > 1 ? 24 : 19;
-  // Roof: a tiled hip with eaves that lift at both ends (처마).
-  const roof = 'M1 21C7 21 11 18 14 12L86 12C89 18 93 21 99 21L94 26H6Z';
-  let tiles = '';
-  for (let x = 20; x <= 80; x += 6) tiles += `M${x} 13.5V24`;
+  // Roof surface: eaves that sag in the middle and lift at the corners.
+  const roof = 'M-1 19C6 21.6 12 22.6 19 22.6H81C88 22.6 94 21.6 101 19C95 16.8 90 13.6 87 9.6H13C10 13.6 5 16.8 -1 19Z';
+  // Soffit: the underside of the eaves, rafters in shadow.
+  const soffit = 'M-1 19C6 21.6 12 22.6 19 22.6H81C88 22.6 94 21.6 101 19L97.6 25.4C92 27.2 86 28 80 28H20C14 28 8 27.2 2.4 25.4Z';
+  const ridge = 'M11 10.4H89L91.6 6.2C89.6 7.6 87.6 8 85.4 7.8H14.6C12.4 8 10.4 7.6 8.4 6.2Z';
+  let ribs = '';
+  let lit = '';
+  for (let x = 17; x <= 83; x += 5.5) {
+    const lean = (x - 50) * 0.06;
+    ribs += `M${(x + lean).toFixed(1)} 11V${(22 - Math.abs(x - 50) * 0.004).toFixed(1)}`;
+    lit += `M${(x + lean + 1.4).toFixed(1)} 11.6V21`;
+  }
+  const post = (x: number) =>
+    `<rect x="${x}" y="27" width="10" height="107" fill="${POST}" stroke="${INK}" stroke-width="1.8"/>` +
+    `<path d="M${x + 2.8} 44V130" stroke="${POST_LIGHT}" stroke-width="1.6" opacity=".7"/>` +
+    `<path d="M${x + 8} 44V130" stroke="${INK}" stroke-width="1" opacity=".3"/>` +
+    // footing stone, wider than the post, with a lit top
+    `<path d="M${x - 3} 138.4V133.4Q${x + 5} 130.8 ${x + 13} 133.4V138.4Z" fill="#9a9284" stroke="${INK}" stroke-width="1.4"/>` +
+    `<path d="M${x - 1.6} 133.6Q${x + 5} 131.8 ${x + 11.6} 133.6" stroke="#cfc8ba" stroke-width=".9" fill="none"/>`;
   return (
     // Contact shadow.
-    `<ellipse cx="50" cy="136.5" rx="46" ry="3" fill="#000" opacity=".16"/>` +
-    // Posts (기둥) on stone footings.
-    `<rect x="9" y="24" width="10" height="110" fill="${WOOD}" stroke="${INK}" stroke-width="2"/>` +
-    `<rect x="81" y="24" width="10" height="110" fill="${WOOD}" stroke="${INK}" stroke-width="2"/>` +
-    `<path d="M12 30V130M84 30V130" stroke="${WOOD_LIGHT}" stroke-width="1.4" opacity=".75"/>` +
-    `<rect x="6" y="131" width="16" height="7" rx="1.5" fill="#8c857a" stroke="${INK}" stroke-width="1.6"/>` +
-    `<rect x="78" y="131" width="16" height="7" rx="1.5" fill="#8c857a" stroke="${INK}" stroke-width="1.6"/>` +
+    `<ellipse cx="50" cy="137" rx="47" ry="3.2" fill="#000" opacity=".16"/>` +
+    post(9) +
+    post(81) +
     // Threshold (문지방).
     `<rect x="18" y="131.5" width="64" height="4.5" fill="${WOOD_DARK}" stroke="${INK}" stroke-width="1.4"/>` +
-    // Beam (보) under the roof, with a thin painted band.
-    `<rect x="5" y="25" width="90" height="17" fill="${WOOD}" stroke="${INK}" stroke-width="2"/>` +
-    `<path d="M7 29.5H93" stroke="${VERMILION}" stroke-width="1.3" opacity=".7"/>` +
-    `<path d="M7 38H93" stroke="${WOOD_LIGHT}" stroke-width="1.2" opacity=".7"/>` +
-    // Roof and tiles.
-    `<path class="gate__roof" d="${roof}" fill="${ROOF}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` +
-    `<path d="${tiles}" stroke="#5c564e" stroke-width="1.6"/>` +
-    `<path d="M14 12H86" stroke="#6c665d" stroke-width="2.4" stroke-linecap="round"/>` +
-    `<path d="M1 21C7 21 11 18 14 12M99 21C93 21 89 18 86 12" fill="none" stroke="#6c665d" stroke-width="1.2"/>` +
+    // Beam (보) with a dancheong band: green ground, red rules, a lit centre line, bracketed ends.
+    `<rect x="5" y="28" width="90" height="14" fill="${DANCHEONG}" stroke="${INK}" stroke-width="1.8"/>` +
+    `<path d="M6 30.6H94M6 39.4H94" stroke="${VERMILION}" stroke-width="1.5"/>` +
+    `<path d="M6 35H94" stroke="#9cc4b4" stroke-width=".9" opacity=".8"/>` +
+    `<path d="M6 30.6H18L22.5 35L18 39.4H6ZM94 30.6H82L77.5 35L82 39.4H94Z" fill="${VERMILION}" opacity=".85"/>` +
+    `<path d="M8.5 35H17M91.5 35H83" stroke="#f3e2c4" stroke-width="1.1" stroke-linecap="round"/>` +
+    // Roof: soffit, tiles, ribs, eave line, ridge.
+    `<path d="${soffit}" fill="${SOFFIT}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<path d="M4 23.6C10 25.6 15 26.2 20 26.2H80C85 26.2 90 25.6 96 23.6" stroke="${WOOD_LIGHT}" stroke-width="1" fill="none" opacity=".6"/>` +
+    `<path class="gate__roof" d="${roof}" fill="${ROOF}" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>` +
+    `<path d="${ribs}" stroke="#211e1b" stroke-width="1.5" opacity=".7"/>` +
+    `<path d="${lit}" stroke="#8a847a" stroke-width=".9" opacity=".75"/>` +
+    `<path d="M-1 19C6 21.6 12 22.6 19 22.6H81C88 22.6 94 21.6 101 19" stroke="#8f887e" stroke-width="1.1" fill="none"/>` +
+    `<path class="gate__roof" d="${ridge}" fill="${ROOF}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<path d="M14.6 8.6H85.4" stroke="#8f887e" stroke-width=".9"/>` +
     // Name plaque (현판) with the month number.
-    `<rect x="${50 - pw / 2}" y="24" width="${pw}" height="19" rx="2" fill="${PAPER}" stroke="${INK}" stroke-width="1.8"/>` +
-    `<rect x="${50 - pw / 2 + 2}" y="26" width="${pw - 4}" height="15" rx="1" fill="none" stroke="${VERMILION}" stroke-width=".9" opacity=".8"/>` +
-    `<text x="50" y="38.6" text-anchor="middle" font-size="13" font-weight="700" font-family="'Gowun Batang', serif" fill="${INK}">${n}</text>`
+    `<rect x="${50 - pw / 2}" y="25" width="${pw}" height="19" rx="2" fill="${PAPER}" stroke="${INK}" stroke-width="1.8"/>` +
+    `<rect x="${50 - pw / 2 + 2}" y="27" width="${pw - 4}" height="15" rx="1" fill="none" stroke="${VERMILION}" stroke-width=".9" opacity=".8"/>` +
+    `<text x="50" y="39.6" text-anchor="middle" font-size="13" font-weight="700" font-family="'Gowun Batang', serif" fill="${INK}">${n}</text>`
   );
 }
-
 /** A closed gate as one static SVG (map legend, demo boards, still frames). */
 export function gateSvg(month: number): string {
   return `<svg class="gate__art" viewBox="0 0 100 140" aria-hidden="true">${doorPainting(month)}${doorLeaf(-1)}${doorLeaf(1)}${frameMarkup(month)}</svg>`;
@@ -125,31 +153,45 @@ export const gateLabel = (month: number) => `Gate, opens with ${MONTHS[month]?.e
 
 /**
  * One bamboo fence segment from (x1, y1) to (x2, y2) in board pixels, `t` thick:
- * a pale bamboo pole with ink outline, two nodes, a highlight, and a dark post
- * with a twine lashing at each end. Runs of segments join post to post.
+ * a soft shadow, a rounded bamboo pole shaded across its thickness (lit on top,
+ * deeper below), a long highlight, and two swollen nodes, each a darker ring
+ * with a lit lip. Runs of segments join post to post.
  */
 export function fenceSegment(x1: number, y1: number, x2: number, y2: number, t: number): string {
   const len = Math.hypot(x2 - x1, y2 - y1);
   const ang = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
   const f = (v: number) => v.toFixed(1);
   const h = t / 2;
-  const node = (u: number) => `M${f(len * u)} ${f(-h)}V${f(h)}`;
+  const node = (u: number) =>
+    `<rect class="fence__node" x="${f(len * u - t * 0.16)}" y="${f(-h - t * 0.08)}" width="${f(t * 0.32)}" height="${f(t * 1.16)}" rx="${f(t * 0.16)}"/>` +
+    `<path class="fence__node-lip" d="M${f(len * u + t * 0.2)} ${f(-h * 0.7)}V${f(h * 0.5)}"/>`;
   return (
     `<g class="fence" transform="translate(${f(x1)} ${f(y1)}) rotate(${f(ang)})">` +
     `<rect class="fence__shade" x="0" y="${f(-h + t * 0.35)}" width="${f(len)}" height="${f(t)}" rx="${f(h)}"/>` +
     `<rect class="fence__pole" x="0" y="${f(-h)}" width="${f(len)}" height="${f(t)}" rx="${f(h)}"/>` +
-    `<path class="fence__hi" d="M${f(t)} ${f(-h * 0.35)}H${f(len - t)}"/>` +
-    `<path class="fence__node" d="${node(0.34)}${node(0.66)}"/>` +
+    `<path class="fence__hi" d="M${f(t)} ${f(-h * 0.42)}H${f(len * 0.31)}M${f(len * 0.37)} ${f(-h * 0.42)}H${f(len * 0.63)}M${f(len * 0.69)} ${f(-h * 0.42)}H${f(len - t)}"/>` +
+    node(0.34) +
+    node(0.66) +
     `</g>`
   );
 }
 
-/** A fence post (the lashed stake where segments meet). */
+/** A fence post: the cut top of a bamboo stake, its hollow in shadow and a lit rim on the near side. */
 export function fencePost(x: number, y: number, t: number): string {
   const f = (v: number) => v.toFixed(1);
-  const r = t * 0.7;
-  return `<g class="fence-post"><circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}"/><path d="M${f(x - r * 0.75)} ${f(y - r * 0.25)}L${f(x + r * 0.75)} ${f(y + r * 0.25)}M${f(x - r * 0.75)} ${f(y + r * 0.35)}L${f(x + r * 0.75)} ${f(y + r * 0.95)}"/></g>`;
+  const r = t * 0.72;
+  return (
+    `<g class="fence-post"><circle class="fence-post__stake" cx="${f(x)}" cy="${f(y)}" r="${f(r)}"/>` +
+    `<circle class="fence-post__hollow" cx="${f(x + r * 0.08)}" cy="${f(y + r * 0.1)}" r="${f(r * 0.42)}"/>` +
+    `<path d="M${f(x - r * 0.72)} ${f(y + r * 0.2)}A${f(r * 0.75)} ${f(r * 0.75)} 0 0 1 ${f(x + r * 0.2)} ${f(y - r * 0.72)}"/></g>`
+  );
 }
+
+/** Shared gradients for the fence layer (inlined once per board). */
+const FENCE_DEFS =
+  '<defs><linearGradient id="fence-bamboo" x1="0" y1="0" x2="0" y2="1">' +
+  '<stop offset="0" stop-color="#ece0a4"/><stop offset=".4" stop-color="#cdb96e"/><stop offset=".85" stop-color="#9f8b48"/><stop offset="1" stop-color="#8a7840"/>' +
+  '</linearGradient><radialGradient id="fence-stake" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#b58a5a"/><stop offset="1" stop-color="#6e4b30"/></radialGradient></defs>';
 
 /**
  * All of a board's fences as SVG markup, in board pixels. `cell(r, c)` gives a
@@ -193,5 +235,5 @@ export function fencesMarkup(
   }
   let stakes = '';
   for (const [x, y] of posts.values()) stakes += fencePost(x, y, t);
-  return poles + stakes;
+  return poles ? FENCE_DEFS + poles + stakes : '';
 }

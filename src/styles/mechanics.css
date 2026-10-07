@@ -125,49 +125,59 @@
   pointer-events: none;
   z-index: 2;
 }
-.fence__shade {
+.fences .fence__shade {
   fill: rgba(40, 28, 16, 0.3);
 }
-.fence__pole {
-  fill: #c9b870;
+/* Bamboo: shaded across the pole (gradient from the fence layer's defs), a long
+   highlight, swollen nodes with a lit lip, cut-stake posts lashed with twine. */
+.fences .fence__pole {
+  fill: url(#fence-bamboo);
   stroke: #2f2a22;
   stroke-width: 1.1;
 }
-.fence__hi {
+.fences .fence__hi {
   fill: none;
-  stroke: rgba(255, 250, 226, 0.7);
+  stroke: rgba(255, 250, 226, 0.75);
   stroke-width: 1;
   stroke-linecap: round;
 }
-.fence__node {
-  fill: none;
-  stroke: #5a5a2a;
-  stroke-width: 1.5;
+.fences .fence__node {
+  fill: #a8944f;
+  stroke: #3b3420;
+  stroke-width: 0.9;
 }
-.fence-post circle {
-  fill: #6e4b30;
+.fences .fence__node-lip {
+  fill: none;
+  stroke: rgba(255, 246, 210, 0.7);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+}
+.fence-post__stake {
+  fill: url(#fence-stake);
   stroke: #2a2724;
   stroke-width: 1.1;
 }
+.fence-post__hollow {
+  fill: #3a2a1c;
+  opacity: 0.75;
+}
 .fence-post path {
   fill: none;
-  stroke: #e2cf9c;
+  stroke: rgba(240, 222, 170, 0.8);
   stroke-width: 0.9;
   stroke-linecap: round;
 }
-:root[data-theme='ink'] .fence__pole {
-  fill: #c2b46e;
+:root[data-theme='ink'] .fences .fence__pole {
   stroke: #15130f;
 }
-:root[data-theme='ink'] .fence__shade {
+:root[data-theme='ink'] .fences .fence__shade {
   fill: rgba(0, 0, 0, 0.5);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='paper']):not([data-theme='light']) .fence__pole {
-    fill: #c2b46e;
+  :root:not([data-theme='paper']):not([data-theme='light']) .fences .fence__pole {
     stroke: #15130f;
   }
-  :root:not([data-theme='paper']):not([data-theme='light']) .fence__shade {
+  :root:not([data-theme='paper']):not([data-theme='light']) .fences .fence__shade {
     fill: rgba(0, 0, 0, 0.5);
   }
 }

@@ -800,46 +800,64 @@ function bonusInner(id: number, look?: CardLook): string {
   );
 }
 
-/** A card under snow (First snow levels): pale sky, soft drifts, one crystal. */
+/**
+ * A card under snow (First snow levels): a pale winter sky, three wind-carved
+ * drifts lit on their crests and shadowed blue under each lip, one dendrite
+ * crystal resting in the middle and two small crystals still falling.
+ */
 export function cardSnowInner(): string {
-  const r = rng(77);
-  let crystal = '';
-  for (let k = 0; k < 6; k++) {
-    const a = (k * Math.PI) / 3 - Math.PI / 2;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    crystal += `M50 54L${f(50 + ca * 15)} ${f(54 + sa * 15)}`;
-    for (const [d, l] of [[6, 4], [10, 3]] as const) {
-      const bx = 50 + ca * d;
-      const by = 54 + sa * d;
-      for (const s of [-1, 1]) {
-        const b = a + (s * Math.PI) / 3;
-        crystal += `M${f(bx)} ${f(by)}L${f(bx + Math.cos(b) * l)} ${f(by + Math.sin(b) * l)}`;
+  // A six-armed dendrite: tapered arms with two pairs of side branches each.
+  const crystal = (cx: number, cy: number, R: number, side: boolean) => {
+    let d = '';
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3 - Math.PI / 2;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      d += taper([[cx + ca * R * 0.16, cy + sa * R * 0.16], [cx + ca * R, cy + sa * R]], lin(R * 0.13, R * 0.03), 2);
+      if (!side) continue;
+      for (const [t, l] of [[0.42, 0.3], [0.68, 0.22]] as const) {
+        const bx = cx + ca * R * t;
+        const by = cy + sa * R * t;
+        for (const sg of [-1, 1]) {
+          const b = a + (sg * Math.PI) / 3;
+          d += taper([[bx, by], [bx + Math.cos(b) * R * l, by + Math.sin(b) * R * l]], lin(R * 0.08, R * 0.02), 2);
+        }
       }
     }
-  }
+    return d;
+  };
   let hex = '';
   for (let k = 0; k <= 6; k++) {
     const a = (k * Math.PI) / 3 - Math.PI / 2;
-    hex += `${k ? 'L' : 'M'}${f(50 + Math.cos(a) * 3)} ${f(54 + Math.sin(a) * 3)}`;
+    hex += `${k ? 'L' : 'M'}${f(50 + Math.cos(a) * 3.6)} ${f(52 + Math.sin(a) * 3.6)}`;
   }
-  let flakes = '';
-  for (let i = 0; i < 26; i++) flakes += C(6 + r() * 88, 8 + r() * 86, 0.5 + r() * 1.1, '#ffffff', O(0.6 + r() * 0.4));
+  // Wind-lit crests and shadowed lips of the drifts, as brush strokes.
+  const lit = taper([[8, 97], [24, 90.5], [40, 92], [54, 96.5]], blade(1.6, 0.4)) + taper([[46, 114.5], [66, 108], [92, 110]], blade(1.8, 0.45));
+  const lips =
+    taper([[30, 101], [44, 99.4], [58, 103]], blade(1.5, 0.5)) +
+    taper([[56, 98.6], [72, 94.4], [90, 95.6]], blade(1.2, 0.5)) +
+    taper([[16, 121], [34, 117.6], [50, 120.5]], blade(1.6, 0.5));
   return (
     cardBase('#e6edf2') +
     `<g clip-path="url(#card-clip)">` +
     `<rect x="4" y="4" width="92" height="132" fill="url(#snow-sky)"/>` +
-    P('M4 92Q26 82 46 88T96 84L96 136L4 136Z', '#dbe4ec') +
-    flakes +
-    P('M4 100Q30 88 52 98T96 94L96 136L4 136Z', '#f6f9fb') +
-    S('M4 100Q30 88 52 98T96 94', '#ffffff', 1) +
-    P('M30 106Q52 100 70 108Q60 106 50 108Q40 106 30 106Z', '#d4dfe8', O(0.8)) +
-    P('M4 118Q36 106 64 116T96 114L96 136L4 136Z', '#ffffff') +
-    P('M4 136L4 126Q30 120 48 128Q30 126 4 136Z', '#dde6ee', O(0.7)) +
-    C(50, 54, 24, 'url(#snow-glow)') +
-    S(crystal, '#93a9bc', 1.1) +
-    S(hex, '#93a9bc', 0.6) +
-    C(50, 54, 1, '#93a9bc') +
+    // a far snowy ridge, its shaded flank and the snow line
+    P('M4 80Q18 70 30 74Q42 64 56 70Q72 62 96 72V136H4Z', '#dde6ee') +
+    P('M56 70Q64 72 70 80Q62 76 54 78Q58 74 56 70Z', '#c4d2df', O(0.7)) +
+    // drifts, back to front, each shading from a lit crest into a blue hollow
+    P('M4 98Q24 88 44 94Q62 99 96 90V136H4Z', 'url(#snow-drift)') +
+    P('M4 103Q28 96 46 101Q66 106 96 98V136H4Z', '#eef3f7') +
+    P(lips, '#b9c9d8', O(0.75)) +
+    P('M4 118Q30 110 52 116Q72 120 96 108V136H4Z', 'url(#snow-drift)') +
+    P('M4 124Q36 116 60 122Q80 126 96 120V136H4Z', '#ffffff') +
+    P(lit, '#ffffff', O(0.9)) +
+    // the resting crystal: a soft glow, a pale plate and the dendrite arms
+    C(50, 52, 26, 'url(#snow-glow)') +
+    P(hex + 'Z', '#dbe5ee') +
+    P(crystal(50, 52, 17, true), '#8ea6bb') +
+    S(hex, '#8ea6bb', 0.6) +
+    // two small crystals falling
+    P(crystal(23, 27, 4.2, false) + crystal(79, 74, 3.2, false), '#a9bccc', O(0.85)) +
     `</g>` +
     cardFinish
   );
@@ -931,12 +949,13 @@ export function spriteDefs(): string {
     '<linearGradient id="sky-storm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f5a66" stop-opacity=".55"/><stop offset=".55" stop-color="#55606a" stop-opacity="0"/></linearGradient>' +
     '<linearGradient id="snow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9e3eb"/><stop offset="1" stop-color="#eef3f6"/></linearGradient>' +
     '<radialGradient id="snow-glow"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="snow-drift" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfdfe"/><stop offset=".3" stop-color="#e7eef4"/><stop offset="1" stop-color="#c9d6e2"/></linearGradient>' +
     '<radialGradient id="back-glow" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#4a5d8f" stop-opacity=".35"/><stop offset=".6" stop-color="#28334f" stop-opacity="0"/><stop offset="1" stop-color="#0d1322" stop-opacity=".45"/></radialGradient>' +
     '</defs>'
   );
 }
 
-const SNOW_DEFS = /<(linearGradient|radialGradient) id="snow-(?:sky|glow)".*?<\/\1>/g;
+const SNOW_DEFS = /<(linearGradient|radialGradient) id="snow-(?:sky|glow|drift)".*?<\/\1>/g;
 
 /** The month motif markup (unpainted, cached). */
 export const motifMarkup = motif;
