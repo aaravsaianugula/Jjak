@@ -38,12 +38,16 @@ first purchase happens in the first session.
 
 - **Events:** `src/services/events.ts` has `on('pair' | 'clear' | 'rush' | 'tool' | 'start', fn)`, emitted
   by the game screen. Features subscribe instead of editing the game loop.
-- **Save slices:** `save.journey`, `save.market`, `save.meta`, each with its own type, default and
+- **Save slices:** `save.journey`, `save.market`, `save.meta`, `save.garden`, each with its own type, default and
   hydrate in `src/services/save-*.ts`.
 - **Item keys:** `${category}:${id}`, e.g. `deck:sumi`, `back:seigaiha`, `garden:koi`.
   `save.market.owned` and `save.market.equip`.
 - **Art APIs:** `DECK_STYLES`, `CARD_BACKS`, `applyDeckStyle`, `applyCardBack` and `foilOverlay` are in
-  `src/art/styles.ts`. `GARDEN_ITEMS` and `gardenSvg` are in `src/art/garden.ts`. `cardSvg(id, cls, { foil })`.
+  `src/art/styles.ts`, plus `cardPreviewSvg(id, style)` and `cardBackPreviewSvg(back)` for the Market. `GARDEN_ITEMS`,
+  `gardenSvg` and `gardenItemSvg` are in `src/art/garden.ts`. `cardSvg(id, cls, { foil })`.
+- **Streak freeze:** `save.streakFreezes` (Warm tea). The Market sells it and the progression feature consumes it.
+- **Flower Path exclusives** (not sold for petals, granted by rank): `back:moon` r25, `brush:gold` r40,
+  `garden:crane` r55, `deck:gilded` r70, `fx:gold` r85, `music:moonlight` r100. **Supporter pack** (IAP) exclusive: `back:clouds`.
 - **Bonus cards:** ids 48/49 (`BONUS_IDS`, `isBonus`, `BONUS_MONTH` in `src/data/deck.ts`), month 12.
 - **Routes:** `nav.market(tab?)`, `nav.garden()` and `nav.path()` (Flower Path + missions).
 

@@ -1,6 +1,7 @@
 import { Preferences } from '@capacitor/preferences';
 import { ECONOMY } from '../config';
 import { type JourneySave, defaultJourney, hydrateJourney } from './save-journey';
+import { type GardenSave, defaultGarden, hydrateGarden } from './save-garden';
 import { type MarketSave, defaultMarket, hydrateMarket } from './save-market';
 import { type MetaSave, defaultMeta, hydrateMeta } from './save-meta';
 
@@ -25,6 +26,8 @@ export interface SaveData {
   petals: number;
   hints: number;
   shuffles: number;
+  /** "Warm tea": each one keeps the Daily streak alive through one missed day */
+  streakFreezes: number;
   album: number[];
   daily: { streak: number; best: number; lastDate: string | null; results: Record<string, DailyResult> };
   settings: { sound: boolean; music: boolean; haptics: boolean; theme: Theme };
@@ -66,6 +69,7 @@ export interface SaveData {
   seenTips: string[];
   /** feature slices — each owns its own file (save-*.ts) */
   journey: JourneySave;
+  garden: GardenSave;
   market: MarketSave;
   meta: MetaSave;
 }
@@ -81,6 +85,7 @@ export const defaultSave = (): SaveData => ({
   petals: 0,
   hints: ECONOMY.startHints,
   shuffles: ECONOMY.startShuffles,
+  streakFreezes: 0,
   album: [],
   daily: { streak: 0, best: 0, lastDate: null, results: {} },
   settings: { sound: true, music: true, haptics: true, theme: 'auto' },
@@ -95,6 +100,7 @@ export const defaultSave = (): SaveData => ({
   gift: { day: 0, lastClaim: null },
   seenTips: [],
   journey: defaultJourney(),
+  garden: defaultGarden(),
   market: defaultMarket(),
   meta: defaultMeta(),
 });
@@ -116,6 +122,7 @@ function hydrate(raw: unknown): SaveData {
     gift: { ...base.gift, ...(r.gift ?? {}) },
     reminder: { ...base.reminder, ...(r.reminder ?? {}) },
     journey: hydrateJourney(r.journey),
+    garden: hydrateGarden(r.garden),
     market: hydrateMarket(r.market),
     meta: hydrateMeta(r.meta),
   };

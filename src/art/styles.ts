@@ -50,3 +50,18 @@ export function applyCardBack(id: string): void {
 export function foilOverlay(): string {
   return '<rect x="3" y="3" width="94" height="134" rx="6" fill="none" stroke="#c9a24a" stroke-width="2.4" class="foil-edge"/>';
 }
+
+/**
+ * Standalone preview of one card painted in any deck style (for the Market),
+ * independent of the sprite currently installed. Stub: the active sprite.
+ */
+export function cardPreviewSvg(id: number, styleId: string): string {
+  void styleId;
+  return `<svg class="card-art" viewBox="0 0 100 140" aria-hidden="true"><use href="#card-${id}"/></svg>`;
+}
+
+/** Standalone preview of a card back (for the Market). Stub: the active back. */
+export function cardBackPreviewSvg(backId: string): string {
+  void backId;
+  return '<svg class="card-art" viewBox="0 0 100 140" aria-hidden="true"><use href="#card-back"/></svg>';
+}

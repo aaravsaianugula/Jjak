@@ -53,3 +53,8 @@ export function gardenSvg(season: number, items: readonly string[]): string {
     .join('');
   return `<svg class="garden-art" viewBox="0 0 360 300" role="img" aria-label="Your garden"><rect width="360" height="300" fill="${tint}"/>${labels}</svg>`;
 }
+
+/** One item on its own (viewBox 0 0 120 120) for Market tiles. Stub. */
+export function gardenItemSvg(id: string): string {
+  return `<svg class="garden-item-art" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="40" fill="#d8cdb8"/><text x="60" y="64" font-size="11" text-anchor="middle" fill="#2a2724">${id}</text></svg>`;
+}
