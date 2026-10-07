@@ -16,7 +16,7 @@ import { breeze, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windVane
 import { type IntroId, contextOf, introFor, openIntro, replayIntroFor, tipKey } from '../intros';
 import { COMBO_WINDOW_MS, FEVER_MS, LUCKY_PETALS, Session, formatTime, thirdStar } from '../../engine/session';
 import { type Yaku, possibleYaku } from '../../engine/yaku';
-import { checkSeals, type Seal } from '../../services/achievements';
+import { checkSeals, sealToast, type Seal } from '../../services/achievements';
 import { emit } from '../../services/events';
 import { ads } from '../../services/ads';
 import { sfx, unlockAudio } from '../../services/audio';
@@ -1590,7 +1590,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           if (extra != null) {
             more.replaceWith(drawPanel(extra, 'Bonus card'));
             const won = checkSeals();
-            if (won.length) toast(`Seal earned: ${won.map((w) => w.title).join(', ')}`);
+            if (won.length) toast(sealToast(won));
           }
         } else more.removeAttribute('disabled');
       });
