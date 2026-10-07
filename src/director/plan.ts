@@ -78,8 +78,8 @@ export type KnobId = keyof Knobs;
 
 const MECH_ORDER: Mechanic[] = ['stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences'];
 /** Partner ideas drawn from the bag (stones are the quiet background, lucky has its own slots). */
-const PARTNERS: Mechanic[] = ['leaves', 'snow', 'knots', 'wind', 'gates', 'fences'];
-const WIND_CYCLE: Wind[] = ['right', 'up', 'left'];
+export const PARTNERS: Mechanic[] = ['leaves', 'snow', 'knots', 'wind', 'gates', 'fences'];
+export const WIND_CYCLE: Wind[] = ['right', 'up', 'left'];
 const slides = (m: Mechanic) => m === 'leaves' || m === 'wind';
 /** Same rule as MECHANICS[*].clashes (checked by a test): sliding never meets snow, fences or the other slide. */
 export const clashes = (a: Mechanic, b: Mechanic): boolean =>
@@ -99,7 +99,7 @@ const CHAPTER_SHAPES: [number, number][] = [
   [6, 6], [8, 5], [7, 6], [8, 6], [8, 6], [8, 6],
 ];
 /** Size classes, small to large; two shapes each so neighbours don't look alike. */
-const SIZES: [number, number][][] = [
+export const SIZES: [number, number][][] = [
   [[6, 4], [7, 4]], // 24–28 cards
   [[6, 5], [7, 4]], // 28–30
   [[6, 5], [6, 6]], // 30–36
@@ -442,7 +442,7 @@ export function planSpec(p: LevelPlan, k: Knobs, seed: string, tier?: number): L
 }
 
 /** Par from the identity: the middle tier's pair count, the moving/covered extras, festival room. */
-function parOf(id: Identity, pairs: number): number {
+export function parOf(id: Pick<Identity, 'mechanics' | 'wind' | 'festival' | 'year'>, pairs: number): number {
   const m = id.mechanics;
   const extra = Math.min(20, (id.wind ? 10 : 0) + (m.includes('snow') ? 10 : 0) + (m.includes('knots') ? 10 : 0)) + (id.festival ? 15 : 0);
   return Math.max(parFor(pairs), parFor(pairs) + extra - 5 * Math.min(id.year, 2));

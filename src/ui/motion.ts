@@ -5,12 +5,60 @@
 
 export const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Re-run a one-shot CSS animation class. */
+const pending = new WeakMap<Element, Map<string, number>>();
+/**
+ * Re-run a one-shot CSS animation class without forcing a synchronous reflow
+ * (reading offsetWidth mid-frame cost a full style + layout pass per call on
+ * the board). A class that isn't on yet is simply added; one that is comes off
+ * for a frame and goes back on, so the animation starts over.
+ */
 export function retrigger(node: Element | null | undefined, cls: string): void {
   if (!node) return;
+  let map = pending.get(node);
+  const was = map?.get(cls);
+  if (was) cancelAnimationFrame(was);
+  if (!node.classList.contains(cls) && !was) {
+    node.classList.add(cls);
+    return;
+  }
   node.classList.remove(cls);
-  void (node as HTMLElement).offsetWidth;
-  node.classList.add(cls);
+  if (!map) pending.set(node, (map = new Map()));
+  const m = map;
+  const id = requestAnimationFrame(() => {
+    m.set(cls, requestAnimationFrame(() => {
+      m.delete(cls);
+      node.classList.add(cls);
+    }));
+  });
+  m.set(cls, id);
+}
+
+/**
+ * Start running CSS animations (by keyframes name, on `node` and its subtree,
+ * pseudo-elements included) over from the top, in place: no class toggling,
+ * so nothing blinks for a frame. Returns false if none were running.
+ */
+export function restartAnimations(node: Element | null | undefined, names: string[]): boolean {
+  if (!node || typeof node.getAnimations !== 'function') return false;
+  const anims = node
+    .getAnimations({ subtree: true })
+    .filter((a): a is CSSAnimation => typeof CSSAnimation !== 'undefined' && a instanceof CSSAnimation && names.includes(a.animationName));
+  for (const a of anims) {
+    a.currentTime = 0;
+    a.play();
+  }
+  return anims.length > 0;
+}
+
+/** Drop a pending retrigger and the class itself (e.g. a shake on a card that was just selected). */
+export function untrigger(node: Element | null | undefined, cls: string): void {
+  if (!node) return;
+  const id = pending.get(node)?.get(cls);
+  if (id) {
+    cancelAnimationFrame(id);
+    pending.get(node)!.delete(cls);
+  }
+  node.classList.remove(cls);
 }
 
 const easeOut = (k: number) => 1 - (1 - k) ** 3;
@@ -79,4 +127,93 @@ export function flip(before: Map<HTMLElement, number>, ms = 320): void {
   setTimeout(() => {
     for (const n of moved) n.style.transition = '';
   }, ms + 40);
+}
+
+/**
+ * Segmented control: one raised pill under the pressed button that slides to
+ * the new choice (transform only; its width is set at once and counter-scaled).
+ * Call after updating `aria-pressed`. Safe before the control is in the page.
+ */
+export function slidePill(seg: HTMLElement | null | undefined): void {
+  if (!seg) return;
+  let pill = seg.querySelector<HTMLElement>(':scope > .seg__pill');
+  if (!pill) {
+    pill = document.createElement('span');
+    pill.className = 'seg__pill';
+    pill.setAttribute('aria-hidden', 'true');
+    seg.prepend(pill);
+    seg.classList.add('has-pill');
+  }
+  const on = seg.querySelector<HTMLElement>(':scope > [aria-pressed="true"]');
+  if (!on) {
+    pill.style.opacity = '0';
+    return;
+  }
+  if (!seg.isConnected || !on.offsetWidth) {
+    requestAnimationFrame(() => seg.isConnected && slidePill(seg));
+    return;
+  }
+  const x = on.offsetLeft;
+  const w = on.offsetWidth;
+  const prev = pill.dataset.x != null ? { x: Number(pill.dataset.x), w: Number(pill.dataset.w) } : null;
+  pill.dataset.x = String(x);
+  pill.dataset.w = String(w);
+  pill.style.width = `${w}px`;
+  pill.style.opacity = '1';
+  if (!prev || reducedMotion() || (prev.x === x && prev.w === w)) {
+    pill.style.transition = 'none';
+    pill.style.transform = `translateX(${x}px)`;
+    return;
+  }
+  pill.style.transition = 'none';
+  pill.style.transform = `translateX(${prev.x}px) scaleX(${prev.w / w})`;
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      pill!.style.transition = '';
+      pill!.style.transform = `translateX(${x}px)`;
+    }),
+  );
+}
+
+/**
+ * Shared-element hand-off: a copy of `from` (a thumbnail) lifts out of its
+ * place and flies into `to` (the same card in a sheet that is opening), which
+ * appears when it lands. `sheet` is the opening sheet: its entrance is paused
+ * for one measurement so the flight aims at where the card will settle.
+ */
+export function flyInto(from: Element, to: HTMLElement, sheet: HTMLElement, ms = 420): void {
+  if (reducedMotion() || typeof to.animate !== 'function') return;
+  const a = from.getBoundingClientRect();
+  if (!a.width) return;
+  sheet.style.animation = 'none';
+  to.style.animation = 'none';
+  const b = to.getBoundingClientRect();
+  sheet.style.animation = '';
+  if (!b.width) return;
+  const fly = document.createElement('div');
+  fly.className = 'fly-card';
+  fly.setAttribute('aria-hidden', 'true');
+  fly.innerHTML = to.innerHTML;
+  Object.assign(fly.style, { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px` });
+  document.body.append(fly);
+  to.style.opacity = '0';
+  (from as HTMLElement).style.visibility = 'hidden';
+  const s = a.width / b.width;
+  const dx = a.left - b.left;
+  const dy = a.top - b.top;
+  const anim = fly.animate(
+    [
+      { transform: `translate(${dx}px, ${dy}px) scale(${s})` },
+      { transform: `translate(${dx * 0.42}px, ${dy * 0.42 - 10}px) scale(${(s + 1) / 2 + 0.02}) rotate(-1.5deg)`, offset: 0.55 },
+      { transform: 'none' },
+    ],
+    { duration: ms, easing: 'cubic-bezier(0.3, 0.7, 0.25, 1)' },
+  );
+  const done = () => {
+    to.style.opacity = '';
+    (from as HTMLElement).style.visibility = '';
+    fly.remove();
+  };
+  anim.onfinish = done;
+  anim.oncancel = done;
 }

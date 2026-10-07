@@ -20,7 +20,7 @@ import { type Wind, applyGravity, findMove } from '../src/engine/moves';
 import { createRng } from '../src/engine/rng';
 import { LUCKY_PETALS, LUCKY_SCORE, Session } from '../src/engine/session';
 import { possibleYaku, newYaku } from '../src/engine/yaku';
-import { defaultJourney, hydrateJourney } from '../src/services/save-journey';
+import { defaultEndless, defaultJourney, hydrateJourney } from '../src/services/save-journey';
 
 const grid = (rows: string[]): Board => {
   // '.' empty, '#' stone, digit/letter = month (card id = month * 4)
@@ -451,6 +451,22 @@ describe('solvability fuzz across the mechanics', () => {
     expect(out.cells.filter(isCard).sort()).toEqual([32, 35]);
   });
 
+  it('a shuffle that re-deals onto other cells says so and frees snow and knots (they cannot follow a card)', () => {
+    const cells = new Array(48).fill(EMPTY);
+    for (const i of [10, 13, 15, 32, 34, 39]) cells[i] = STONE;
+    cells[33] = 35;
+    cells[44] = 32;
+    const s = new Session(spec({ rows: 8, cols: 6, seed: 'pocket' }), 0, { rows: 8, cols: 6, cells });
+    s.hidden.add(33);
+    s.knots.add(44);
+    s.shuffle();
+    expect(s.relaid).toBe(true);
+    expect(s.hidden.size + s.knots.size).toBe(0);
+    // Every lock left refers to a cell that still holds a card.
+    for (const i of [...s.hidden, ...s.knots]) expect(isCard(s.board.cells[i])).toBe(true);
+    expect(s.findMove()).not.toBeNull();
+  });
+
   it('solvable-by-construction still holds for boards built with lucky cards', () => {
     for (let k = 0; k < 120; k++) {
       const rng = createRng(`luckgen-${k}`);
@@ -470,7 +486,7 @@ describe('solvability fuzz across the mechanics', () => {
 describe('journey save slice and stamps', () => {
   it('hydrates old and broken slices', () => {
     expect(hydrateJourney(undefined)).toEqual(defaultJourney());
-    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false });
+    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false, endless: defaultEndless() });
     const h = hydrateJourney({ v: 1, stamps: { gyeongju: '2026-10-07', bad: 3 }, luckyPairs: -2, luckyPetals: 30 });
     expect(h.stamps).toEqual({ gyeongju: '2026-10-07' });
     expect(h.luckyPairs).toBe(0);
@@ -495,7 +511,7 @@ describe('journey save slice and stamps', () => {
 });
 
 describe('recordClear: lucky petals and passport stamps', () => {
-  it('credits lucky petals and stamps the place on the first festival clear only', async () => {
+  it('credits lucky petals and stamps the place on the first festival clear only (no farming on replays)', async () => {
     const { save } = await import('../src/services/storage');
     const { recordClear, syncStamps } = await import('../src/services/progress');
     save.journey = defaultJourney();
@@ -520,7 +536,10 @@ describe('recordClear: lucky petals and passport stamps', () => {
     expect(save.petals).toBeGreaterThanOrEqual(first.petals + LUCKY_PETALS);
     const again = play();
     expect(again.stamp).toBeUndefined(); // one stamp per place
-    expect(again.lucky).toBe(LUCKY_PETALS);
+    // Replays can't be farmed: the lucky pair still counts, but petals came with the first clear.
+    expect(again.lucky).toBeUndefined();
+    expect(save.journey.luckyPairs).toBe(2);
+    expect(save.journey.luckyPetals).toBe(LUCKY_PETALS);
     // Older saves: festival boards cleared before stamps existed get theirs back.
     save.stars[24] = 2;
     expect(syncStamps()).toBe(1);

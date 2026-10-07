@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="jjak_background">#1C1B19</color>
+    <color name="jjak_ink">#EEE6D7</color>
+    <color name="colorPrimary">#BF4A31</color>
+    <color name="colorPrimaryDark">#1C1B19</color>
+    <color name="colorAccent">#BF4A31</color>
+    <bool name="jjak_light_bars">false</bool>
+</resources>

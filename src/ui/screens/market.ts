@@ -467,7 +467,7 @@ export function marketScreen(tab?: string): Screen {
       list.forEach((it, i) => {
         const tile = tileFor(it, isNew(it));
         // The first tiles of a new section follow it in, one after another.
-        if (changed && i < 6) {
+        if (changed && i < 4) {
           tile.classList.add('is-stagger');
           tile.style.setProperty('--i', String(i));
         }

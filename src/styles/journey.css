@@ -338,6 +338,14 @@
     transform: translateY(-8px);
   }
 }
+/* Closing: the levels fold up and fade before the stops below glide back. */
+.stop__body.is-out {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 140ms ease-in,
+    transform 150ms var(--ease-in);
+}
 .stop__postcard {
   margin: 0 2px 10px;
   padding-left: 10px;
@@ -521,13 +529,7 @@
 }
 
 /* ───────────────────────────── Game: wind ───────────────────────────── */
-/* Cards drift sideways or up: slide on both axes (falling leaves keep main.css's top-only slide). */
-.game .card.is-drift {
-  transition:
-    left 360ms cubic-bezier(0.3, 0.7, 0.3, 1.08),
-    top 360ms cubic-bezier(0.3, 0.7, 0.3, 1.08),
-    transform 160ms ease;
-}
+/* Cards drift sideways or up on `translate` (.is-sliding in game.css). */
 .breeze {
   position: absolute;
   inset: 0;
@@ -775,20 +777,24 @@
   width: 84px;
   height: 84px;
   transform: rotate(var(--tilt, 0deg));
-  animation: stamp-thunk 560ms cubic-bezier(0.3, 1.5, 0.45, 1) var(--stamp-at, 600ms) both;
+  animation: stamp-thunk 520ms linear var(--stamp-at, 600ms) both;
 }
 .passport__stamp .stamp-art {
   width: 100%;
   height: 100%;
 }
+/* Thunk: the stamp drops (accelerating), meets the page a hair small, and settles;
+   the ink bleed below starts at the moment of contact (half-way). */
 @keyframes stamp-thunk {
   0% {
     opacity: 0;
-    transform: translateY(-14px) scale(1.9) rotate(calc(var(--tilt, 0deg) - 10deg));
+    transform: translateY(-12px) scale(1.6) rotate(calc(var(--tilt, 0deg) - 8deg));
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
   }
-  55% {
+  50% {
     opacity: 1;
-    transform: scale(0.94) rotate(var(--tilt, 0deg));
+    transform: scale(0.95) rotate(var(--tilt, 0deg));
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   100% {
     opacity: 1;
@@ -874,9 +880,6 @@
   }
   .passport__bleed {
     display: none;
-  }
-  .game .card.is-drift {
-    transition: none;
   }
 }
 
@@ -1051,7 +1054,7 @@
 }
 
 /* The road: a verge wash, packed earth with a lighter crown, ruts, paving stones,
-   tapered brush edges, grass and pebbles. It draws itself from the stamp to the pass. */
+   dry-brush strokes, tapered brush edges and grass. It draws itself from the stamp to the pass. */
 .rv-road__verge {
   fill: var(--rv-line);
   opacity: 0.12;
@@ -1064,25 +1067,24 @@
   fill: var(--rv-road-hi);
   opacity: 0.6;
 }
-.rv-road__rut {
-  fill: none;
-  stroke: var(--rv-line);
-  stroke-width: 0.9;
-  stroke-linecap: round;
-  stroke-dasharray: 14 5 3 6;
-  opacity: 0.22;
-}
-.rv-road__stones path {
-  fill: var(--rv-stone);
-  fill-opacity: 0.55;
-  stroke: var(--rv-line);
-  stroke-width: 0.5;
-  stroke-opacity: 0.22;
-  stroke-linejoin: round;
-}
 .rv-road__edge {
   fill: var(--rv-line);
   opacity: 0.78;
+}
+.rv-road__shade {
+  fill: var(--rv-line);
+  opacity: 0.1;
+}
+.rv-road__dry {
+  fill: var(--rv-line);
+  opacity: 0.16;
+}
+.rv-road__dry--soft {
+  opacity: 0.08;
+}
+.rv-road__glint {
+  fill: var(--rv-road-hi);
+  opacity: 0.5;
 }
 .rv-road__tufts path {
   fill: none;
@@ -1090,10 +1092,6 @@
   stroke-width: 0.9;
   stroke-linecap: round;
   opacity: 0.75;
-}
-.rv-road__pebbles ellipse {
-  fill: var(--rv-line);
-  opacity: 0.5;
 }
 .rv-road--far .rv-road__edge {
   opacity: 0.6;
@@ -1177,16 +1175,20 @@
   stroke-dashoffset: 0;
 }
 /* Waypoints: places walked are inked; past the stamp they are only outlines. */
-.rv-mark path,
-.rv-mark ellipse {
-  fill: none;
+.rv-mark path {
+  fill: color-mix(in srgb, var(--rv-line) 22%, transparent);
   stroke: var(--rv-line);
-  stroke-width: 1.1;
-  stroke-dasharray: 2.4 1.8;
+  stroke-width: 0.9;
+  stroke-opacity: 0.55;
+}
+.rv-mark ellipse {
+  fill: var(--rv-line);
+  opacity: 0.18;
+  stroke: none;
 }
 .rv-mark.is-done path {
   fill: var(--rv-line);
-  stroke-dasharray: none;
+  stroke: none;
 }
 .rv-mark.is-done ellipse {
   fill: var(--rv-line);
@@ -1235,7 +1237,7 @@
 }
 @keyframes rv-fly {
   to {
-    transform: translate(70px, 46px) scale(0.86);
+    transform: translate(64px, 22px) scale(0.86);
   }
 }
 @keyframes rv-flap {
@@ -1251,11 +1253,12 @@
 }
 .reveal__petals i {
   position: absolute;
-  top: -12px;
-  width: 7px;
-  height: 5px;
-  border-radius: 60% 40% 60% 40%;
-  background: #e8a7b2;
+  top: -14px;
+  width: 11px;
+  height: 10px;
+  /* A cherry petal: rounded, with the little notch at its tip. */
+  clip-path: path('M5.5 10C2.2 9.4 0 6.6 0.5 3.6C0.9 1.4 2.4 0.2 3.9 0.5L5.5 2.2L7.1 0.5C8.6 0.2 10.1 1.4 10.5 3.6C11 6.6 8.8 9.4 5.5 10Z');
+  background: linear-gradient(160deg, #f6d3d9, #e29aa8);
   opacity: 0;
 }
 .reveal.is-on .reveal__petals i {
@@ -1368,8 +1371,10 @@
 .reveal__slot i {
   width: 44px;
   height: 44px;
-  border: 1.6px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+  border: 1.2px solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 7%, transparent) 55%, transparent 72%);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .reveal__slot b {
   display: block;
@@ -1456,5 +1461,56 @@
   }
   .reveal__petals {
     display: none;
+  }
+}
+
+/* ───────────────────────────── Preparing the road (an endless board still being made) ───────────────────────────── */
+.road-wait {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 28px);
+  z-index: 55;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  transform: translateX(-50%);
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+}
+.road-wait.is-on {
+  opacity: 1;
+}
+.road-wait__line {
+  display: block;
+  width: 72px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+  opacity: 0.55;
+  transform-origin: left center;
+  animation: road-wait 1.6s var(--ease-out) infinite;
+}
+@keyframes road-wait {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scaleX(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .road-wait__line {
+    animation: none;
   }
 }

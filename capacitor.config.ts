@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appId: 'com.jjak.puzzle',
   appName: 'Jjak',
   webDir: 'dist',
-  backgroundColor: '#f3ecdf',
+  // No fixed background: MainActivity paints Paper or Ink from the player's theme
+  // (or the phone's light/dark setting) before the page draws.
   android: {
     allowMixedContent: false,
     webContentsDebuggingEnabled: false,
@@ -14,7 +15,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 1500,
       launchAutoHide: false,
-      backgroundColor: '#f3ecdf',
+      // The splash follows the system theme natively (Theme.SplashScreen colours + drawable-night).
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
     },

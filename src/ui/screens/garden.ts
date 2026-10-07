@@ -21,7 +21,7 @@ import { type Screen } from '../app';
 import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
-import { petalBump } from '../motion';
+import { petalBump, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 const SEASONS = [
@@ -87,7 +87,9 @@ export function gardenScreen(): Screen {
   const visitFits = (visit: { visitor: { seasons?: number[] } }) => !visit.visitor.seasons || visit.visitor.seasons.includes(season);
 
   /* ── the scene ── */
-  const renderScene = () => {
+  const renderScene = (fade = false) => {
+    // A season or time change dissolves the old scene over the new one (ids are unique per render).
+    const was = fade && !reducedMotion() ? sceneEl.querySelector('.garden-art') : null;
     const visit = todaysVisit();
     const shown = shownPieces();
     sceneEl.dataset.season = String(season);
@@ -101,6 +103,15 @@ export function gardenScreen(): Screen {
     sceneEl.innerHTML = `${svg}<div class="gd-particles" aria-hidden="true">${particles(season, night)}</div>`;
     sceneEl.querySelector('svg')?.setAttribute('aria-label', sceneLabel(shown, season, night));
     for (const id of fresh) sceneEl.querySelector(`[data-item="${id}"]`)?.classList.add('is-new');
+    if (was) {
+      const veil = document.createElement('div');
+      veil.className = 'gd-was';
+      veil.setAttribute('aria-hidden', 'true');
+      veil.append(was);
+      sceneEl.append(veil);
+      veil.addEventListener('animationend', () => veil.remove(), { once: true });
+      setTimeout(() => veil.remove(), 900);
+    }
   };
 
   /* ── the lines under the scene ── */
@@ -248,7 +259,7 @@ export function gardenScreen(): Screen {
     sfx.tap();
     el.querySelectorAll<HTMLElement>('.gd-seasons button').forEach((x) => x.setAttribute('aria-pressed', String(Number(x.dataset.season) === season)));
     fresh = [];
-    renderScene();
+    renderScene(true);
     renderInfo();
   };
   el.querySelector('.gd-seasons')!.addEventListener('click', (e) => {
@@ -263,7 +274,7 @@ export function gardenScreen(): Screen {
     timeBtn.setAttribute('aria-pressed', String(night));
     timeBtn.innerHTML = night ? MOON : SUN;
     fresh = [];
-    renderScene();
+    renderScene(true);
   });
 
   sceneEl.addEventListener('click', (e) => {

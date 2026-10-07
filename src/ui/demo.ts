@@ -19,6 +19,7 @@ import { unlockAudio, sfx } from '../services/audio';
 import { haptic } from '../services/haptics';
 import { type DemoEvent, type DemoScript, type Ghost, DemoRun, ghostPath, pairProblem, turnPairs } from './demo-model';
 import { h } from './dom';
+import { reducedMotion, restartAnimations, retrigger } from './motion';
 import { ICONS } from './icons';
 import { KNOT_SVG } from './journey-fx';
 
@@ -28,14 +29,10 @@ const CH = 140;
 const GAP = 8;
 const LANE = 34;
 const SVG_NS = 'http://www.w3.org/2000/svg';
+/** The brush in board units (its tip is the bottom centre). */
+const BRUSH_W = 40;
+const BRUSH_H = 132;
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const retrigger = (node: Element | null | undefined, cls: string) => {
-  if (!node) return;
-  node.classList.remove(cls);
-  void (node as HTMLElement).offsetWidth;
-  node.classList.add(cls);
-};
 
 /** Thrown into a running sequence when it is cancelled (a newer one started, or the player was destroyed). */
 const CANCEL = Symbol('demo-cancel');
@@ -124,7 +121,7 @@ export class DemoPlayer {
     this.H = rows * CH + 2 * LANE;
     this.boardEl.style.setProperty('--ar', String(this.W / this.H));
     this.boardEl.setAttribute('aria-label', `Demo board, ${rows} by ${cols}`);
-    this.brush.style.width = `${(40 / this.W) * 100}%`;
+    this.brush.style.width = `${(BRUSH_W / this.W) * 100}%`;
     for (const svg of [this.fenceSvg, this.inkSvg]) svg.setAttribute('viewBox', `0 0 ${this.W} ${this.H}`);
     this.inkSvg.replaceChildren();
     this.nodes.clear();
@@ -255,6 +252,13 @@ export class DemoPlayer {
     );
   }
 
+  /** Wait until the current state has painted (two frames), so a following change transitions. */
+  private frame(tok: Token): Promise<void> {
+    return new Promise((resolve, reject) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => (tok.live && !this.dead ? resolve() : reject(CANCEL)))),
+    );
+  }
+
   /** Run a sequence, swallowing cancellation. Resolves true if it finished. */
   private async guard(fn: (tok: Token) => Promise<void>): Promise<boolean> {
     const tok = this.cancel();
@@ -363,7 +367,7 @@ export class DemoPlayer {
     if (this.size === 'tile') return;
     if (this.capEl.textContent === text) return;
     this.capEl.textContent = text;
-    retrigger(this.capEl, 'is-new');
+    if (!this.capEl.classList.contains('is-new') || !restartAnimations(this.capEl, ['demo-cap'])) retrigger(this.capEl, 'is-new');
   }
 
   private mark(cells: number[]) {
@@ -386,18 +390,19 @@ export class DemoPlayer {
     const { x, y } = this.cellXY(i);
     const b = this.brush;
     const first = !b.classList.contains('is-on');
+    // The tip sits at (x, y): the brush is 40 × 132 board units, and `translate`
+    // percentages are of its own box, so the glide is pure compositing.
+    const at = (px: number, py: number) => `${(px / BRUSH_W) * 100}% ${(py / BRUSH_H) * 100}%`;
     if (first) {
       // Enter from below-right of the target, then glide in.
       b.style.transition = 'none';
-      b.style.left = `${((x + 70) / this.W) * 100}%`;
-      b.style.top = `${((y + 120) / this.H) * 100}%`;
-      void b.offsetWidth;
+      b.style.translate = at(x + 70, y + 120);
+      await this.frame(tok);
       b.style.transition = '';
       b.classList.add('is-on');
     }
-    b.style.left = `${(x / this.W) * 100}%`;
-    b.style.top = `${(y / this.H) * 100}%`;
-    await this.sleep(first ? 380 : 320, tok);
+    b.style.translate = at(x, y);
+    await this.sleep(first ? 420 : 340, tok);
     retrigger(b, 'is-dab');
     await this.sleep(110, tok);
   }
@@ -438,13 +443,29 @@ export class DemoPlayer {
     if (moved.length) {
       const movers = moved.map(([from, to]) => [this.nodes.get(from), to] as const);
       for (const [from] of moved) this.nodes.delete(from);
-      for (const [n, to] of movers) {
+      const { cols } = this.run.state.board;
+      const slid: HTMLElement[] = [];
+      for (const [[from], [n, to]] of moved.map((m, k) => [m, movers[k]] as const)) {
         if (!n) continue;
         this.nodes.set(to, n);
-        n.classList.add('is-sliding');
         this.place(n, to);
-        setTimeout(() => n.classList.remove('is-sliding'), 520);
+        if (rm) continue;
+        // FLIP on `translate` (percent of the card's own box): no left/top animation.
+        const dx = ((from % cols) - (to % cols)) * CW;
+        const dy = (Math.floor(from / cols) - Math.floor(to / cols)) * CH;
+        n.style.translate = `${(dx / (CW - GAP)) * 100}% ${(dy / (CH - GAP)) * 100}%`;
+        slid.push(n);
       }
+      if (slid.length)
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            for (const n of slid) {
+              n.classList.add('is-sliding');
+              n.style.translate = '';
+              setTimeout(() => n.classList.remove('is-sliding'), 560);
+            }
+          }),
+        );
     }
     for (const i of revealed) {
       const n = this.nodes.get(i);
@@ -493,6 +514,8 @@ export class DemoPlayer {
   private showCombo(n: number, centre = false) {
     this.comboEl.replaceChildren(h('b', {}, '짝'.repeat(n)), h('span', {}, `×${n}`));
     this.comboEl.classList.add('is-on');
+    // Centred: glide down by half the board (one read, at the end of a demo).
+    if (centre) this.comboEl.style.setProperty('--centre-dy', `${this.boardEl.clientHeight / 2}px`);
     this.comboEl.classList.toggle('is-centre', centre);
     this.comboEl.classList.toggle('is-max', n >= 5);
     retrigger(this.comboEl, 'is-pop');

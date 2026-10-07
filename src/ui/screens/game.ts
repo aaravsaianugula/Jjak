@@ -23,7 +23,7 @@ import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { music } from '../../services/music';
 import { REMINDER_TIMES, disableReminder, enableReminder, planReminders } from '../../services/reminders';
-import { type ClearSummary, completedMonths, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, type RushRecorded, shareTextFor } from '../../services/progress';
+import { type ClearSummary, completedMonths, luckyPays, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, type RushRecorded, shareTextFor } from '../../services/progress';
 import { store } from '../../services/store';
 import { AD_POLICY } from '../../config';
 import { shareText } from '../../services/share';
@@ -35,7 +35,7 @@ import { choose, openSheet } from '../modal';
 import { showHowToPlay } from './settings';
 import { boardReport, rushReport } from '../../services/meta';
 import { pathResult, rankUpMoment } from './path';
-import { petalBump } from '../motion';
+import { petalBump, reducedMotion, restartAnimations, retrigger, untrigger } from '../motion';
 import { nav } from '../nav';
 import { MARKET_PAPER_IDS } from '../../data/market';
 import { activeBrush, activeFx } from '../../services/market';
@@ -51,15 +51,11 @@ const COMBO_WORDS = ['', '', 'Pair', 'Nice', 'Lovely', 'Brilliant'];
 const INK_DRAW = 210;
 const INK_LIFE = 900;
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const fmt = (n: number) => n.toLocaleString('en-US');
-/** Re-run a one-shot CSS animation class. */
-function retrigger(node: Element | null | undefined, cls: string) {
-  if (!node) return;
-  node.classList.remove(cls);
-  void (node as HTMLElement).offsetWidth;
-  node.classList.add(cls);
-}
+/** Only touch the text when it changes (a same-value write still costs a layout and paint). */
+const setText = (node: Element, text: string) => {
+  if (node.textContent !== text) node.textContent = text;
+};
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -213,25 +209,64 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   /** Centre of a cell in board coordinates (no layout reads). */
   const cellXY = (cell: number) => ({ x: xOf(cell % spec.cols), y: yOf(Math.floor(cell / spec.cols)) });
 
-  function layout() {
+  /** Board and stage sizes from the last layout, so effects never read layout mid-frame. */
+  let boardW = 0;
+  let boardH = 0;
+  let stageW = 0;
+  let stageH = 0;
+  /** Where each card was last placed (board px), for sliding moved cards with transforms. */
+  const placed = new WeakMap<HTMLElement, { x: number; y: number }>();
+  /** Board origin inside the stage (the stage centres the board). */
+  const boardX = () => Math.max(0, (stageW - boardW) / 2);
+  const boardY = () => Math.max(0, (stageH - boardH) / 2);
+
+  /**
+   * Size and place every card. With `slide`, cards whose cell changed glide from
+   * where they were with a `translate` (GPU-only; left/top jump once, under it).
+   */
+  function layout(slide = false) {
     const w = stage.clientWidth;
     const hgt = stage.clientHeight;
     if (!w || !hgt) return;
+    stageW = w;
+    stageH = hgt;
     const byW = w / (spec.cols + 2 * MARGIN);
     const byH = hgt / (spec.rows * ASPECT + 2 * MARGIN);
     cw = Math.floor(Math.min(byW, byH, 96));
     ch = Math.round(cw * ASPECT);
     margin = Math.round(cw * MARGIN);
-    board.style.width = `${spec.cols * cw + 2 * margin}px`;
-    board.style.height = `${spec.rows * ch + 2 * margin}px`;
+    boardW = spec.cols * cw + 2 * margin;
+    boardH = spec.rows * ch + 2 * margin;
+    board.style.width = `${boardW}px`;
+    board.style.height = `${boardH}px`;
     const gap = Math.max(2, Math.round(cw * GAP));
+    const moved: HTMLElement[] = [];
     for (const [i, cel] of cardEls) {
       const r = Math.floor(i / spec.cols);
       const c = i % spec.cols;
-      cel.style.left = `${margin + c * cw + gap / 2}px`;
-      cel.style.top = `${margin + r * ch + gap / 2}px`;
+      const x = margin + c * cw + gap / 2;
+      const y = margin + r * ch + gap / 2;
+      const was = placed.get(cel);
+      if (slide && was && (was.x !== x || was.y !== y) && !reducedMotion()) {
+        cel.style.translate = `${was.x - x}px ${was.y - y}px`;
+        moved.push(cel);
+      }
+      placed.set(cel, { x, y });
+      cel.style.left = `${x}px`;
+      cel.style.top = `${y}px`;
       cel.style.width = `${cw - gap}px`;
       cel.style.height = `${ch - gap}px`;
+    }
+    if (moved.length) {
+      // Let the offset paint for a frame, then release it into the slide.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          for (const cel of moved) {
+            cel.classList.add('is-sliding');
+            cel.style.translate = '';
+          }
+        }),
+      );
     }
     const walls = session.board.walls;
     if (walls && fenceLayer.parentNode === board) fenceLayer.innerHTML = fencesMarkup(walls, spec.rows, spec.cols, margin, margin, cw, ch);
@@ -328,6 +363,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   function refreshFaces(flip: boolean) {
+    // Cards re-dealt onto different cells: redraw the board and deal it back in.
+    if (session.relaid) {
+      session.relaid = false;
+      clearHint();
+      renderBoard();
+      deal(0, 14);
+      return;
+    }
     const rm = reducedMotion();
     session.board.cells.forEach((v, i) => {
       const c = cardEls.get(i);
@@ -364,7 +407,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const n = P.length;
     if (n < 2) return;
     // Market brushes (the default ink below is unchanged).
-    if (activeBrush() !== 'ink') return brushStroke(paths, P, activeBrush(), { cw, uid: `ink-${gid}-${++strokeSeq}`, width: board.clientWidth, height: board.clientHeight, still: reducedMotion() });
+    if (activeBrush() !== 'ink') return brushStroke(paths, P, activeBrush(), { cw, uid: `ink-${gid}-${++strokeSeq}`, width: boardW, height: boardH, still: reducedMotion() });
     const dirs: { x: number; y: number }[] = [];
     const lens: number[] = [];
     let L = 0;
@@ -446,7 +489,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     g.style.setProperty('--len', f(L + w * 3));
     g.style.setProperty('--draw', `${INK_DRAW}ms`);
     // Reveal mask: a fat round stroke that runs along the path.
-    const mask = mk('mask', { id: sid, maskUnits: 'userSpaceOnUse', x: -40, y: -40, width: board.clientWidth + 80, height: board.clientHeight + 80 });
+    const mask = mk('mask', { id: sid, maskUnits: 'userSpaceOnUse', x: -40, y: -40, width: boardW + 80, height: boardH + 80 });
     mask.append(mk('polyline', { points: centre, 'stroke-width': f(w * 3.2), 'stroke-dasharray': `${f(L + w * 3)} ${f(L + w * 6)}` }, 'ink-reveal'));
     g.append(mask);
     // Wash: the ink spreading into the paper fibres (two layers fake a soft edge).
@@ -515,10 +558,11 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     // Market effects (the default blossom below is unchanged).
     if (activeFx() !== 'blossom') return void burstFx(board, x, y, activeFx(), { cw });
     const colors = ['#e3a5b0', '#d98a98', '#c4472f', '#e6c27a', '#f2d4da'];
-    for (let k = 0; k < 7; k++) {
-      const ink = k >= 5;
+    // Five slips: four petals and one drop of ink (calmer, and fewer layers per pair).
+    for (let k = 0; k < 5; k++) {
+      const ink = k >= 4;
       const p = h('i', { class: ink ? 'petal petal--ink' : 'petal' });
-      const a = (k / 7) * Math.PI * 2 + Math.random() * 0.8;
+      const a = (k / 5) * Math.PI * 2 + Math.random() * 0.9;
       const d = cw * (ink ? 0.35 + Math.random() * 0.3 : 0.55 + Math.random() * 0.55);
       p.style.left = `${x - 5}px`;
       p.style.top = `${y - 5}px`;
@@ -685,7 +729,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       rush.last = now;
       if (paused || rush.over || busy) return;
       rush.left = Math.max(0, rush.left - dt);
-      timeEl.textContent = formatTime(rush.left + 999);
+      setText(timeEl, formatTime(rush.left + 999));
       const urgent = rush.left < 10_000;
       el.classList.toggle('is-urgent', urgent);
       const sec = Math.ceil(rush.left / 1000);
@@ -695,7 +739,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       return;
     }
     if (paused || session.done || spec.mode === 'zen') return;
-    timeEl.textContent = formatTime(session.elapsedMs(performance.now()));
+    setText(timeEl, formatTime(session.elapsedMs(performance.now())));
   }, 250);
 
   // ── Input ─────────────────────────────────────────────────────────
@@ -708,7 +752,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   const select = (c: HTMLElement | undefined, on: boolean) => {
     if (!c) return;
-    if (on) c.classList.remove('is-shake', 'is-deal');
+    if (on) {
+      untrigger(c, 'is-shake');
+      c.classList.remove('is-deal');
+    }
     c.classList.toggle('is-selected', on);
     c.setAttribute('aria-pressed', String(on));
   };
@@ -845,12 +892,11 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         cardEls.delete(from);
         cardEls.set(to, c);
         c.dataset.cell = String(to);
-        c.classList.add(wind && wind !== 'down' ? 'is-drift' : 'is-falling');
       }
       setTimeout(() => {
-        layout();
-        if (wind) breeze(stage, wind);
-        setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-falling', 'is-drift')), 380);
+        layout(true);
+        if (wind) breeze(stage, wind, false, stageW, stageH);
+        setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-sliding')), 520);
       }, 200 + gateMs);
     }
     // Knots: a freed card's cord slips off once it has settled.
@@ -863,8 +909,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (res.lucky) {
       const p1 = cellXY(res.a);
       const p2 = cellXY(res.b);
-      luckyMoment(stage, board.offsetLeft + (p1.x + p2.x) / 2, board.offsetTop + (p1.y + p2.y) / 2);
-      live(`Lucky pair! Plus ${LUCKY_PETALS} petals when you clear the board.`);
+      // Petals for a lucky pair come with a level's first clear only.
+      const pays = luckyPays(spec.mode, !(save.stars[spec.number] > 0));
+      luckyMoment(stage, boardX() + (p1.x + p2.x) / 2, boardY() + (p1.y + p2.y) / 2, pays);
+      live(pays ? `Lucky pair! Plus ${LUCKY_PETALS} petals when you clear the board.` : 'Lucky pair!');
     }
     if (res.revealed.length) {
       setTimeout(() => {
@@ -919,9 +967,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   // ── Fever (×5 combo) ──────────────────────────────────────────────
   let feverTimer: ReturnType<typeof setTimeout> | null = null;
+  let feverDrain: Animation | null = null;
   function startFever(a: number, b: number) {
     el.classList.add('is-fever');
-    retrigger(feverTag, 'is-on');
+    // The tag stays up through a renewed Fever; only its drain line starts over.
+    feverTag.classList.add('is-on');
+    feverDrain?.cancel();
+    feverDrain = feverTag.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: FEVER_MS, easing: 'linear', fill: 'forwards', pseudoElement: '::after' });
     sfx.stamp();
     haptic.success();
     banner(
@@ -932,12 +984,12 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     live('Full bloom! Double points for a few seconds.');
     // Warm air: a bloom of colour from the pair, and petals drifting behind the cards.
     if (!reducedMotion()) {
-      air.style.setProperty('--air-h', `${stage.clientHeight}px`);
+      air.style.setProperty('--air-h', `${stageH}px`);
       const p1 = cellXY(a);
       const p2 = cellXY(b);
       const ring = h('i', { class: 'bloom-ring' });
-      ring.style.left = `${board.offsetLeft + (p1.x + p2.x) / 2}px`;
-      ring.style.top = `${board.offsetTop + (p1.y + p2.y) / 2}px`;
+      ring.style.left = `${boardX() + (p1.x + p2.x) / 2}px`;
+      ring.style.top = `${boardY() + (p1.y + p2.y) / 2}px`;
       air.append(ring);
       setTimeout(() => ring.remove(), 1300);
       air.classList.remove('is-fading');
@@ -962,6 +1014,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   function endFever() {
     el.classList.remove('is-fever');
     feverTag.classList.remove('is-on');
+    const drained = feverDrain;
+    feverDrain = null;
+    setTimeout(() => drained?.cancel(), 320);
     if (!air.querySelector('.drift')) return;
     air.classList.add('is-fading');
     setTimeout(() => {
@@ -1120,10 +1175,30 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   let comboBarOff: ReturnType<typeof setTimeout> | null = null;
+  let comboDrain: Animation[] = [];
+  /**
+   * The combo window drains (and cools from gold to ash near the end). The bar
+   * stays lit between pairs and only its drain starts over: Web Animations, so
+   * no class toggling (no blink) and no style flush on the tap.
+   */
   function restartComboBar() {
-    retrigger(comboBar, 'on');
+    comboBar.classList.add('on');
+    for (const a of comboDrain) a.cancel();
+    const fill = comboBar.firstElementChild as HTMLElement;
+    const opts: KeyframeAnimationOptions = { duration: COMBO_WINDOW_MS, easing: 'linear', fill: 'forwards' };
+    comboDrain = [fill.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], opts)];
+    if (!el.classList.contains('is-fever')) {
+      comboDrain.push(fill.animate([{ backgroundColor: 'var(--gold)' }, { backgroundColor: 'var(--gold)', offset: 0.62 }, { backgroundColor: 'var(--muted)' }], opts));
+    }
     if (comboBarOff) clearTimeout(comboBarOff);
-    comboBarOff = setTimeout(() => comboBar.classList.remove('on'), COMBO_WINDOW_MS + 200);
+    comboBarOff = setTimeout(stopComboBar, COMBO_WINDOW_MS + 200);
+  }
+  function stopComboBar() {
+    comboBar.classList.remove('on');
+    // Let the bar fade out at empty before the drain lets go of it.
+    const drained = comboDrain;
+    comboDrain = [];
+    setTimeout(() => drained.forEach((a) => a.cancel()), 420);
   }
 
   // ── Tools ─────────────────────────────────────────────────────────
@@ -1216,7 +1291,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (!coach.hidden && coachText.textContent === text) return;
     coachText.textContent = text;
     coach.hidden = false;
-    retrigger(coach, 'is-new');
+    if (!coach.classList.contains('is-new') || !restartAnimations(coach, ['g-rise'])) retrigger(coach, 'is-new');
   }
   /** After a pair, any caption has done its job. */
   function tutorialStep() {
@@ -1233,7 +1308,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         m.forEach((i) => cardEls.get(i)?.classList.add('is-hint'));
       }
     }
-    if (wind && wind !== 'down') setTimeout(() => breeze(stage, wind, true), 250);
+    if (wind && wind !== 'down') setTimeout(() => breeze(stage, wind, true, stageW, stageH), 250);
     const id = introFor(spec, save.seenTips);
     if (id) {
       save.seenTips.push(tipKey(id, spec.goal));
@@ -1280,7 +1355,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   function shower() {
     if (reducedMotion()) return;
     const colors = ['#e3a5b0', '#d98a98', '#f2d4da', '#c4472f', '#e6c27a'];
-    const hgt = stage.clientHeight + 24;
+    const hgt = stageH + 24;
     for (let k = 0; k < 28; k++) {
       const p = h('i', { class: 'fall' });
       p.style.left = `${Math.random() * 100}%`;
@@ -1348,7 +1423,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
               .map((s, i) => `<div class="star ${s.on ? 'on' : ''}${'goal' in s ? ' star--goal' : ''}" style="--at:${STAR_AT + i * STAR_STEP}ms">${ICONS.blossom}<span>${'goal' in s ? `<small>Goal</small>` : ''}${esc(s.label)}</span></div>`)
               .join('')}</div>`
       }
-      <div class="statline">
+      <div class="statline" style="--at:${rm ? 0 : statsAt}ms">
         <div><b>${formatTime(secs)}</b><span>Time</span></div>
         <div><b data-count>${fmt(session.score)}</b><span>Score</span></div>
         <div><b>×${session.bestCombo}</b><span>Best combo</span></div>
@@ -1692,7 +1767,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     updateHud();
     goalState = '';
     updateGoal();
-    comboBar.classList.remove('on');
+    stopComboBar();
     showCombo(0);
     if (feverTimer) clearTimeout(feverTimer);
     endFever();
@@ -1750,7 +1825,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const introMs = spec.mode === 'journey' && spec.number === 1 ? 900 : goal ? 1900 : 1150;
     renderBoard();
     // The cards start dealing just as the title card begins to lift.
-    deal(Math.max(0, introMs - 320));
+    deal(Math.max(0, introMs - 220));
     ro.observe(stage);
     updateHud();
     updateGoal();

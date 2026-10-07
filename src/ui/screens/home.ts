@@ -7,7 +7,7 @@ import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
 import { LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
-import { levelPlan } from '../../director';
+import { shownSpec } from '../../director';
 import { formatTime } from '../../engine/session';
 import { ROUTE_CHAPTERS, ROUTE_LEVELS, routeOf } from '../../data/route';
 import { roadGoesOn } from '../reveal';
@@ -48,7 +48,7 @@ export function homeScreen(): Screen {
     const lantern = i >= slot && levelsToLantern(chapterStart + i) === 0;
     return `<span class="${i < slot ? 'done' : i === slot ? 'now' : ''}${lantern ? ' lan' : ''}"></span>`;
   }).join('');
-  const spec = levelPlan(level).spec;
+  const spec = shownSpec(level);
   music.setSeason(season);
   // Where the road has reached: the place, its season, and the board's twist.
   const road = routeOf(level);
@@ -210,8 +210,15 @@ function openGift(home: HTMLElement): void {
   const done = (card: number | null, times: number) => {
     sheet.close();
     const won = checkSeals();
-    toast(`Gift claimed${times > 1 ? ' ×2' : ''}${won.length ? ` · Seal earned: ${won[0].title}` : ''}`);
-    home.querySelector('.gift-btn')?.remove();
+    // The note follows once the sheet has slid away, so the two never overlap.
+    const note = `Gift claimed${times > 1 ? ' ×2' : ''}${won.length ? ` · Seal earned: ${won[0].title}` : ''}`;
+    setTimeout(() => toast(note), reducedMotion() ? 0 : 240);
+    // The gift dot bows out instead of vanishing.
+    const giftBtn = home.querySelector<HTMLElement>('.gift-btn');
+    if (giftBtn) {
+      giftBtn.classList.add('is-leaving');
+      setTimeout(() => giftBtn.remove(), reducedMotion() ? 0 : 260);
+    }
     if (card != null) {
       const m = monthDef(card);
       const c = frag(`<div class="detail"><div class="detail__card draw__card is-reveal">${cardSvg(card)}</div>
@@ -222,35 +229,24 @@ function openGift(home: HTMLElement): void {
     petalBump(home.querySelector<HTMLElement>('.petals'), shownPetals ?? before, save.petals, { delay: 200 });
     shownPetals = save.petals;
   };
-  // Today's square is stamped before the sheet closes (the gift is already claimed).
-  const stampToday = (then: () => void) => {
-    const day = content.querySelector<HTMLElement>('.gday--now');
-    if (!day || reducedMotion()) return then();
+  /** Today's square gets its seal pressed on, then the sheet goes (the claim itself is saved at once). */
+  const stampThen = (card: number | null, times: number) => {
     actions.querySelectorAll('button').forEach((b) => b.setAttribute('disabled', ''));
-    day.classList.add('is-stamped');
-    day.querySelector('.gday__icon')?.insertAdjacentHTML('beforeend', `<i class="gday__done">${ICONS.check}</i>`);
-    day.insertAdjacentHTML('beforeend', '<i class="gday__seal seal" aria-hidden="true">済</i>');
-    setTimeout(then, 620);
+    const today = content.querySelector<HTMLElement>('.gday--now');
+    if (!today || reducedMotion()) return done(card, times);
+    today.append(h('span', { class: 'gday__stamp', 'aria-hidden': 'true' }, '受'));
+    today.querySelector('.gday__icon')?.insertAdjacentHTML('beforeend', `<i class="gday__done">${ICONS.check}</i>`);
+    today.classList.add('is-claimed');
+    setTimeout(() => done(card, times), 640);
   };
-  actions.append(
-    h('button', {
-      class: 'btn btn--primary btn--block',
-      onclick: () => {
-        const card = claimGift(1);
-        stampToday(() => done(card, 1));
-      },
-    }, 'Claim'),
-  );
+  actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => stampThen(claimGift(1), 1) }, 'Claim'));
   if (ads.rewardedAvailable && !p.gift.card) {
     actions.append(
       h('button', {
         class: 'btn btn--ghost btn--block',
         html: `${ICONS.ad}<span>Claim ×2 · watch a short ad</span>`,
         onclick: async () => {
-          if (await ads.rewarded()) {
-            const card = claimGift(2);
-            stampToday(() => done(card, 2));
-          }
+          if (await ads.rewarded()) stampThen(claimGift(2), 2);
           else toast('The ad didn’t finish. You can still claim the normal gift.');
         },
       }),

@@ -26,6 +26,19 @@
   height: 100%;
   display: block;
 }
+/* the previous season or hour, dissolving away over the new one */
+.gd-was {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: gd-was 640ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes gd-was {
+  to {
+    opacity: 0;
+    transform: scale(1.012);
+  }
+}
 .gd-scene [data-item],
 .gd-scene [data-visitor],
 .gd-scene [data-note] {

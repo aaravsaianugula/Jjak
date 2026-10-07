@@ -114,18 +114,17 @@ export function bonusFrame(): string {
   );
 }
 
-/** Sparse gold dust behind the art (sunago). */
+/** Gold mist behind the art (kasumi): two soft tapered bands of gold wash, no specks. */
 function goldDust(seed: number): string {
   const r = rng(seed);
   let d = '';
-  for (let i = 0; i < 26; i++) {
-    const x = 8 + r() * 84;
-    const y = 10 + r() * 120;
-    const s = 0.35 + r() * 0.8;
-    const a = r() * 3;
-    d += `M${f(x)} ${f(y - s)}L${f(x + s * (0.8 + a * 0.1))} ${f(y)}L${f(x)} ${f(y + s * 0.9)}L${f(x - s)} ${f(y + 0.1)}Z`;
+  for (const y0 of [22 + r() * 10, 98 + r() * 14]) {
+    const x0 = 4 + r() * 10;
+    const len = 46 + r() * 30;
+    const w = 3.2 + r() * 1.6;
+    d += `M${f(x0)} ${f(y0)}C${f(x0 + len * 0.3)} ${f(y0 - w)} ${f(x0 + len * 0.7)} ${f(y0 - w * 0.8)} ${f(x0 + len)} ${f(y0 - 0.4)}C${f(x0 + len * 0.7)} ${f(y0 + w * 0.5)} ${f(x0 + len * 0.3)} ${f(y0 + w * 0.6)} ${f(x0)} ${f(y0)}Z`;
   }
-  return `<path d="${d}" fill="${GOLD_MID}" opacity=".5"/>`;
+  return `<path d="${d}" fill="${GOLD_MID}" opacity=".22"/>`;
 }
 
 /** The 福 chip in the top-left corner (where a month number would be). */
@@ -244,7 +243,13 @@ function magpieParts(): Part[] {
 function fuSeal(x: number, y: number, s: number, rot: number): string {
   const r = rng(48);
   let wear = '';
-  for (let i = 0; i < 8; i++) wear += `<circle cx="${f(x + 1.4 + r() * (s - 2.8))}" cy="${f(y + 1.4 + r() * (s - 2.8))}" r="${f(0.15 + r() * 0.3)}" fill="${PAPER}" opacity="${f(0.25 + r() * 0.3)}"/>`;
+  // ink wear: two dry streaks where the vermilion didn't take
+  for (let i = 0; i < 2; i++) {
+    const sx = x + 1.6 + r() * (s * 0.4);
+    const sy = y + 2 + r() * (s - 4);
+    const l = s * (0.3 + r() * 0.25);
+    wear += `<path d="M${f(sx)} ${f(sy)}q${f(l / 2)} -.5 ${f(l)} 0q${f(-l / 2)} .35 ${f(-l)} 0Z" fill="${PAPER}" opacity=".4"/>`;
+  }
   const c = x + s / 2;
   return (
     `<g transform="rotate(${rot} ${f(c)} ${f(y + s / 2)})">` +
@@ -332,7 +337,7 @@ function knotParts(): { back: string; art: string } {
     `<path d="${d}" fill="none" stroke="${PAPER}" stroke-width="${f(w + 3.6)}" stroke-linecap="round" stroke-linejoin="round"/>` +
     `<path d="${d}" fill="none" stroke="${RED_DK}" stroke-width="${f(w + 0.9)}" stroke-linecap="round" stroke-linejoin="round"/>` +
     `<path d="${d}" fill="none" stroke="${VERMILION}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>` +
-    `<path d="${d}" fill="none" stroke="#ec9479" stroke-width=".5" stroke-dasharray="1.1 1.3" stroke-linecap="round" stroke-opacity=".8"/>`;
+    `<path d="${d}" fill="none" stroke="#ec9479" stroke-width=".45" stroke-linecap="round" stroke-opacity=".7" transform="translate(-.35 -.35)"/>`;
   const top = 'M50 13.6V40';
   const loop = 'M50 13.6C45.6 13.4 44.4 8.8 47 6.6C48.6 5.4 51.4 5.4 53 6.6C55.6 8.8 54.4 13.4 50 13.6';
   // side cords that carry the outer coins

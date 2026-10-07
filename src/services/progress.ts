@@ -56,6 +56,9 @@ export function drawCard(): number | null {
   return id;
 }
 
+/** Lucky pairs pay petals on a Journey level's first clear (and on other modes' boards, which have no replays to farm). */
+export const luckyPays = (mode: string, firstClear: boolean) => mode !== 'journey' || firstClear;
+
 /** Apply a finished board to the save file and report what the player earned. */
 export function recordClear(s: Session): ClearSummary {
   const st = s.stars();
@@ -131,12 +134,15 @@ export function recordClear(s: Session): ClearSummary {
     out.petals = ECONOMY.zenPetals;
   }
 
-  // Lucky bonus pairs: a small gift of petals on top of the board's own.
+  // Lucky bonus pairs: a small gift of petals on top of the board's own, the first
+  // time a level is cleared (like blossom petals, replays can't be farmed for them).
   if (s.luckyPairs > 0) {
-    out.lucky = s.luckyPairs * LUCKY_PETALS;
-    save.petals += out.lucky;
     save.journey.luckyPairs += s.luckyPairs;
-    save.journey.luckyPetals += out.lucky;
+    if (luckyPays(s.spec.mode, out.firstClear)) {
+      out.lucky = s.luckyPairs * LUCKY_PETALS;
+      save.petals += out.lucky;
+      save.journey.luckyPetals += out.lucky;
+    }
   }
 
   save.petals += out.petals;

@@ -6,6 +6,8 @@
  * in tests/economy.test.ts can run every number here without a browser.
  * Tuned against the 50-hour budget in docs/EXPANSION_PLAN.md §1.
  */
+import { MAX_STREAK_FREEZES } from './market';
+
 
 // ───────────────────────────── XP ─────────────────────────────
 
@@ -304,8 +306,8 @@ export const FOIL_DROP = { fromChapter: 4, chance: 0.04 };
 /** Petals given instead when a foil would drop but every album card is already gilded. */
 export const FOIL_FALLBACK_PETALS = 25;
 
-/** Warm tea a player can hold. */
-export const MAX_TEA = 2;
+/** Warm tea a player can hold: the Market's cap, so rewards and purchases agree. */
+export const MAX_TEA = MAX_STREAK_FREEZES;
 /** Petals given instead of tea when the pot is full. */
 export const TEA_FALLBACK_PETALS = 20;
 

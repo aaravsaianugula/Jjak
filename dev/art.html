@@ -23,8 +23,9 @@ h2{font:600 15px/1.2 system-ui,sans-serif;margin:24px 0 10px}
 .piece{width:140px;height:140px;border-radius:12px;background:#ebe2d1;display:grid;place-items:center;overflow:hidden}
 body.dark .piece{background:#2a2824}
 .piece svg{width:100%;height:100%}
-.stamp{width:110px;height:110px}
-.card{width:110px;height:154px}
+.g-stamp{width:110px;height:110px;position:relative}
+.g-card{width:110px;height:154px;position:relative}
+.g-stamp>svg,.g-card>svg{width:100%;height:100%;display:block}
 .road{width:360px;height:640px;position:relative;overflow:hidden;border-radius:10px}
 </style></head>
 <body><div id="out"></div>
@@ -61,11 +62,11 @@ if (view === 'scenes') {
   h += `<h2>Garden pieces</h2><div class="row">${GARDEN_ITEMS.map((g) => `<div class="cell"><div class="piece">${gardenItemSvg(g.id, 0)}</div>${g.name}</div>`).join('')}</div>`;
   h += `<h2>Visitors</h2><div class="row">${GARDEN_VISITORS.map((v) => `<div class="cell"><div class="piece">${gardenVisitorSvg(v.id, 0, GARDEN_ITEMS.map((g) => g.id))}</div>${v.name}</div>`).join('')}</div>`;
 } else if (view === 'stamps') {
-  h += `<h2>Passport stamps</h2><div class="row">${ROUTE.map((c, i) => `<div class="cell"><div class="stamp">${stampSvg(c, i, '2026-10-07')}</div>${c.en}</div>`).join('')}</div>`;
-  h += `<h2>Empty</h2><div class="row">${ROUTE.slice(0, 4).map((c, i) => `<div class="stamp">${stampSvg(c, i, null)}</div>`).join('')}</div>`;
+  h += `<h2>Passport stamps</h2><div class="row">${ROUTE.map((c, i) => `<div class="cell"><div class="g-stamp">${stampSvg(c, i, '2026-10-07')}</div>${c.en}</div>`).join('')}</div>`;
+  h += `<h2>Empty</h2><div class="row">${ROUTE.slice(0, 4).map((c, i) => `<div class="g-stamp">${stampSvg(c, i, null)}</div>`).join('')}</div>`;
 } else if (view === 'mech') {
-  h += `<h2>Gates</h2><div class="row">${Array.from({ length: 12 }, (_, m) => `<div class="card">${gateSvg(m)}</div>`).join('')}</div>`;
-  h += `<h2>Knot, snow, back</h2><div class="row"><div class="card" style="position:relative">${cardSvg(4)}<span class="knot" style="position:absolute;inset:0">${KNOT_SVG}</span></div><div class="card">${cardSvg('snow')}</div><div class="card">${cardSvg('back')}</div></div>`;
+  h += `<h2>Gates</h2><div class="row">${Array.from({ length: 12 }, (_, m) => `<div class="g-card">${gateSvg(m)}</div>`).join('')}</div>`;
+  h += `<h2>Knot, snow, back</h2><div class="row"><div class="g-card" style="position:relative">${cardSvg(4)}<span class="knot" style="position:absolute;inset:0">${KNOT_SVG}</span></div><div class="g-card">${cardSvg('snow')}</div><div class="g-card">${cardSvg('back')}</div></div>`;
   const walls = new Uint8Array(12); walls[1] = 1; walls[5] = 2; walls[6] = 3; walls[9] = 1;
   h += `<h2>Fences</h2><svg width="400" height="420" viewBox="0 0 400 420">${[0,1,2,3,4,5,6,7,8,9,10,11].map((i) => `<svg x="${(i % 4) * 100 + 4}" y="${Math.floor(i / 4) * 140 + 4}" width="92" height="132" viewBox="0 0 100 140"><use href="#card-${i * 4}"/></svg>`).join('')}${fencesMarkup(walls, 3, 4, 0, 0, 100, 140)}</svg>`;
 } else if (view === 'road') {

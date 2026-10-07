@@ -6,6 +6,7 @@ import { type Screen } from '../app';
 import { esc, frag } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
+import { flyInto, slidePill } from '../motion';
 import { nav } from '../nav';
 
 const CARD_SETS = SEALS.filter((s) => s.cards);
@@ -75,12 +76,12 @@ export function albumScreen(): Screen {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-id]');
     if (!btn) return;
     const id = Number(btn.dataset.id);
-    openDetail(id, owned.has(id));
+    openDetail(id, owned.has(id), btn);
   });
   return { name: 'album', el };
 }
 
-function openDetail(id: number, have: boolean) {
+function openDetail(id: number, have: boolean, from?: Element) {
   const m = monthDef(id);
   const d = cardDef(id);
   const kind = KIND_LABEL[d.kind];
@@ -118,7 +119,10 @@ function openDetail(id: number, have: boolean) {
         ${sets(id)}
       </div>`);
   if (have && save.meta.foil.includes(id)) addFoilToggle(content, id);
-  openSheet(content, { label: have ? `${title}, ${m.en}` : `${m.en}, not yet collected`, close: true });
+  const sheet = openSheet(content, { label: have ? `${title}, ${m.en}` : `${m.en}, not yet collected`, close: true });
+  // The card lifts out of the album page and settles into the detail.
+  const card = content.querySelector<HTMLElement>('.detail__card');
+  if (have && from && card) flyInto(from, card, sheet.el);
 }
 
 /** Card detail: switch between the printed card and its gold-leaf edition. */
@@ -132,6 +136,7 @@ function addFoilToggle(content: HTMLElement, id: number) {
     card.innerHTML = cardSvg(id, 'card-art', { foil });
     card.classList.toggle('is-foil', foil);
     seg.querySelectorAll<HTMLElement>('[data-ed]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.ed === 'foil') === foil)));
+    slidePill(seg.querySelector<HTMLElement>('.seg'));
   };
   seg.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-ed]');

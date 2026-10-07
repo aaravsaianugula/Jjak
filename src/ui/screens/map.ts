@@ -12,7 +12,7 @@ import {
   routeOf,
 } from '../../data/route';
 import { type LevelSpec, windOf } from '../../engine/levels';
-import { levelPlan } from '../../director';
+import { shownSpec, shownYears } from '../../director';
 import { GOALS } from '../../engine/goals';
 import { MECHANICS } from '../../engine/mechanics';
 
@@ -23,7 +23,7 @@ import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { esc, frag } from '../dom';
 import { ICONS } from '../icons';
-import { flip, measure } from '../motion';
+import { flip, measure, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 /** What each chapter features, for the open chapter's note. */
@@ -67,7 +67,7 @@ export function mapScreen(): Screen {
   const here = routeOf(unlocked);
   // Nothing past level 600 shows until the player has cleared it (the road reads as finished).
   const endless = save.level > ROUTE_LEVELS;
-  const maxYear = endless ? here.year : 0;
+  const maxYear = shownYears(save.level);
   let year = maxYear;
   let open: number | null = here.index;
 
@@ -122,7 +122,7 @@ export function mapScreen(): Screen {
     for (let n = first; n < first + ROUTE_LEVELS_PER_CHAPTER; n++) {
       const stars = save.stars[n] ?? 0;
       const isLocked = n > unlocked;
-      const spec = levelPlan(n).spec;
+      const spec = shownSpec(n);
       const tw = twistOf(spec);
       const fest = !!spec.festival;
       const lantern = n >= unlocked && levelsToLantern(n) === 0;
@@ -190,9 +190,27 @@ export function mapScreen(): Screen {
     list.innerHTML = html;
   }
 
+  let folding = false;
   function toggle(i: number) {
+    if (folding) return;
     const was = open;
     open = open === i ? null : i;
+    // Closing: the levels fade up and out first, then the road closes the gap.
+    const closing = was != null ? list.querySelector<HTMLElement>(`.stop[data-ch="${was}"] .stop__body`) : null;
+    if (closing && !reducedMotion()) {
+      folding = true;
+      closing.classList.remove('is-in');
+      closing.classList.add('is-out');
+      setTimeout(() => {
+        folding = false;
+        relayout(was);
+      }, 150);
+      return;
+    }
+    relayout(was);
+  }
+
+  function relayout(was: number | null) {
     // FLIP: the stops below the change glide to their new places (transforms
     // only) while the opened chapter's levels fade in under them.
     const from = Math.min(...[was, open].filter((k): k is number => k != null));
