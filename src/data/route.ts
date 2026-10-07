@@ -14,7 +14,7 @@ export type Country = 'KR' | 'JP';
 /** 0 spring, 1 summer, 2 autumn, 3 winter */
 export type Season = 0 | 1 | 2 | 3;
 /** The idea a chapter features. 'basics' = chapter 1, 'mix' = several at once. */
-export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'mix';
+export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'mix';
 
 export interface RouteChapter {
   /** stable id (save files key stamps by it) */
@@ -49,11 +49,11 @@ const ROWS: Row[] = [
   // 9–12
   ['jeju', 'Jeju', '제주', '濟州', 'KR', '#c29a2a', 'wind', 'Yellow canola flowers sway in the island wind below the slopes of Hallasan.'],
   ['yakushima', 'Yakushima', '야쿠시마', '屋久島', 'JP', '#3f6e55', 'mix', 'Summer rain keeps moss on every stone in the ancient cedar forests of Yakushima.'],
-  ['andong', 'Andong Hahoe', '안동 하회', '安東 河回', 'KR', '#9a5a2f', 'knots', 'Mask dancers perform each autumn in Hahoe, a village held in a bend of the river.'],
+  ['andong', 'Andong Hahoe', '안동 하회', '安東 河回', 'KR', '#9a5a2f', 'gates', 'Mask dancers perform each autumn in Hahoe, a village held in a bend of the river.'],
   ['sapporo', 'Sapporo', '삿포로', '札幌', 'JP', '#557ea0', 'snow', 'Each February, snow sculptures line Odori Park for the Sapporo Snow Festival.'],
   // 13–16
   ['hirosaki', 'Hirosaki', '히로사키', '弘前', 'JP', '#c46a7f', 'wind', 'Fallen cherry petals drift on Hirosaki’s castle moat until the water turns pink.'],
-  ['damyang', 'Damyang', '담양', '潭陽', 'KR', '#567f3e', 'stones', 'The bamboo grove of Juknokwon keeps a cool green shade all summer long.'],
+  ['damyang', 'Damyang', '담양', '潭陽', 'KR', '#567f3e', 'fences', 'The bamboo grove of Juknokwon keeps a cool green shade all summer long.'],
   ['nikko', 'Nikko', '닛코', '日光', 'JP', '#b0502d', 'leaves', 'Maples redden along the hairpin bends of the Irohazaka road above Nikko.'],
   ['pohang', 'Pohang', '포항', '浦項', 'KR', '#b4573a', 'mix', 'On New Year’s morning, crowds at Homigot watch the first sunrise beside the bronze Hand of Harmony.'],
   // 17–20

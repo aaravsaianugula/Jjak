@@ -144,12 +144,12 @@ const SLOT_TIER = [1, 1, 2, 2, 3, 3, 0, 3, 4, 4, 5, 6];
 export type Mechanic = 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences';
 /** Chapter index (0-based) where each idea first appears on the road. */
 export const MECHANIC_INTRO: Record<Mechanic, number> = { stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13 };
-const POOL: Mechanic[] = ['stones', 'leaves', 'snow', 'knots', 'wind'];
+const POOL: Mechanic[] = ['stones', 'leaves', 'snow', 'knots', 'wind', 'gates', 'fences'];
 const WIND_CYCLE: Wind[] = ['right', 'up', 'left'];
 const slides = (m: Mechanic) => m === 'leaves' || m === 'wind';
 /** Falling leaves and wind never share a board, and neither shares one with snow. */
 const clashes = (a: Mechanic, b: Mechanic) =>
-  a !== b && ((slides(a) && slides(b)) || (slides(a) && b === 'snow') || (slides(b) && a === 'snow'));
+  a !== b && ((slides(a) && slides(b)) || (slides(a) && (b === 'snow' || b === 'fences')) || (slides(b) && (a === 'snow' || a === 'fences')));
 
 /** Snow covers a quarter to a half of the pairs' worth of cards; knots fewer. */
 const snowFor = (pairs: number, t: number) => Math.max(2, Math.round(pairs * Math.min(0.5, 0.25 + 0.2 * t)));
@@ -250,6 +250,8 @@ export function journeyLevel(n: number): LevelSpec {
   const wind: Wind | null = has('leaves') ? 'down' : has('wind') ? WIND_CYCLE[(ch + slot + year) % 3] : null;
   const snow = has('snow') ? snowFor(pairs, t) : 0;
   const knots = has('knots') ? knotsFor(pairs, t) : 0;
+  const gates = has('gates') ? Math.min(6, evenRound(2 + 3 * t)) : 0;
+  const fences = has('fences') ? Math.round(4 + 6 * t) : 0;
   // Sliding, snow and knots each slow you down; festival boards get extra room.
   const extra = Math.min(20, (wind ? 10 : 0) + (snow ? 10 : 0) + (knots ? 10 : 0)) + (festival ? 15 : 0);
   const par = Math.max(parFor(pairs), parFor(pairs) + extra - 5 * Math.min(year, 2));
@@ -268,6 +270,8 @@ export function journeyLevel(n: number): LevelSpec {
     knots,
     lucky: has('lucky'),
     festival,
+    ...(gates ? { gates } : {}),
+    ...(fences ? { fences } : {}),
   };
 }
 

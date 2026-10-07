@@ -28,6 +28,8 @@ const FOCUS_NOTE: Record<Focus, { en: string; native: string; note: string }> = 
   lucky: { en: 'Lucky cards', native: '복 · 福', note: 'A bonus pair hides on these boards. Pair it for petals.' },
   knots: { en: 'Knots', native: '매듭 · 結び', note: 'A tied card can’t be picked until a card beside it clears.' },
   wind: { en: 'Wind', native: '바람 · 風', note: 'After each pair, cards drift sideways or up with the wind.' },
+  gates: { en: 'Gates', native: '문 · 門', note: 'A gate opens when you pair the flower painted on it.' },
+  fences: { en: 'Fences', native: '울타리 · 垣', note: 'Paths can’t cross the bamboo fences between cards.' },
   mix: { en: 'A mix', native: '섞기 · 混', note: 'Everything you’ve met so far, side by side.' },
 };
 

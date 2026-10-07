@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { stampDate, stampShape, stampSvg } from '../src/art/stamp';
 import { ALL_CARD_IDS, BONUS_IDS, cardDef, monthDef } from '../src/data/deck';
 import { ROUTE, ROUTE_CHAPTERS, ROUTE_LEVELS, chapterFirstLevel, festivalTitle, placeLine, routeOf } from '../src/data/route';
-import { EMPTY, STONE, type Board, cardsLeft, isCard, monthOf } from '../src/engine/board';
+import { EMPTY, STONE, type Board, cardsLeft, isCard, isGate, monthOf } from '../src/engine/board';
 import { generateBoard, reshuffle } from '../src/engine/generate';
 import {
   CHAPTERS,
@@ -97,7 +97,7 @@ describe('the Flower Road route', () => {
       expect(c.postcard.length).toBeGreaterThan(30);
       expect(c.postcard.length).toBeLessThan(130);
       expect(c.postcard.endsWith('.')).toBe(true);
-      expect(['basics', 'stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'mix']).toContain(c.focus);
+      expect(['basics', 'stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'mix']).toContain(c.focus);
     }
   });
 
@@ -172,10 +172,10 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 600; n++) {
       const sp = journeyLevel(n);
       const w = windOf(sp);
-      const seen = { stones: sp.stones > 0, leaves: w === 'down', snow: sp.snow > 0, lucky: !!sp.lucky, knots: (sp.knots ?? 0) > 0, wind: !!w && w !== 'down' };
+      const seen = { stones: sp.stones > 0, leaves: w === 'down', snow: sp.snow > 0, lucky: !!sp.lucky, knots: (sp.knots ?? 0) > 0, wind: !!w && w !== 'down', gates: (sp.gates ?? 0) > 0, fences: (sp.fences ?? 0) > 0 };
       for (const [k, on] of Object.entries(seen)) if (on && first[k] == null) first[k] = Math.floor((n - 1) / 12);
     }
-    expect(first).toEqual({ stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8 });
+    expect(first).toEqual({ stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13 });
     // The first board of each new idea shows it alone, so its tip is the only lesson.
     for (const [m, ch] of Object.entries(MECHANIC_INTRO)) {
       const n = ch * 12 + 2;
@@ -222,7 +222,7 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 700; n++) {
       const sp = journeyLevel(n);
       const b = buildBoard(sp);
-      expect(cardsLeft(b) + b.cells.filter((v) => v === STONE).length).toBe(sp.rows * sp.cols);
+      expect(cardsLeft(b) + b.cells.filter((v) => v === STONE || isGate(v)).length).toBe(sp.rows * sp.cols);
       const counts = new Map<number, number>();
       for (const v of b.cells) if (isCard(v)) counts.set(monthOf(v), (counts.get(monthOf(v)) ?? 0) + 1);
       for (const c of counts.values()) expect(c % 2).toBe(0);
