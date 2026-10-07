@@ -165,29 +165,89 @@ function sprite(): Element | null {
  * Markup for one illustration: `<svg class=cls viewBox><use/></svg>` in the
  * app, standalone markup (with the shared gradients) without a document.
  */
-export function art(id: string, cls = 'mk-ill', attrs = ''): string {
+export function art(id: string, cls = 'mk-ill', attrs = '', fine = false): string {
   const a = ARTS.get(id);
   if (!a) return '';
   const s = sprite();
-  if (!s) return `<svg class="${cls}" viewBox="${a.vb}" aria-hidden="true"${attrs}><defs>${DEFS}</defs>${a.body()}</svg>`;
-  if (!built.has(id)) {
-    s.insertAdjacentHTML('beforeend', `<symbol id="mka-${id}" viewBox="${a.vb}">${a.body()}</symbol>`);
-    built.add(id);
+  if (!s) return `<svg class="${cls}" viewBox="${a.vb}" aria-hidden="true"${attrs}><defs>${DEFS}</defs>${build(a, true)}</svg>`;
+  const sym = fine ? `${id}--fine` : id;
+  ensure(s, sym, a, fine);
+  return `<svg class="${cls}" viewBox="${a.vb}" aria-hidden="true"${attrs}><use href="#mka-${sym}"/></svg>`;
+}
+
+/**
+ * Cards inside an illustration: thumbnails draw light stand-ins (a few shapes
+ * each: painting the real card symbols, with their patterns, in every tile cost
+ * more than the rest of the art together); the detail sheet (`fine`) uses the
+ * real cards from the card sprite.
+ */
+let fineBuild = true;
+function build(a: Art, fine: boolean): string {
+  fineBuild = fine;
+  try {
+    return a.body();
+  } finally {
+    fineBuild = true;
   }
-  return `<svg class="${cls}" viewBox="${a.vb}" aria-hidden="true"${attrs}><use href="#mka-${id}"/></svg>`;
+}
+function ensure(s: Element, sym: string, a: Art, fine: boolean): void {
+  if (built.has(sym)) return;
+  const body = build(a, fine);
+  built.add(sym);
+  // Stand-in cards (and any other sprite symbols) this one uses.
+  for (const m of body.matchAll(/href="#mka-([\w-]+)"/g)) {
+    const dep = ARTS.get(m[1]);
+    if (dep) ensure(s, m[1], dep, false);
+  }
+  s.insertAdjacentHTML('beforeend', `<symbol id="mka-${sym}" viewBox="${a.vb}">${body}</symbol>`);
 }
 
 /** Standalone markup (gradients inlined): for CSS data URIs and tests. */
 export function artStandalone(id: string): string {
   const a = ARTS.get(id);
-  return a ? `<svg xmlns="${NS}" viewBox="${a.vb}"><defs>${DEFS}</defs>${a.body()}</svg>` : '';
+  return a ? `<svg xmlns="${NS}" viewBox="${a.vb}"><defs>${DEFS}</defs>${build(a, true)}</svg>` : '';
 }
+
+/** href of a card: the real one (fine builds) or its light stand-in. */
+const STAND_INS = new Set(['back', '10', '11', '31']);
+export const cardHref = (card: string | number) => (!fineBuild && STAND_INS.has(String(card)) ? `#mka-c-${card}` : `#card-${card}`);
 
 /** A card from the card sprite, centred at (x, y), w wide, turned by deg. */
 export const cardUse = (card: string | number, x: number, y: number, w: number, deg = 0) => {
   const h = w * 1.4;
-  return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(deg)})"><use href="#card-${card}" x="${f(-w / 2)}" y="${f(-h / 2)}" width="${f(w)}" height="${f(h)}"/></g>`;
+  return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(deg)})"><use href="${cardHref(card)}" x="${f(-w / 2)}" y="${f(-h / 2)}" width="${f(w)}" height="${f(h)}"/></g>`;
 };
+
+// ── Light stand-in cards (100 × 140, like the real ones) ────────────
+
+const cardPaper = (wash: string) =>
+  `<rect x="4" y="4" width="92" height="132" rx="7" fill="#f8f1e4" stroke="#cdb99a" stroke-width="1.5"/><rect x="9" y="9" width="82" height="122" rx="4" fill="${wash}"/>`;
+const cherries = () =>
+  P(taperStroke([[8, 70], [30, 50], [52, 36], [86, 22]], 7, 2), '#4a3426') +
+  blossom(30, 44, 15, '#f2a7b5', '#b93a55', 10) +
+  blossom(62, 30, 13, '#f6bcc7', '#b93a55', 40) +
+  blossom(54, 60, 12, '#f2a7b5', '#b93a55', 70) +
+  blossom(80, 46, 10, '#f6bcc7', '#b93a55', 20);
+defineArt('c-back', '0 0 100 140', () =>
+  `<rect x="4" y="4" width="92" height="132" rx="7" fill="url(#mka-indigo)" stroke="#16263e" stroke-width="1.5"/>` +
+  `<rect x="11" y="11" width="78" height="118" rx="4" fill="none" stroke="#c9a24a" stroke-width="2.4"/>` +
+  `<rect x="36" y="56" width="28" height="28" rx="3" fill="#c0442d"/><rect x="40.5" y="60.5" width="19" height="19" rx="1.5" fill="none" stroke="#fbe9dc" stroke-width="2"/>` +
+  `<path d="M8 8H60L8 70Z" fill="#fff" opacity=".08"/>`,
+);
+defineArt('c-10', '0 0 100 140', () =>
+  cardPaper('#f7e3e6') + cherries() + `<g transform="rotate(-8 50 96)"><rect x="40" y="70" width="20" height="54" rx="2" fill="#c0442d"/><path d="M44 78V116" stroke="#e8c77e" stroke-width="2" opacity=".7"/></g>`,
+);
+defineArt('c-11', '0 0 100 140', () => {
+  let stripes = '';
+  for (let i = 0; i < 6; i++) stripes += `<rect x="${9 + i * 13.7}" y="94" width="13.7" height="37" fill="${i % 2 ? '#f6efe2' : '#c0442d'}"/>`;
+  return cardPaper('#f7e3e6') + cherries() + stripes + `<rect x="9" y="91" width="82" height="4" fill="#5a3a22"/>`;
+});
+defineArt('c-31', '0 0 100 140', () =>
+  cardPaper('#c9553c') +
+  `<rect x="9" y="9" width="82" height="80" rx="4" fill="url(#mka-lac-red)" opacity=".7"/>` +
+  `<circle cx="50" cy="56" r="24" fill="url(#mka-moon)"/>` +
+  P('M9 100C26 82 42 84 56 92S80 88 91 82V131H9Z', '#2c2622'),
+);
 
 // ── Shared objects ──────────────────────────────────────────────────
 
@@ -235,7 +295,7 @@ function teaBowl(cx: number, y: number, w: number, tea = true): string {
 
 defineArt('tool-hints', '0 0 140 110', () => {
   const card = (id: number, x: number, y: number, deg: number) =>
-    `<g transform="translate(${x} ${y}) rotate(${deg})"><rect x="-13.4" y="-18.4" width="26.8" height="36.8" rx="2.6" fill="none" stroke="#f6c46a" stroke-width="4" opacity=".32"/><use href="#card-${id}" x="-12.5" y="-17.5" width="25" height="35"/><rect x="-11.5" y="-16.1" width="23" height="32.2" rx="1.5" fill="none" stroke="#f3d68e" stroke-width="1.1"/></g>`;
+    `<g transform="translate(${x} ${y}) rotate(${deg})"><rect x="-13.4" y="-18.4" width="26.8" height="36.8" rx="2.6" fill="none" stroke="#f6c46a" stroke-width="4" opacity=".32"/><use href="${cardHref(id)}" x="-12.5" y="-17.5" width="25" height="35"/><rect x="-11.5" y="-16.1" width="23" height="32.2" rx="1.5" fill="none" stroke="#f3d68e" stroke-width="1.1"/></g>`;
   return (
     `<ellipse cx="96" cy="90" rx="42" ry="8" fill="url(#mka-glow)" style="opacity:calc(var(--mka-glow-o,.9) * .8)"/>` +
     shadow(96, 89.5, 30, 2.8) +
@@ -251,7 +311,7 @@ defineArt('tool-hints', '0 0 140 110', () => {
 
 defineArt('tool-shuffles', '0 0 140 110', () => {
   const stack = (x: number, y: number, deg: number, dir: number) =>
-    `<g transform="translate(${x} ${y}) rotate(${deg})">${[3, 2, 1, 0].map((k) => `<use href="#card-back" x="${f(-11 + dir * k * 1.5)}" y="${f(-15.4 + k * 1.1)}" width="22" height="30.8"/>`).join('')}</g>`;
+    `<g transform="translate(${x} ${y}) rotate(${deg})">${[3, 2, 1, 0].map((k) => `<use href="${cardHref('back')}" x="${f(-11 + dir * k * 1.5)}" y="${f(-15.4 + k * 1.1)}" width="22" height="30.8"/>`).join('')}</g>`;
   const p0: [number, number] = [36, 62];
   const p1: [number, number] = [70, 6];
   const p2: [number, number] = [104, 62];
@@ -308,7 +368,7 @@ defineArt('tool-card', '0 0 140 110', () => {
     const a = ((-170 + i * 20) * Math.PI) / 180;
     rays += P(taperStroke([[72 + Math.cos(a) * 20, 38 + Math.sin(a) * 20], [72 + Math.cos(a) * 36, 38 + Math.sin(a) * 36]], 2.2, 0.2), '#e9c46a', ' opacity=".4"');
   }
-  const back = (deg: number) => `<g transform="translate(72 94) rotate(${deg})"><use href="#card-back" x="-14" y="-50" width="28" height="39.2"/></g>`;
+  const back = (deg: number) => `<g transform="translate(72 94) rotate(${deg})"><use href="${cardHref('back')}" x="-14" y="-50" width="28" height="39.2"/></g>`;
   return (
     `<circle cx="72" cy="40" r="34" fill="url(#mka-glow)" style="opacity:var(--mka-glow-o,.9)"/>` +
     rays +
@@ -327,7 +387,7 @@ defineArt('tool-card', '0 0 140 110', () => {
     back(-15) +
     back(30) +
     back(15) +
-    `<g transform="translate(72 84) rotate(2)"><rect x="-15.6" y="-56.2" width="31.2" height="42.2" rx="3" fill="none" stroke="#f6c46a" stroke-width="4" opacity=".35"/><use href="#card-31" x="-15" y="-56" width="30" height="42"/><rect x="-13.8" y="-54.3" width="27.6" height="38.6" rx="1.8" fill="none" stroke="#e8c77e" stroke-width="1"/></g>` +
+    `<g transform="translate(72 84) rotate(2)"><rect x="-15.6" y="-56.2" width="31.2" height="42.2" rx="3" fill="none" stroke="#f6c46a" stroke-width="4" opacity=".35"/><use href="${cardHref(31)}" x="-15" y="-56" width="30" height="42"/><rect x="-13.8" y="-54.3" width="27.6" height="38.6" rx="1.8" fill="none" stroke="#e8c77e" stroke-width="1"/></g>` +
     glint(46, 30, 3.4) +
     glint(101, 22, 4) +
     glint(104, 50, 2.6)

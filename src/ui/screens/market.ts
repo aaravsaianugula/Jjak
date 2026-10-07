@@ -88,7 +88,7 @@ const monthHave = (m: number) => [0, 1, 2, 3].filter((v) => save.album.includes(
 
 // ── Previews ────────────────────────────────────────────────────────
 
-const toolArt = (it: MarketItem): string => art(`tool-${it.id}`, 'mk-ill mk-ill--tool');
+const toolArt = (it: MarketItem, big: boolean): string => art(`tool-${it.id}`, 'mk-ill mk-ill--tool', '', big);
 
 /** Board papers: a deckle-edged sheet held by a brass weight, with close-up detail over the real board texture. */
 const paperArt = (it: MarketItem): string => {
@@ -271,7 +271,7 @@ function itemArt(it: MarketItem, big = false): HTMLElement {
   const wrap = h('span', { class: `mk-art mk-art--${it.category}${big ? ' mk-art--big' : ''}`, 'aria-hidden': 'true' });
   switch (it.category) {
     case 'tool':
-      wrap.innerHTML = toolArt(it);
+      wrap.innerHTML = toolArt(it, big);
       break;
     case 'deck': {
       const fan = (art: (id: number) => string) => `<span class="mk-cards mk-cards--fan">${DECK_CARDS.map((id) => `<span class="mk-card">${art(id)}</span>`).join('')}</span>`;
