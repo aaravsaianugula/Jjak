@@ -32,9 +32,7 @@ const cord = (x: number, y: number, len: number) =>
   P(`M${f(x - 6)} ${f(y + len * 0.86 - 1.4)}l1.5 1.5-1.5 1.5-1.5-1.5Z`, '#e3c27a') +
   P(`M${f(x - 7.6)} ${f(y + len * 0.86 + 1.4)}h3.2l.8 5.2q-2.4 1-4.8 0Z`, 'url(#mka-silk)');
 
-defineArt('chest', '0 0 48 44', () =>
-  floor(24, 40.4, 21, 3.4) +
-  chestBody() +
+const closedLid = () =>
   P('M5.4 14.6Q5.4 9 10.6 8.6H37.4Q42.6 9 42.6 14.6V21.6H5.4Z', 'url(#mka-lac-black)', ' stroke="#120e0c" stroke-width=".5"') +
   P('M5.4 18.2H42.6V21.6H5.4Z', '#000', ' opacity=".2"') +
   S('M9.4 10.9Q24 8.7 38.6 10.9', '#fff', 0.8, ' opacity=".26"') +
@@ -43,7 +41,12 @@ defineArt('chest', '0 0 48 44', () =>
   P('M5.4 15.2Q5.4 9 10.6 8.6H12.8V11.2H8.4V15.2Z', BRASS) +
   P('M42.6 15.2Q42.6 9 37.4 8.6H35.2V11.2H39.6V15.2Z', BRASS) +
   P('M20 19.2H28V24.8Q24 27.4 20 24.8Z', BRASS, ` stroke="${LINE}" stroke-width=".4"`) +
-  S('M24 21.2V23.6', '#5a3a14', 0.9) +
+  S('M24 21.2V23.6', '#5a3a14', 0.9);
+
+defineArt('chest', '0 0 48 44', () =>
+  floor(24, 40.4, 21, 3.4) +
+  chestBody() +
+  closedLid() +
   `<circle cx="24" cy="27.6" r="1.7" fill="none" stroke="#c99a48" stroke-width="1"/>` +
   cord(24, 29.2, 7),
 );
@@ -209,4 +212,32 @@ defineArt('i-hintshuffle', '0 0 24 24', () => cardUse('back', 16, 14, 9.6, 12) +
 /** The lantern gift on the result sheet: a lit lantern against dusk (also a CSS data URI). */
 defineArt('lantern-gift', '0 0 40 40', () =>
   `<circle cx="20" cy="20" r="19.4" fill="url(#mka-night)"/>` + `<circle cx="20" cy="20" r="18.6" fill="none" stroke="#c99a48" stroke-width=".8"/>` + lantern(20, 4.2, 0.48),
+);
+
+// ── Chest openings (inline, so each part can move: the lid lifts away, the light
+// comes up inside, the contents rise). Classes are animated in meta.css. ──
+
+defineArt('chest-reveal', '0 0 48 44', () =>
+  `<g class="ca-glow"><circle cx="24" cy="16" r="22" fill="url(#mka-glow)" style="opacity:var(--mka-glow-o,.9)"/></g>` +
+  floor(24, 40.4, 21, 3.4) +
+  `<g class="ca-open">${openLid()}<ellipse cx="24" cy="20.6" rx="14.6" ry="1.8" fill="#ffe9b0" opacity=".95"/></g>` +
+  chestBody() +
+  `<circle cx="24" cy="24.6" r="1.7" fill="none" stroke="#c99a48" stroke-width="1"/>` +
+  S('M24 26.2C23.4 30 24.8 33 24 37', '#c0442d', 1.3) +
+  P('M22.4 37h3.2l.8 4.6q-2.4 1-4.8 0Z', 'url(#mka-silk)') +
+  `<g class="ca-closed">${closedLid()}</g>` +
+  `<g class="ca-rise">${petalShape(18.6, 12, 0.55, -20)}${petalShape(27.6, 7.6, 0.5, 30, '#f4bfca')}${glint(32, 13.4, 2.4)}${glint(14.6, 5.6, 1.7)}</g>`,
+);
+
+defineArt('bandaji-reveal', '0 0 52 44', () =>
+  `<g class="ca-glow"><circle cx="26" cy="8" r="22" fill="url(#mka-glow)" style="opacity:var(--mka-glow-o,.9)"/></g>` +
+  floor(26, 40.6, 24, 3.4) +
+  `<g class="ca-open">${P('M3 9.6 7.4 1.2H44.6L49 9.6Z', 'url(#mka-wood-dark)', ' stroke="#3e2414" stroke-width=".5"')}${P('M7.4 1.2H44.6L45.4 2.8H6.6Z', '#fff', ' opacity=".14"')}</g>` +
+  bandajiBody() +
+  `<g class="ca-open">${P('M4.6 9.6H47.4V11.6H4.6Z', '#2a160c')}<ellipse cx="26" cy="10.4" rx="18" ry="1.4" fill="#ffe9b0" opacity=".9"/></g>` +
+  hinge(13) +
+  hinge(39) +
+  lockPlate() +
+  `<g class="ca-closed"><rect x="3" y="7.2" width="46" height="3.4" rx="1" fill="url(#mka-wood-dark)"/>${S('M4.4 7.9H47.6', '#fff', 0.6, ' opacity=".22"')}${P('M3 7.2H9.2V10.6H3.8Q3 10.6 3 9.8Z', BRASS)}${P('M49 7.2H42.8V10.6H48.2Q49 10.6 49 9.8Z', BRASS)}</g>` +
+  `<g class="ca-rise">${glint(16, 3.4, 2)}${glint(37, 5, 1.6)}${petalShape(26, 3, 0.5, 15)}</g>`,
 );

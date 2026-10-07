@@ -356,6 +356,8 @@ export function marketScreen(tab?: string): Screen {
   const startTab = MARKET_TABS.some((t) => t.id === tab) ? tab! : lastTab;
   let current = startTab;
   let openDemo: { stop(): void } | null = null;
+  /** Tiles whose state just changed (bought, equipped, unequipped): they settle in on the next render. */
+  let changedKeys: string[] = [];
 
   const balanceN = h('span', { class: 'petals__n num' }, fmt(save.petals));
   const balance = h('span', { class: 'petals mk-balance', role: 'status', 'aria-label': `${save.petals} petals`, html: ICONS.petal });
@@ -409,7 +411,7 @@ export function marketScreen(tab?: string): Screen {
     const have = it.category === 'tool' ? haveLine(it) : '';
     const native = `<span lang="ko">${esc(it.ko)}</span> · <span class="ja" lang="ja">${esc(it.ja)}</span>`;
     const label = `${it.name}. ${st === 'buy' || st === 'short' ? `${it.price} petals` : st === 'locked' ? sourceLine(it) : st === 'equipped' ? 'In use' : st === 'owned' ? 'Owned' : ''}`;
-    const tile = h('button', { class: `mk-tile is-${st}${fresh ? ' is-new' : ''}`, 'data-key': it.key, 'aria-label': label });
+    const tile = h('button', { class: `mk-tile is-${st}${fresh ? ' is-new' : ''}${changedKeys.includes(it.key) ? ' is-changed' : ''}`, 'data-key': it.key, 'aria-label': label });
     tile.append(itemArt(it));
     if ((st === 'owned' || st === 'equipped') && !it.isDefault && it.category !== 'paper') tile.append(frag('<span class="mk-seal mk-seal--sm" aria-hidden="true">Yours</span>'));
     if (fresh) tile.append(h('i', { class: 'mk-dot', 'aria-hidden': 'true' }));
@@ -462,7 +464,15 @@ export function marketScreen(tab?: string): Screen {
     }
     const grid = (list: MarketItem[]) => {
       const g = h('div', { class: `mk-grid mk-grid--${t.category}` });
-      for (const it of list) g.append(tileFor(it, isNew(it)));
+      list.forEach((it, i) => {
+        const tile = tileFor(it, isNew(it));
+        // The first tiles of a new section follow it in, one after another.
+        if (changed && i < 6) {
+          tile.classList.add('is-stagger');
+          tile.style.setProperty('--i', String(i));
+        }
+        g.append(tile);
+      });
       return g;
     };
     if (t.category === 'paper') {
@@ -479,6 +489,7 @@ export function marketScreen(tab?: string): Screen {
     }
     frag0.append(frag(`<p class="mk-fine">Prices are always in petals. Nothing here is random, and nothing runs out.</p>`));
     body.replaceChildren(frag0);
+    changedKeys = [];
     body.scrollTop = scrollTop;
     paintStills(body);
     // Dots stay for this visit; next time they're gone.
@@ -540,6 +551,8 @@ export function marketScreen(tab?: string): Screen {
     let loop: ReturnType<typeof setTimeout> | null = null;
     if (it.category === 'brush' || it.category === 'fx') {
       const demo = big.querySelector<HTMLElement>('.mk-demo')!;
+      // Place the pair at once, so the picture never shows unsized cards before the first run.
+      requestAnimationFrame(() => layoutDemo(demo));
       const run = () => {
         if (!demo.isConnected) return;
         const ms = playDemo(demo, it, activeBrush(), activeFx());
@@ -602,7 +615,9 @@ export function marketScreen(tab?: string): Screen {
             h('button', {
               class: 'btn btn--primary btn--block',
               onclick: () => {
+                const was = itemsIn(it.category).find((x) => x.key !== it.key && isEquipped(x.key));
                 if (equip(slot, it.id)) {
+                  changedKeys = [it.key, ...(was ? [was.key] : [])];
                   sfx.hint();
                   haptic.medium();
                   refresh();
@@ -620,6 +635,7 @@ export function marketScreen(tab?: string): Screen {
               class: 'btn btn--ghost btn--block',
               onclick: () => {
                 setGardenShown(it.id, !shown);
+                changedKeys = [it.key];
                 haptic.light();
                 refresh();
                 render();
@@ -706,6 +722,7 @@ export function marketScreen(tab?: string): Screen {
           revealCard(res.drawn);
         } else {
           floatNote(stage, it.key === TOOL.tea ? '+1 cup' : '+3');
+          changedKeys = [it.key];
           rerender();
           // The "you have" line turns green for a moment: the purchase landed.
           const have = stage.parentElement?.querySelector('.mk-have');
@@ -718,6 +735,7 @@ export function marketScreen(tab?: string): Screen {
         sfx.stamp();
         haptic.success();
         stampYours(stage, rm);
+        changedKeys = [it.key];
         rerender();
       }
       refresh();
@@ -817,14 +835,27 @@ export function marketScreen(tab?: string): Screen {
   showTab(startTab);
   // While the player looks around, prepare the deck previews in idle time (one
   // card per idle slot), so the Decks tab opens warm.
+  // Then the drawn art of the other tabs, one sprite symbol per idle slot.
+  const warmArt = [
+    ...itemsIn('tool').map((it) => `tool-${it.id}`),
+    'inkstone',
+    'weight',
+    ...['plain', ...itemsIn('paper').filter((it) => !it.source && !it.isDefault).map((it) => it.id)].map((id) => `paper-${id}`),
+    ...[...MUSIC_IDS].map((id) => `music-${id}`),
+  ];
   const warm = itemsIn('deck').flatMap((it) => DECK_CARDS.map((id) => [id, it.id] as const));
   let warmId = 0;
   const idle = (fn: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 2000 }) : window.setTimeout(fn, 120));
   const unidle = (n: number) => (typeof cancelIdleCallback === 'function' ? cancelIdleCallback(n) : clearTimeout(n));
   const warmNext = () => {
+    if (!el.isConnected) return;
     const next = warm.shift();
-    if (!next || !el.isConnected) return;
-    cardPreviewSvg(next[0], next[1]);
+    if (next) cardPreviewSvg(next[0], next[1]);
+    else {
+      const sym = warmArt.shift();
+      if (!sym) return;
+      art(sym);
+    }
     warmId = idle(warmNext);
   };
   warmId = idle(warmNext);

@@ -395,9 +395,6 @@
 .mk-tile:active {
   transform: scale(0.975);
 }
-.mk-tile.is-equipped {
-  box-shadow: inset 0 0 0 1.5px var(--ink), var(--shadow);
-}
 .mk-tile__text {
   display: flex;
   flex-direction: column;
@@ -666,15 +663,9 @@
   position: absolute;
   inset: 2px 6px 3px;
   display: block;
-  background:
-    linear-gradient(var(--mk-mount), var(--mk-mount)) top / 100% 3px no-repeat,
-    linear-gradient(var(--mk-mount), var(--mk-mount)) bottom / 100% 3px no-repeat,
-    linear-gradient(var(--mk-mount-hi), var(--mk-mount-hi)) 0 4px / 100% 0.5px no-repeat,
-    linear-gradient(var(--mk-mount-hi), var(--mk-mount-hi)) 0 calc(100% - 4px) / 100% 0.5px no-repeat,
-    radial-gradient(110% 80% at 20% 0%, var(--mk-art-light), transparent 60%),
-    var(--hanji),
-    var(--mk-scroll-paper);
-  box-shadow: 0 3px 6px -3px rgba(40, 25, 10, 0.5), inset 0 0 0 0.5px rgba(60, 40, 20, 0.15);
+  border-block: 3px solid var(--mk-mount);
+  background: var(--mk-scroll-paper);
+  box-shadow: 0 3px 6px -3px rgba(40, 25, 10, 0.5), inset 0 1px 0 var(--mk-mount-hi), inset 0 -1px 0 var(--mk-mount-hi);
 }
 .mk-scroll__rod {
   position: absolute;
@@ -708,7 +699,7 @@
 }
 .mk-scroll__paper .mk-demo {
   position: absolute;
-  inset: 4px 0;
+  inset: 1px 0;
   width: auto;
   height: auto;
 }
@@ -748,10 +739,7 @@
   inset: 7px 8px 6px;
   display: block;
   border-radius: 9px;
-  background:
-    radial-gradient(70% 70% at 50% 45%, var(--mk-art-light), transparent 75%),
-    var(--hanji),
-    var(--bg);
+  background: radial-gradient(70% 70% at 50% 45%, var(--mk-art-light), transparent 75%), var(--bg);
   box-shadow: inset 0 0 0 1px var(--line), inset 0 6px 12px -8px rgba(60, 40, 20, 0.35);
 }
 .mk-board .mk-demo {
@@ -779,7 +767,7 @@
   position: absolute;
   inset: 0;
   display: block;
-  background: var(--hanji), var(--bg);
+  background: var(--bg);
   transform: rotate(-1.6deg);
 }
 .mk-swatch .paper {
@@ -828,6 +816,8 @@
 .mk-demo__card {
   position: absolute;
   display: block;
+  width: 18%;
+  aspect-ratio: 100 / 140;
   border-radius: 6px;
   transition: opacity 260ms ease, transform 260ms var(--ease-out);
   filter: drop-shadow(0 3px 4px rgba(40, 20, 5, 0.2));
@@ -990,19 +980,6 @@
 }
 .btn.is-short {
   color: var(--muted);
-}
-.btn.is-nudge {
-  animation: mk-nudge 360ms ease-in-out;
-}
-@keyframes mk-nudge {
-  20%,
-  60% {
-    transform: translateX(-4px);
-  }
-  40%,
-  80% {
-    transform: translateX(4px);
-  }
 }
 .mk-note {
   display: flex;
@@ -1953,5 +1930,174 @@ html:root .paper.paper--market.paper--suminagashi {
   }
   .mk-demo__card {
     transition: none;
+  }
+}
+
+/* ───────────────────────────── Motion: calm, transform and opacity only ───────────────────────────── */
+/* The "in use" ring is its own layer, so it can fade in (equip) and out (unequip). */
+.mk-tile.is-equipped {
+  box-shadow: var(--shadow);
+}
+.mk-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  opacity: 0;
+  pointer-events: none;
+}
+.mk-tile.is-equipped::after {
+  opacity: 1;
+}
+.mk-tile.is-changed.is-equipped::after {
+  animation: mk-ring-in 380ms var(--ease-out) both;
+}
+.mk-tile.is-changed:not(.is-equipped)::after {
+  animation: mk-ring-out 320ms ease-out both;
+}
+@keyframes mk-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+}
+@keyframes mk-ring-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* What the tile says now ("In use", "Owned", "+3"…) settles in from below. */
+.mk-tile.is-changed .mk-tile__foot > *,
+.mk-tile.is-changed .mk-tile__native {
+  animation: mk-foot-in 360ms var(--ease-out) 80ms both;
+}
+@keyframes mk-foot-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.mk-tile.is-changed .mk-seal--sm {
+  animation: mk-seal-in 420ms cubic-bezier(0.2, 1.3, 0.4, 1) 160ms both;
+}
+@keyframes mk-seal-in {
+  from {
+    opacity: 0;
+    transform: rotate(-14deg) scale(1.7);
+  }
+}
+/* A new section's first tiles follow it in. */
+.mk-body.is-switching .mk-tile.is-stagger {
+  animation: mk-tile-in 340ms var(--ease-out) backwards;
+  animation-delay: calc(60ms + var(--i, 0) * 34ms);
+}
+@keyframes mk-tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+/* Item sheet: the picture rises, the words follow. */
+.mk-art--big .mk-board,
+.mk-art--big .mk-swatch,
+.mk-art--big .mk-garden,
+.mk-art--big .mk-scroll__stone {
+  animation: card-rise 480ms var(--ease-out) both;
+}
+.mk-art--big .mk-scroll__stone {
+  animation-delay: 160ms;
+}
+/* A scroll unrolls: the paper opens from the middle and the rods travel out. */
+.mk-art--big .mk-scroll {
+  container-type: inline-size;
+}
+.mk-art--big .mk-scroll__paper {
+  animation: mk-unroll 520ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+.mk-art--big .mk-scroll__rod {
+  animation: mk-rod-l 520ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+.mk-art--big .mk-scroll__rod--r {
+  animation-name: mk-rod-r;
+}
+@keyframes mk-unroll {
+  from {
+    transform: scaleX(0.04);
+  }
+}
+@keyframes mk-rod-l {
+  from {
+    transform: translateX(calc(50cqw - 7px));
+  }
+}
+@keyframes mk-rod-r {
+  from {
+    transform: translateX(calc(-50cqw + 7px));
+  }
+}
+.mk-sheet__head > * {
+  animation: mk-head-in 380ms var(--ease-out) backwards;
+}
+.mk-sheet__head > :nth-child(2) {
+  animation-delay: 50ms;
+}
+.mk-sheet__head > :nth-child(3) {
+  animation-delay: 90ms;
+}
+.mk-sheet__head > :nth-child(n + 4) {
+  animation-delay: 130ms;
+}
+@keyframes mk-head-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Status lines (in use, owned, the price) come in softly when they change. */
+.mk-status > * {
+  animation: mk-head-in 320ms var(--ease-out) 120ms backwards;
+}
+/* Not enough petals: one soft sway, not a shake. */
+@keyframes mk-nudge {
+  30% {
+    transform: translateX(-3px);
+  }
+  65% {
+    transform: translateX(2px);
+  }
+}
+.btn.is-nudge {
+  animation: mk-nudge 360ms var(--ease-out);
+}
+
+.mk-status:has(~ .mk-actions .is-nudge) .mk-earn {
+  animation: mk-earn-glow 700ms ease-out;
+}
+@keyframes mk-earn-glow {
+  30% {
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-tile.is-changed::after,
+  .mk-tile.is-changed .mk-tile__foot > *,
+  .mk-tile.is-changed .mk-tile__native,
+  .mk-tile.is-changed .mk-seal--sm,
+  .mk-body.is-switching .mk-tile.is-stagger,
+  .mk-art--big .mk-board,
+  .mk-art--big .mk-swatch,
+  .mk-art--big .mk-garden,
+  .mk-art--big .mk-scroll__stone,
+  .mk-art--big .mk-scroll__paper,
+  .mk-art--big .mk-scroll__rod,
+  .mk-sheet__head > *,
+  .mk-status > *,
+  .mk-status .mk-earn {
+    animation: none !important;
   }
 }

@@ -23,7 +23,7 @@ import { openSheet } from '../modal';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
 import { fillStrip, pathStrip } from './path';
-import { petalBump } from '../motion';
+import { petalBump, reducedMotion } from '../motion';
 import { GARDEN_ITEMS } from '../../art/garden';
 import { hasAffordableNew, isOwned } from '../../services/market';
 
@@ -222,14 +222,35 @@ function openGift(home: HTMLElement): void {
     petalBump(home.querySelector<HTMLElement>('.petals'), shownPetals ?? before, save.petals, { delay: 200 });
     shownPetals = save.petals;
   };
-  actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => done(claimGift(1), 1) }, 'Claim'));
+  // Today's square is stamped before the sheet closes (the gift is already claimed).
+  const stampToday = (then: () => void) => {
+    const day = content.querySelector<HTMLElement>('.gday--now');
+    if (!day || reducedMotion()) return then();
+    actions.querySelectorAll('button').forEach((b) => b.setAttribute('disabled', ''));
+    day.classList.add('is-stamped');
+    day.querySelector('.gday__icon')?.insertAdjacentHTML('beforeend', `<i class="gday__done">${ICONS.check}</i>`);
+    day.insertAdjacentHTML('beforeend', '<i class="gday__seal seal" aria-hidden="true">済</i>');
+    setTimeout(then, 620);
+  };
+  actions.append(
+    h('button', {
+      class: 'btn btn--primary btn--block',
+      onclick: () => {
+        const card = claimGift(1);
+        stampToday(() => done(card, 1));
+      },
+    }, 'Claim'),
+  );
   if (ads.rewardedAvailable && !p.gift.card) {
     actions.append(
       h('button', {
         class: 'btn btn--ghost btn--block',
         html: `${ICONS.ad}<span>Claim ×2 · watch a short ad</span>`,
         onclick: async () => {
-          if (await ads.rewarded()) done(claimGift(2), 2);
+          if (await ads.rewarded()) {
+            const card = claimGift(2);
+            stampToday(() => done(card, 2));
+          }
           else toast('The ad didn’t finish. You can still claim the normal gift.');
         },
       }),

@@ -8,6 +8,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { cardSvg } from '../../art/cards';
+import { artInline } from '../../art/market-art';
 import { pathArt } from '../../art/path-art';
 import { IAP } from '../../config';
 import { cardDef, monthDef } from '../../data/deck';
@@ -274,6 +275,23 @@ const petalBurstHtml = (n: number) =>
         return `<i style="--dx:${Math.round(Math.cos(a) * d)}px;--dy:${Math.round(Math.sin(a) * d - 18)}px;--r:${Math.round(Math.random() * 300 - 150)}deg;--d:${120 + Math.round(Math.random() * 160)}ms"></i>`;
       }).join('')}</span>`;
 
+/**
+ * A mission card turns over (a short tilt away and back, transform only):
+ * `swap` changes it while it's edge-on and may return the card that replaces it.
+ */
+function turnOver(card: HTMLElement | null, swap: () => HTMLElement | null | void): void {
+  if (!card || reducedMotion()) {
+    swap();
+    return;
+  }
+  card.classList.add('is-turning');
+  setTimeout(() => {
+    const next = swap() || card;
+    next.classList.remove('is-turning');
+    retrigger(next, 'is-turned');
+  }, 170);
+}
+
 // ───────────────────────────── Screen ─────────────────────────────
 
 let lastTab: Tab | null = null;
@@ -404,8 +422,9 @@ export function pathScreen(): Screen {
     haptic.medium();
     if (row && !reducedMotion()) {
       const node = row.querySelector<HTMLElement>('.road__node')!;
-      node.insertAdjacentHTML('beforeend', `<span class="fp-seal fp-seal--node fp-stamp-in" aria-hidden="true"><b>${c.rank}</b></span>${petalBurstHtml(8)}`);
+      node.insertAdjacentHTML('beforeend', `<span class="fp-seal fp-seal--node fp-stamp-in" aria-hidden="true"><b>${c.rank}</b></span><i class="fp-ring" aria-hidden="true"></i>${petalBurstHtml(8)}`);
       row.classList.add('is-claiming');
+      if (!btn) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       const act = row.querySelector('.road__act');
       if (act) act.innerHTML = `<span class="road__done">${ICONS.check}</span>`;
     }
@@ -429,7 +448,7 @@ export function pathScreen(): Screen {
           ? `<button class="btn btn--accent mcard__claim" data-mclaim="${m.slot}">Claim</button>`
           : `${s.rerolled ? '' : `<button class="icon-btn mcard__reroll" data-reroll="${m.slot}" aria-label="Swap this mission for another (once today)">${ICONS.restart}</button>`}<button class="chip-btn mcard__go" data-mgo="${m.def.go}" data-mid="${m.def.id}">${ICONS.play}<span>Play</span></button>`;
       ul.append(
-        frag(`<li class="panel mcard${s.done ? ' is-done' : ''}${s.claimed ? ' is-claimed' : ''}">
+        frag(`<li class="panel mcard${s.done ? ' is-done' : ''}${s.claimed ? ' is-claimed' : ''}" data-slot="${m.slot}">
           <div class="mcard__top">
             <span class="mcard__badge">${pathArt(`m-${m.def.go}`, 'mcard__art')}<span class="tier" data-tier="${m.def.tier}" aria-label="${TIER_LABEL[m.def.tier]}"><i></i><i></i><i></i></span></span>
             <span class="mcard__text">${esc(m.text)}</span>
@@ -565,8 +584,12 @@ export function pathScreen(): Screen {
         sfx.stamp();
         haptic.medium();
         const card = mclaim.closest<HTMLElement>('.mcard');
-        if (card && !reducedMotion()) card.insertAdjacentHTML('beforeend', `<span class="mcard__stamp seal fp-stamp-in" aria-hidden="true">済</span>${petalBurstHtml(8)}`);
-        mclaim.replaceWith(frag(`<span class="mcard__claimed">${ICONS.check}Claimed</span>`));
+        const settle = () => {
+          card?.classList.add('is-claimed');
+          mclaim.replaceWith(frag(`<span class="mcard__claimed">${ICONS.check}Claimed</span>`));
+          if (card && !reducedMotion()) card.insertAdjacentHTML('beforeend', `<span class="mcard__stamp seal fp-stamp-in" aria-hidden="true">済</span>${petalBurstHtml(8)}`);
+        };
+        turnOver(card, settle);
         toast(`+${r.xp} XP${r.petals ? ` · +${r.petals} petals` : ''}`);
         refreshPetals();
         renderHero();
@@ -576,8 +599,12 @@ export function pathScreen(): Screen {
     }
     const reroll = t.closest<HTMLElement>('[data-reroll]');
     if (reroll) {
-      if (rerollMission(Number(reroll.dataset.reroll))) {
-        renderPane(true);
+      const slot = Number(reroll.dataset.reroll);
+      if (rerollMission(slot)) {
+        turnOver(reroll.closest<HTMLElement>('.mcard'), () => {
+          renderPane(true);
+          return pane.querySelector<HTMLElement>(`.mcard[data-slot="${slot}"]`);
+        });
         toast('A new mission for today');
       } else toast('No other mission fits right now');
       return;
@@ -599,6 +626,7 @@ export function pathScreen(): Screen {
         haptic.success();
         refreshPetals();
         renderAll();
+        pane.querySelector('.wchest')?.classList.add('is-opened');
         revealChest('Weekly chest', g, true);
       }
       return;
@@ -615,6 +643,7 @@ export function pathScreen(): Screen {
       haptic.success();
       refreshPetals();
       renderAll();
+      pane.querySelector(`[data-chest="${chest.dataset.chest}"][data-step="${chest.dataset.step}"]`)?.classList.add('is-opened');
       revealChest(`${chest.dataset.step}-blossom chest`, g);
     }
   });
@@ -639,7 +668,7 @@ export function pathScreen(): Screen {
 function revealChest(name: string, g: Granted, weekly = false): void {
   const reward: Reward = { xp: g.xp, petals: g.petals, hints: g.hints, shuffles: g.shuffles, tea: g.tea };
   const content = frag(`<div class="fp-reveal">
-    <div class="fp-up__stage"><span class="fp-chest-big fp-rise-in" aria-hidden="true">${pathArt(weekly ? 'bandaji-open' : 'chest-open', 'fp-chest-big__art')}</span>${petalBurstHtml(10)}</div>
+    <div class="fp-up__stage"><span class="fp-chest-big fp-rise-in${reducedMotion() ? ' is-still' : ''}" aria-hidden="true">${artInline(weekly ? 'bandaji-reveal' : 'chest-reveal', 'fp-chest-big__art')}</span>${petalBurstHtml(10)}</div>
     <div class="detail__kind">${esc(name)} · opened</div>
     <div class="chips chips--center">${chips(reward)}</div>
     ${

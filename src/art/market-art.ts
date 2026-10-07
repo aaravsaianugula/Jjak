@@ -202,6 +202,17 @@ function ensure(s: Element, sym: string, a: Art, fine: boolean): void {
   s.insertAdjacentHTML('beforeend', `<symbol id="mka-${sym}" viewBox="${a.vb}">${body}</symbol>`);
 }
 
+/**
+ * Inline markup (not a <use>), for art whose parts animate one by one (a chest
+ * opening). Gradients still come from the sprite.
+ */
+export function artInline(id: string, cls: string): string {
+  const a = ARTS.get(id);
+  if (!a) return '';
+  const defs = sprite() ? '' : `<defs>${DEFS}</defs>`;
+  return `<svg class="${cls}" viewBox="${a.vb}" aria-hidden="true">${defs}${build(a, true)}</svg>`;
+}
+
 /** Standalone markup (gradients inlined): for CSS data URIs and tests. */
 export function artStandalone(id: string): string {
   const a = ARTS.get(id);
@@ -422,7 +433,7 @@ defineArt('music-default', '0 0 140 110', () => {
   const n = 16;
   for (let i = 0; i < n; i++) {
     const a = A0 + ((A1 - A0) * i) / n;
-    if (i % 2) pleats += P(sector(r, R, a, a + (A1 - A0) / n), '#6b4a2a', ' opacity=".05"');
+    if (i % 2) pleats += sector(r, R, a, a + (A1 - A0) / n);
   }
   // sticks
   let sticks = '';
@@ -430,7 +441,7 @@ defineArt('music-default', '0 0 140 110', () => {
     const a = A0 + ((A1 - A0) * i) / n;
     const [x0, y0] = pt(6, a);
     const [x1, y1] = pt(r + 1, a);
-    sticks += S(`M${f(x0)} ${f(y0)}L${f(x1)} ${f(y1)}`, '#c9a66a', 1.7) + S(`M${f(x0)} ${f(y0)}L${f(x1)} ${f(y1)}`, '#e9d39e', 0.5);
+    sticks += `M${f(x0)} ${f(y0)}L${f(x1)} ${f(y1)}`;
   }
   const guard = (a: number) => {
     const [x0, y0] = pt(4, a);
@@ -481,9 +492,10 @@ defineArt('music-default', '0 0 140 110', () => {
   return (
     `<defs>${clip}</defs>` +
     shadow(70, 101, 58, 5) +
-    sticks +
+    S(sticks, '#c9a66a', 1.7) +
+    S(sticks, '#e9d39e', 0.5) +
     leaf +
-    pleats +
+    P(pleats, '#6b4a2a', ' opacity=".05"') +
     `<g clip-path="url(#mka-fanclip)">${spring}${summer}${autumn}${winter}</g>` +
     S(`M${f(gx0)} ${f(gy0)}A${R} ${R} 0 0 1 ${f(gx1)} ${f(gy1)}`, '#8a6a44', 0.8) +
     S(sector(r, R, A0, A1), '#8a6a44', 0.5, ' opacity=".6"') +
@@ -506,11 +518,13 @@ defineArt('music-gayageum', '0 0 140 110', () => {
   const K = 1.5; // the body is drawn flat and stretched to its true width
   let strings = '';
   let bridges = '';
+  let shades = '';
   for (let i = 0; i < 12; i++) {
     const y = 53.4 + i * 1.1;
     const x = 46 + i * 4.6;
-    bridges += P(`M${f(x - 2.2)} ${f(y + 0.9)}L${f(x - 0.3)} ${f(y - 1.5)}H${f(x + 0.3)}L${f(x + 2.2)} ${f(y + 0.9)}Z`, '#f8f0de', ' stroke="#6e5034" stroke-width=".3"') + P(`M${f(x + 0.3)} ${f(y - 1.5)}L${f(x + 2.2)} ${f(y + 0.9)}H${f(x + 0.6)}Z`, '#cbb48c');
-    strings += S(`M10 ${f(y)}H121`, '#f6ead0', 0.38);
+    bridges += `M${f(x - 2.2)} ${f(y + 0.9)}L${f(x - 0.3)} ${f(y - 1.5)}H${f(x + 0.3)}L${f(x + 2.2)} ${f(y + 0.9)}Z`;
+    shades += `M${f(x + 0.3)} ${f(y - 1.5)}L${f(x + 2.2)} ${f(y + 0.9)}H${f(x + 0.6)}Z`;
+    strings += `M10 ${f(y)}H121`;
   }
   // string tails hang from the head end
   let tails = '';
@@ -536,8 +550,9 @@ defineArt('music-gayageum', '0 0 140 110', () => {
     P('M8 52Q5.6 59 8 67H121V52Z', 'url(#mka-wood-pale)', ` stroke="${LINE}" stroke-width=".7"`) +
     S('M20 55.2Q60 54.4 116 55.6M24 63.4Q70 64.2 114 62.8', '#a87a48', 0.4, ' opacity=".35"') +
     P('M13.2 52.4H15V66.6H13.2Z', '#5a3a22') +
-    bridges +
-    strings +
+    P(bridges, '#f8f0de', ' stroke="#6e5034" stroke-width=".3"') +
+    P(shades, '#cbb48c') +
+    S(strings, '#f6ead0', 0.38) +
     P('M121 51 127 49.6C131 49 133.6 50.6 133.6 54V65C133.6 68.4 131 70 127 69.4L121 68Z', 'url(#mka-wood-dark)', ` stroke="${LINE}" stroke-width=".6"`) +
     S('M128.6 51.6c2.6-.6 3.6 2.2 1.2 2.8M128.6 67.6c2.6.6 3.6-2.2 1.2-2.8', '#e3c27a', 0.7) +
     S('M9 53.4Q7.4 59 9 65.6', '#fff', 0.8, ' opacity=".35"') +
@@ -560,11 +575,13 @@ defineArt('music-koto', '0 0 140 110', () => {
   const C: [number, number] = [70, 84];
   let strings = '';
   let ji = '';
+  let jiShade = '';
   for (let i = 0; i < 13; i++) {
     const y = 76.8 + i * 0.72;
     const x = 30 + i * 5.6 + (i % 2) * 1.5;
-    ji += P(`M${f(x - 1.9)} ${f(y + 1.7)}L${f(x - 0.7)} ${f(y - 2.6)}H${f(x + 0.7)}L${f(x + 1.9)} ${f(y + 1.7)}Z`, '#fbf7ea', ' stroke="#7a6a4c" stroke-width=".3"') + P(`M${f(x + 0.7)} ${f(y - 2.6)}L${f(x + 1.9)} ${f(y + 1.7)}H${f(x + 0.9)}Z`, '#d6c8a6');
-    strings += S(`M12 ${f(y)}H117`, '#f7f0dc', 0.32);
+    ji += `M${f(x - 1.9)} ${f(y + 1.7)}L${f(x - 0.7)} ${f(y - 2.6)}H${f(x + 0.7)}L${f(x + 1.9)} ${f(y + 1.7)}Z`;
+    jiShade += `M${f(x + 0.7)} ${f(y - 2.6)}L${f(x + 1.9)} ${f(y + 1.7)}H${f(x + 0.9)}Z`;
+    strings += `M12 ${f(y)}H117`;
   }
   return (
     `<defs><clipPath id="mka-window"><circle cx="100" cy="35" r="29"/></clipPath></defs>` +
@@ -593,8 +610,9 @@ defineArt('music-koto', '0 0 140 110', () => {
     P('M117 75H134Q136 75 136 77V86H117Z', '#8e2f24') +
     S('M119 76 135 85M123 75.4 135 82.4M117.6 79 131 86M117.6 83 125 86', '#e3c27a', 0.4, ' opacity=".75"') +
     S('M117 75.4V85.6', '#e3c27a', 0.6) +
-    ji +
-    strings +
+    P(ji, '#fbf7ea', ' stroke="#7a6a4c" stroke-width=".3"') +
+    P(jiShade, '#d6c8a6') +
+    S(strings, '#f7f0dc', 0.32) +
     `</g>`
   );
 });
