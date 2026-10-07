@@ -2,7 +2,7 @@
 /**
  * Drives the web build through every screen and saves phone-size screenshots.
  *   npm run dev   (in another terminal)   then   npm run screens [baseUrl] [outDir]
- * Also used to produce Play Store screenshots (1080×2340 at scale 2.77).
+ * Env: THEME=paper|ink, VIEW=390x844, SCALE=2 (store shots: SCALE=2.6214 VIEW=412x732)
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -15,106 +15,123 @@ const [vw, vh] = (process.env.VIEW ?? '390x844').split('x').map(Number);
 mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium' });
-const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: scale, hasTouch: true, colorScheme: theme === 'ink' ? 'dark' : 'light' });
-let page = await ctx.newPage();
-page.on('pageerror', (e) => console.log('pageerror:', e.message));
-page.on('console', (m) => m.type() === 'error' && !m.text().includes('404') && console.log('console:', m.text()));
-/** Boot the app in a fresh context whose localStorage already holds `data`. */
-const loadWith = async (data) => {
+let page;
+
+/** Fresh context whose localStorage already holds `data` (null = first launch). */
+async function open(data) {
   const origin = new URL(base).origin;
-  const t = JSON.stringify(data);
-  const fresh = await browser.newContext({
-    viewport: { width: vw, height: vh }, deviceScaleFactor: scale, hasTouch: true, colorScheme: theme === 'ink' ? 'dark' : 'light',
-    storageState: { cookies: [], origins: [{ origin, localStorage: [{ name: 'jjak.save.v1', value: t }, { name: 'CapacitorStorage.jjak.save.v1', value: t }] }] },
+  const origins = data
+    ? [{ origin, localStorage: ['jjak.save.v1', 'CapacitorStorage.jjak.save.v1'].map((name) => ({ name, value: JSON.stringify(data) })) }]
+    : [];
+  const ctx = await browser.newContext({
+    viewport: { width: vw, height: vh },
+    deviceScaleFactor: scale,
+    hasTouch: true,
+    colorScheme: theme === 'ink' ? 'dark' : 'light',
+    storageState: { cookies: [], origins },
   });
-  page = await fresh.newPage();
+  page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror:', e.message));
   await page.goto(base);
-};
+  await page.waitForTimeout(400);
+}
 const shot = async (name) => {
   await page.waitForTimeout(700);
   await page.screenshot({ path: `${out}/${name}.png` });
   console.log('saved', name);
 };
+/** Play `n` hinted pairs (or until the board/sheet changes). */
+async function playPairs(n, gap = 450) {
+  for (let k = 0; k < n; k++) {
+    if (await page.$('.sheet')) return;
+    await page.click('.tool[aria-label="Hint"]');
+    await page.waitForTimeout(100);
+    const cells = await page.$$eval('.card.is-hint', (els) => els.map((e) => e.getAttribute('data-cell')));
+    if (cells.length < 2) return;
+    await page.locator(`.card[data-cell="${cells[0]}"]`).dispatchEvent('pointerdown');
+    await page.locator(`.card[data-cell="${cells[1]}"]`).dispatchEvent('pointerdown');
+    await page.waitForTimeout(gap);
+  }
+}
 
-// 1. First launch
-await page.goto(base);
-await page.evaluate(() => localStorage.clear());
-await page.reload();
-await shot('01-welcome');
-await page.click('[data-next]');
-await shot('02-age');
-await page.selectOption('select.year', '2008');
-await page.click('[data-done]');
-await shot('03-level1-tutorial');
-
-// 2. A returning player mid-way through Summer
-const saveData = {
-  v: 1, birthYear: 2006, level: 17, petals: 145, hints: 2, shuffles: 1,
+const album = [0, 1, 2, 3, 4, 7, 8, 10, 11, 12, 15, 16, 19, 20, 22, 23, 24, 27, 28, 29, 30, 31, 32, 35, 36, 39, 40, 43, 44, 47];
+const today = new Date();
+const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const results = {};
+for (const back of [1, 2, 3, 5]) results[key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - back))] = { ms: 98000, score: 4200, combo: 4, stars: 2 };
+const base17 = {
+  v: 1, onboarded: true, birthYear: null, level: 17, petals: 145, hints: 2, shuffles: 1,
   stars: Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i + 1, 2 + (i % 2)])),
-  album: [0, 3, 4, 7, 8, 11, 12, 15, 16, 19, 20, 23, 24, 28, 29, 31, 32, 35, 36, 40, 43, 44, 47],
-  daily: { streak: 4, best: 6, lastDate: null, results: {} },
+  album,
+  daily: { streak: 3, best: 6, lastDate: key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)), results },
   settings: { sound: false, haptics: false, theme },
-  stats: { pairs: 300, clears: 16, bestCombo: 5, zenBoards: 2 },
+  stats: { pairs: 412, clears: 21, bestCombo: 5, zenBoards: 2, cleanClears: 7, fastClears: 12, bestDailyMs: 83000 },
   ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0 },
   seenTips: ['variants', 'stones'],
+  seals: ['first', 'combo3', 'combo5', 'spring', 'daily1', 'streak3', 'month', 'godori', 'tsukimi'],
+  paper: 'plain',
 };
-await loadWith(saveData);
-await shot('04-home');
 
+// 1. First launch
+await open(null);
+await shot('01-welcome');
+await page.click('[data-begin]');
+await shot('02-level1-tutorial');
+
+// 2. Returning player
+await open(base17);
+await shot('03-home');
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
-await shot('05-game');
+await shot('04-game');
+await playPairs(2, 120);
+await page.waitForTimeout(80);
+await page.screenshot({ path: `${out}/05-path.png` });
+console.log('saved 05-path');
 
-// make a couple of moves using the hint button logic exposed through the DOM
-for (let k = 0; k < 3; k++) {
-  await page.click('.tool[aria-label="Hint"]');
-  await page.waitForTimeout(150);
-  const cells = await page.$$eval('.card.is-hint', (els) => els.map((e) => e.getAttribute('data-cell')));
-  if (cells.length < 2) break;
-  await page.locator(`.card[data-cell="${cells[0]}"]`).dispatchEvent('pointerdown');
-  if (k === 2) {
-    await page.waitForTimeout(100);
-    await shot('06-selected');
-  }
-  await page.locator(`.card[data-cell="${cells[1]}"]`).dispatchEvent('pointerdown');
-  await page.waitForTimeout(120);
-  if (k === 1) await page.screenshot({ path: `${out}/07-path.png` });
-  await page.waitForTimeout(500);
-}
-
-// 3. Solve a whole small board to reach the result sheet
-await loadWith({ ...saveData, level: 2, hints: 99 });
+// 3. Result sheet with a new card draw + seal
+await open({ ...base17, level: 2, stars: {}, hints: 99, seals: [] });
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
-for (let k = 0; k < 40; k++) {
-  if (await page.$('.sheet')) break;
-  await page.click('.tool[aria-label="Hint"]');
-  await page.waitForTimeout(80);
-  const cells = await page.$$eval('.card.is-hint', (els) => els.map((e) => e.getAttribute('data-cell')));
-  if (cells.length < 2) break;
-  await page.locator(`.card[data-cell="${cells[0]}"]`).dispatchEvent('pointerdown');
-  await page.locator(`.card[data-cell="${cells[1]}"]`).dispatchEvent('pointerdown');
-  await page.waitForTimeout(420);
-}
-await page.waitForSelector('.sheet', { timeout: 5000 });
-await page.waitForTimeout(900);
-await shot('08-result');
+await playPairs(40, 380);
+await page.waitForSelector('.sheet', { timeout: 6000 });
+await page.waitForTimeout(1000);
+await shot('06-result');
 
-// 4. Album + detail
-await loadWith(saveData);
+// 4. Journey map, seals, album
+await open(base17);
+await page.click('[data-go="map"]');
+await shot('07-map');
+await open(base17);
+await page.click('[data-go="seals"]');
+await shot('08-seals');
+await open(base17);
 await page.click('[data-go="album"]');
 await shot('09-album');
-await page.click('.month__cards button[data-id="28"]');
+await page.click('.month__cards button[data-id="31"]');
 await shot('10-card-detail');
 
-// 5. Settings, Daily
-await loadWith(saveData);
+// 5. New mechanics (tips dismissed), with a board paper
+await open({ ...base17, level: 30, seenTips: ['variants', 'stones', 'gravity', 'snow'], paper: '7', hints: 99 });
+await page.click('[data-go="journey"]');
+await page.waitForSelector('.card');
+await shot('11-falling-leaves');
+await open({ ...base17, level: 38, seenTips: ['variants', 'stones', 'gravity'], hints: 99, paper: '2' });
+await page.click('[data-go="journey"]');
+await page.waitForSelector('.card');
+await shot('12-snow-tip');
+await page.click('.sheet .btn');
+await shot('13-snow');
+
+// 6. Settings + paper picker, Daily
+await open(base17);
 await page.click('[data-go="settings"]');
-await shot('11-settings');
-await loadWith(saveData);
+await shot('14-settings');
+await page.click('[data-act="paper"]');
+await shot('15-papers');
+await open(base17);
 await page.click('[data-go="daily"]');
 await page.waitForSelector('.card');
-await shot('12-daily');
+await shot('16-daily');
 
 await browser.close();

@@ -12,6 +12,9 @@ export interface DailyResult {
 
 export interface SaveData {
   v: 1;
+  /** finished the first-launch welcome */
+  onboarded: boolean;
+  /** legacy (pre-13+ builds asked for it); no longer collected */
   birthYear: number | null;
   /** highest Journey level unlocked (1-based) */
   level: number;
@@ -22,7 +25,22 @@ export interface SaveData {
   album: number[];
   daily: { streak: number; best: number; lastDate: string | null; results: Record<string, DailyResult> };
   settings: { sound: boolean; haptics: boolean; theme: Theme };
-  stats: { pairs: number; clears: number; bestCombo: number; zenBoards: number };
+  stats: {
+    pairs: number;
+    clears: number;
+    bestCombo: number;
+    zenBoards: number;
+    /** boards cleared with no hint/shuffle */
+    cleanClears: number;
+    /** boards cleared under par */
+    fastClears: number;
+    /** fastest daily, ms */
+    bestDailyMs: number;
+  };
+  /** earned achievement ids */
+  seals: string[];
+  /** selected board paper: 'plain' or a month key */
+  paper: string;
   ads: { clearsSinceInterstitial: number; lastInterstitialAt: number };
   seenTips: string[];
 }
@@ -31,6 +49,7 @@ const KEY = 'jjak.save.v1';
 
 export const defaultSave = (): SaveData => ({
   v: 1,
+  onboarded: false,
   birthYear: null,
   level: 1,
   stars: {},
@@ -40,7 +59,9 @@ export const defaultSave = (): SaveData => ({
   album: [],
   daily: { streak: 0, best: 0, lastDate: null, results: {} },
   settings: { sound: true, haptics: true, theme: 'auto' },
-  stats: { pairs: 0, clears: 0, bestCombo: 0, zenBoards: 0 },
+  stats: { pairs: 0, clears: 0, bestCombo: 0, zenBoards: 0, cleanClears: 0, fastClears: 0, bestDailyMs: 0 },
+  seals: [],
+  paper: 'plain',
   ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0 },
   seenTips: [],
 });
@@ -53,6 +74,7 @@ function hydrate(raw: unknown): SaveData {
   return {
     ...base,
     ...r,
+    onboarded: r.onboarded ?? r.birthYear != null,
     daily: { ...base.daily, ...(r.daily ?? {}) },
     settings: { ...base.settings, ...(r.settings ?? {}) },
     stats: { ...base.stats, ...(r.stats ?? {}) },
@@ -108,10 +130,7 @@ export async function flush(): Promise<void> {
 }
 
 export async function resetSave(): Promise<void> {
-  const keep = { birthYear: save.birthYear, settings: save.settings };
+  const keep = { onboarded: save.onboarded, settings: save.settings };
   save = { ...defaultSave(), ...keep };
   await flush();
 }
-
-export const ageOf = (birthYear: number | null): number | null =>
-  birthYear == null ? null : new Date().getFullYear() - birthYear;

@@ -1,6 +1,6 @@
 # Jjak — Market & Player Research (October 2026)
 
-Purpose: decide *what* puzzle game to build for a global, 10–25 audience on Google Play,
+Purpose: decide *what* puzzle game to build for a global, 13–25 audience on Google Play,
 grounded in current data rather than vibes. Every claim below links to its source; the
 **Confidence** column says how much weight it deserves.
 
@@ -29,7 +29,7 @@ grounded in current data rather than vibes. Every claim below links to its sourc
 | From **Aug 31, 2026** new apps/updates must target **Android 16 (API 36)** (extension to Nov 1, 2026 available). | [Android Developers — target SDK](https://developer.android.com/google/play/requirements/target-sdk), [Play Console Help](https://support.google.com/googleplay/android-developer/answer/11926878) | High (official) |
 | **Capacitor 8** targets SDK 36, minSdk 24, AGP 8.13, Gradle 8.14.3, Java 21. | [Capacitor 8 upgrade guide](https://capacitorjs.com/docs/updating/8-0) | High (official) |
 | New **personal** Play developer accounts (created after Nov 13, 2023) must run a **closed test with ≥12 testers for 14 consecutive days** before production. | [Choicely](https://www.choicely.com/blog/google-play-12-tester-rule), [testerscommunity](https://www.testerscommunity.com/guides/how-many-testers-do-you-need-google-play) | Medium-High (consistent secondary sources; confirm in Play Console) |
-| A 10–25 audience includes **under-13s → Google Play Families policy** applies. Ads to children must be tagged child-directed, use Families-certified SDKs (AdMob is), and must not send the Advertising ID for kids/unknown-age users. AdMob's TFCD/TFUA tags are being superseded by a "tag for age treatment". | [AdMob Help — Families](https://support.google.com/admob/answer/6223431), [AdMob Help — child-directed](https://support.google.com/admob/answer/6219315) | High (official) |
+| An audience that includes **under-13s triggers the Google Play Families policy** (Jjak therefore targets 13+). Ads to children must be tagged child-directed, use Families-certified SDKs (AdMob is), and must not send the Advertising ID for kids/unknown-age users. AdMob's TFCD/TFUA tags are being superseded by a "tag for age treatment". | [AdMob Help — Families](https://support.google.com/admob/answer/6223431), [AdMob Help — child-directed](https://support.google.com/admob/answer/6219315) | High (official) |
 | `@capacitor-community/admob` **8.x** supports Capacitor 8 incl. UMP consent (`requestConsentInfo`, `showConsentForm`, `showPrivacyOptionsForm`). | [npm](https://www.npmjs.com/package/@capacitor-community/admob), [Capgo guide](https://capgo.app/blog/admob-gdpr-consent-capacitor/) | High |
 
 ---
@@ -85,7 +85,7 @@ Why this wins:
 | Risk | Mitigation |
 |---|---|
 | Hwatu is associated with gambling (Go-Stop) in Korea | No betting, no wagering vocabulary, no chips/coins visuals; IARC answer "no simulated gambling" is accurate because there is no wagering mechanic. |
-| Under-13 users → Families policy | Neutral age screen; child-directed ad requests with G max rating for <13; non-personalized ads. |
+| Under-13 users → Families policy | Target audience set to 13+; no child-oriented marketing; ads capped at Parental Guidance. |
 | Cultural accuracy | Both KR and JP names shown; document KR/JP differences as fun facts; native-speaker review before launch. |
 | Matching-by-month is harder than identical tiles | Teach gradually: early levels use identical cards only, variants introduced at level 6+, month numeral printed on every card. |
 

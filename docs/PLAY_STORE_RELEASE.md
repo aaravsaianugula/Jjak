@@ -113,8 +113,8 @@ with GitHub Pages:
 | Privacy policy | URL from section 5 |
 | Ads | **Yes, contains ads** |
 | App access | All functionality available without special access |
-| Target audience | **9–12, 13–15, 16–17, 18+**. Because 9–12 is included, the app falls under the **Families policy**. The code already handles this with a neutral age screen, child-directed / G-rated / non-personalized ad requests for under-13s, and AdMob, which is a Families Self-Certified Ads SDK. *Simpler alternative:* pick 13+ only. You avoid Families review, but then you can't market to under-13s. |
-| Appeals to children? | Answer honestly. The art is deliberately *not* childish, but if you select 9–12, Google may still apply Families rules. |
+| Target audience | **13–15, 16–17, 18+** (13+ only). The app isn't in the Families programme, so it has no age gate. Ads are capped at Parental Guidance content in `src/services/ads.ts`. |
+| Unintentional appeal to children? | **No**. The art, copy and store listing are aimed at teens and young adults: no cartoon mascots, no childish language. Keep the listing that way, or Google may ask you to join Families. |
 | Content rating (IARC) | Category **Game**. No violence, sexuality, language, or drugs. **No gambling or simulated gambling**: the cards come from a deck that's also used for gambling games, but Jjak has no wagering, chips, or betting. Users can't interact or share user-generated content (the share button sends plain text through the OS). Expected result: **Everyone / PEGI 3 / USK 0**. |
 | Data safety | See below. |
 | Government app / financial / health | No |
@@ -130,7 +130,6 @@ because it's the authoritative source. At the time of writing, typical answers a
 | Approximate location (from IP) | Yes | Yes | Advertising, fraud prevention | |
 | App interactions | Yes | Yes | Advertising, analytics | |
 | Crash logs / diagnostics | Yes | Yes | Analytics, fraud prevention | |
-| Birth year | **No** | — | — | It stays on the device and is never transmitted. Only an age *bucket* flag goes into ad requests. |
 
 * Data is encrypted in transit: **Yes**.
 * Users can request deletion: game data is local, so uninstalling or using *Settings →
@@ -158,11 +157,16 @@ winter.
 The cards come from the 48-card flower deck that Korea (Hwatu 화투) and Japan
 (Hanafuda 花札) share — redrawn from scratch in a calm, paper-and-ink style.
 
-◆ JOURNEY — hundreds of hand-tuned, always-solvable boards across four seasons
-◆ DAILY JJAK — one board for the whole world each day. Keep your streak, share your time
+◆ JOURNEY — endless, always-solvable boards across four seasons. Stones in summer,
+  falling leaves in autumn, first snow in winter
+◆ DAILY JJAK — one board for the whole world each day, with a new theme every weekday.
+  Keep your streak, share your time
 ◆ ZEN — endless boards with no clock at all
 ◆ ALBUM — collect all 48 cards and learn each flower's name in Korean and Japanese,
   with little stories behind them (why is the October deer looking away?)
+◆ SEALS — 28 achievements, including the classic card sets players in Korea and Japan
+  know by heart: Five Brights, Godori, Boar-Deer-Butterfly
+◆ BOARD PAPERS — complete a flower to unlock its paper for your board
 ◆ Paper and Ink themes, gentle sound design, satisfying haptics
 ◆ Plays offline. Short sessions. No account needed.
 
@@ -180,7 +184,7 @@ rewarded ads are always your choice.
 ## 7. Release tracks
 
 1. **Internal testing**: upload the AAB and add yourself. Install from the Play link and
-   check that test ads, consent, and the age screen work.
+   check that test ads and the consent form work.
 2. **Closed testing** (required for new personal accounts): ≥ 12 testers opted in for 14
    days straight. Friends, classmates, or a Discord or Reddit community work. Keep them
    playing, because Google asks about tester engagement when you apply for production.
@@ -189,8 +193,10 @@ rewarded ads are always your choice.
 
 ## 8. Pre-launch QA checklist
 
-- [ ] First launch: welcome → birth year → Level 1 tutorial shows a hint and coach text
-- [ ] Year 2016 (under 13): ads load as G-rated test ads, with no personalized-ads consent prompt
+- [ ] First launch: welcome (three rules) → Level 1 tutorial shows a hint and coach text
+- [ ] Level 6 shows the "four cards per flower" tip; Level 27 shows Falling leaves; Level 38 shows First snow
+- [ ] Seals: earning one shows it on the result sheet and adds petals
+- [ ] Settings → Board paper: locked papers can't be picked; a completed flower unlocks its paper
 - [ ] EU test (UMP debug geography EEA): consent form appears, and Settings shows "Ad privacy choices"
 - [ ] Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s
 - [ ] Rewarded: closing early grants nothing, and finishing grants the item

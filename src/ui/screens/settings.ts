@@ -1,4 +1,6 @@
-import { Capacitor } from '@capacitor/core';
+import { MONTH_TINTS } from '../../art/cards';
+import { MONTHS } from '../../data/deck';
+import { completedMonths } from '../../services/progress';
 import { APP_VERSION, LINKS } from '../../config';
 import { ads } from '../../services/ads';
 import { resetSave, save, persist, type Theme } from '../../services/storage';
@@ -20,9 +22,10 @@ export function settingsScreen(): Screen {
       <div class="list">
         <div class="row"><span>Sound</span><button class="switch" role="switch" data-toggle="sound" aria-label="Sound"></button></div>
         <div class="row"><span>Haptics</span><button class="switch" role="switch" data-toggle="haptics" aria-label="Haptics"></button></div>
+        <button class="row" data-act="paper"><span>Board paper<small data-paper-name></small></span><span class="muted">›</span></button>
         <div class="row"><span>Theme</span>
           <div class="seg" role="group" aria-label="Theme">
-            <button data-theme="auto">Auto</button><button data-theme="paper">Paper</button><button data-theme="ink">Ink</button>
+            <button data-set-theme="auto">Auto</button><button data-set-theme="paper">Paper</button><button data-set-theme="ink">Ink</button>
           </div>
         </div>
       </div>
@@ -40,12 +43,14 @@ export function settingsScreen(): Screen {
     </div>
   </section>`);
 
+  const paperName = () => (save.paper === 'plain' ? 'Plain hanji' : MONTHS[Number(save.paper)].en);
   const sync = () => {
+    el.querySelector('[data-paper-name]')!.textContent = paperName();
     el.querySelectorAll<HTMLElement>('[data-toggle]').forEach((b) => {
       const k = b.dataset.toggle as 'sound' | 'haptics';
       b.setAttribute('aria-checked', String(save.settings[k]));
     });
-    el.querySelectorAll<HTMLElement>('[data-theme]').forEach((b) => b.setAttribute('aria-pressed', String(save.settings.theme === b.dataset.theme)));
+    el.querySelectorAll<HTMLElement>('[data-set-theme]').forEach((b) => b.setAttribute('aria-pressed', String(save.settings.theme === b.dataset.setTheme)));
   };
   sync();
 
@@ -60,9 +65,9 @@ export function settingsScreen(): Screen {
       sync();
       return;
     }
-    const th = t.closest<HTMLElement>('[data-theme]');
+    const th = t.closest<HTMLElement>('[data-set-theme]');
     if (th) {
-      save.settings.theme = th.dataset.theme as Theme;
+      save.settings.theme = th.dataset.setTheme as Theme;
       persist();
       applyTheme();
       sync();
@@ -70,6 +75,10 @@ export function settingsScreen(): Screen {
     }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'how') showHowToPlay();
+    if (act === 'paper') {
+      await pickPaper();
+      sync();
+    }
     if (act === 'consent') await ads.showPrivacyOptions();
     if (act === 'reset') {
       const ok = await choose('Reset all progress?', 'Levels, stars, petals, streaks and your album will be erased. This can’t be undone.', [
@@ -83,7 +92,6 @@ export function settingsScreen(): Screen {
       }
     }
   });
-  if (!Capacitor.isNativePlatform()) void 0;
   return { name: 'settings', el };
 }
 
@@ -101,4 +109,32 @@ export function showHowToPlay(): void {
   content.append(btn);
   const s = openSheet(content, { label: 'How to play' });
   btn.addEventListener('click', () => s.close());
+}
+
+/** Board papers: one per flower, unlocked by collecting all four of its cards. */
+function pickPaper(): Promise<void> {
+  const done = new Set(completedMonths());
+  const swatch = (key: string, name: string, tint: string, motif: number, locked: boolean) => `
+    <button class="swatch ${save.paper === key ? 'is-on' : ''}" data-paper="${key}" ${locked ? 'disabled' : ''} aria-label="${esc(name)}${locked ? ', locked' : ''}">
+      <span class="swatch__face" style="--paper-tint:${tint}">${motif >= 0 ? `<svg viewBox="0 0 100 140"><use href="#motif-${motif}"/></svg>` : ''}</span>
+      <span class="swatch__name">${esc(name)}</span>
+      ${locked ? '<span class="swatch__lock">Collect all 4</span>' : ''}
+    </button>`;
+  const content = frag(`<div>
+    <h2>Board paper</h2>
+    <p class="muted">Collect all four cards of a flower in the Album to unlock its paper.</p>
+    <div class="swatches">
+      ${swatch('plain', 'Plain hanji', 'transparent', -1, false)}
+      ${MONTHS.map((m) => swatch(String(m.index), m.en, MONTH_TINTS[m.index], m.index, !done.has(m.index))).join('')}
+    </div>
+  </div>`);
+  const sheet = openSheet(content, { label: 'Board paper' });
+  content.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-paper]');
+    if (!b || b.disabled) return;
+    save.paper = b.dataset.paper!;
+    persist();
+    sheet.close();
+  });
+  return sheet.closed;
 }

@@ -2,7 +2,7 @@
 
 **One-liner:** a calm, beautiful pair-connecting puzzle built on the 48-card flower deck
 that Korea (Hwatu 화투) and Japan (Hanafuda 花札) share.
-**Audience:** global, ages 10–25 (US first). **Platform:** Android (Google Play) via
+**Audience:** global, ages 13–25 (Play target audience 13+, US first). **Platform:** Android (Google Play) via
 Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md`](RESEARCH.md).
 
 ---
@@ -38,8 +38,11 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 | Loop | Cadence | Hook |
 |---|---|---|
 | **Journey** | Session | Endless levels in 4 seasonal chapters × 12 levels, then "Year 2" with more stones. |
-| **Daily Jjak** | Daily | One worldwide board per date. Streak counter and an emoji share card. |
-| **Album** | Weeks | 48 collectible cards with KR/JP names, romanization, and culture notes. One new card per first clear and per Daily. |
+| **Daily Jjak** | Daily | One worldwide board per date with a weekday theme (Stone Monday, Snowy Tuesday, Leaf-fall Wednesday…). Streak counter, a 7-day strip on Home, a countdown to the next board, and an emoji share card. |
+| **Album** | Weeks | 48 collectible cards with KR/JP names, romanization, and culture notes. One new card per first clear and per Daily. Each card shows which real card sets (yaku) it belongs to. |
+| **Seals 印** | Weeks–months | 28 achievements in four groups (Play, Journey, Daily, Album sets), each paying petals. The Album sets are real Go-Stop / Koi-Koi yaku: 홍단 red poetry ribbons, 청단 blue ribbons, 초단 plain red ribbons, 고도리 Godori, 猪鹿蝶 Ino-Shika-Chō, 月見酒 / 花見酒, and 오광 Five Brights. Collecting is the only goal; nothing is wagered. |
+| **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif) under Settings. 12 to collect. |
+| **Journey map** | Any time | Every unlocked level with its blossoms, so you can replay for missing ones. |
 | **Zen** | Any time | Endless, untimed, no stars. |
 
 ## 4. Level curve
@@ -50,10 +53,12 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 | 2–5 | 4×4 → 6×5 | 6 → 12 | identical | 0 | Scanning bigger boards |
 | 6 | 6×4 | 12 | **4 per flower** | 0 | "Match the flower, not the picture" (tip sheet) |
 | 7–12 (Spring) | 6×5 → 8×6 | 12 | yes | 0 | Full 48-card boards |
-| 13–24 (Summer) | as above | 12 | yes | 2 from slot 4 | Routing around stones |
-| 25–36 (Autumn) | as above | 12 | yes | 2–4 | Planning order |
-| 37–48 (Winter) | as above | 12 | yes | 2–6 | Mastery |
-| 49+ | loops | 12 | yes | up to `maxStones` | Endless |
+| 13–24 (Summer) | as above | 12 | yes | 2 from slot 4 | **Stones** block paths |
+| 25–36 (Autumn) | as above | 12 | yes | 2–4 | **Falling leaves** on every other level from 27: cards drop to fill gaps after each pair |
+| 37–48 (Winter) | as above | 12 | yes | 2–6 | **First snow** on every other level from 38: ~20% of cards start face-down and are revealed when a neighbour clears |
+| 49+ (Year 2…) | loops | 12 | yes | up to `maxStones` | All three ideas mixed (never falling leaves and snow on the same board) |
+
+Falling-leaves and snow boards get +10 s of par time. If snow is the only reason a board is stuck, all snow melts for free; if it's still stuck, the board reshuffles.
 
 `maxStones(rows, cols) = floor(interior / 4)` (rounded down to an even number) keeps
 boards open. **Par time** = `ceil((pairs × 4.5 + 10) / 5) × 5` seconds.
@@ -89,12 +94,9 @@ which is why the Daily is identical worldwide.
 | Interstitial | *Between* boards only | Never before level 5. At most once every 3 clears and once every 150 s. Never mid-puzzle. |
 | Banner | Home and Album | Never over the board. |
 
-**Age-appropriate ads.** A neutral birth-year screen appears on first launch.
-* Under 13 (or unknown): child-directed treatment, under-age-of-consent, max rating G,
-  non-personalized.
-* 13–15: under-age-of-consent, PG.
-* 16–17: PG.
-* 18+: T.
+**Audience and ads.** The Play Console target audience is 13+, so Jjak is not in the
+Families programme and has no age gate. Ad requests are capped at **Parental Guidance**
+content to suit an Everyone-rated game played by teens.
 
 Consent goes through Google UMP before any ad request.
 

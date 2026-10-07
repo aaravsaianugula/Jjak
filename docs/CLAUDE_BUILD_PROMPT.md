@@ -7,7 +7,7 @@
 ---
 
 You are a senior mobile game designer and engineer. Plan, design, and build **Jjak (짝)**,
-a puzzle game for Google Play aimed at a **global audience aged 10–25** (US first). Be
+a puzzle game for Google Play aimed at a **global audience aged 13–25** (US first; Play target audience 13+). Be
 creative, but make choices that ship. Work in phases, and verify each phase before moving on.
 
 ## 1. Product brief (fixed decisions)
@@ -73,9 +73,8 @@ creative, but make choices that ship. Work in phases, and verify each phase befo
   and once every 150 s. Never mid-puzzle.
 - **Banner:** home/album screens only, never over the board.
 - **Consent:** Google UMP (GDPR/US states) on launch; privacy-options entry in Settings.
-- **Ages 10–25 means Families policy.** Use a neutral age screen on first launch (birth
-  year). For users under 13, use child-directed / under-age-of-consent ad requests, max
-  content rating G, and no personalized ads. Never ask for any other personal data.
+- **Audience is 13+** in Play Console, so the app stays out of the Families programme: no
+  age gate. Cap ad content at Parental Guidance and never collect personal data.
 - Put all ad unit IDs in one config file. Ship with Google's **test IDs** and document the swap.
 
 ## 5. Tech stack and constraints
@@ -114,7 +113,7 @@ creative, but make choices that ship. Work in phases, and verify each phase befo
 1. Restate the plan as milestones with acceptance criteria.
 2. Build the engine and tests first, and get them green.
 3. Build the UI. Screenshot it, critique it like an art director, and iterate at least twice.
-4. Wire up ads, consent, and the age gate, with test IDs.
+4. Wire up ads and consent, with test IDs.
 5. Package Android and CI. Make sure the build passes in CI.
 6. Finish with a report covering what was built, how it was verified, what the owner must do
    (AdMob IDs, keystore, Play Console), and known limitations.

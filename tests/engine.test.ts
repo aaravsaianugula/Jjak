@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY, STONE, type Board, cardsLeft, isCard, monthOf } from '../src/engine/board';
 import { generateBoard, reshuffle } from '../src/engine/generate';
-import { buildBoard, dailyLevel, dailyNumber, journeyLevel, zenLevel } from '../src/engine/levels';
-import { countMoves, findMove } from '../src/engine/moves';
+import { buildBoard, dailyLevel, dailyNumber, dailyTheme, journeyLevel, pickSnow, zenLevel } from '../src/engine/levels';
+import { applyGravity, countMoves, findMove } from '../src/engine/moves';
 import { findPath, reachable } from '../src/engine/path';
 import { createRng } from '../src/engine/rng';
 import { Session, starCount } from '../src/engine/session';
@@ -142,7 +142,7 @@ describe('generation', () => {
       let t = 0;
       let guard = 0;
       while (!s.done && guard++ < 500) {
-        const m = findMove(s.board)!;
+        const m = findMove(s.board, s.hidden)!;
         expect(m).not.toBeNull();
         s.tap(m[0], (t += 1000));
         const r = s.tap(m[1], (t += 1000));
@@ -225,5 +225,69 @@ describe('session scoring', () => {
     }
     if (s.autoShuffles === 0) expect(starCount(s.stars())).toBe(3);
     else expect(starCount(s.stars())).toBe(2);
+  });
+});
+
+describe('falling leaves & snow', () => {
+  it('gravity compacts columns and treats stones as floors', () => {
+    const b = board(['1.', '.2', '#.', '3.', '..']);
+    const moves = applyGravity(b);
+    expect(b.cells).toEqual(board(['..', '1.', '#.', '..', '32']).cells);
+    expect(moves.length).toBe(3);
+  });
+
+  it('snow covers only fully surrounded cards and is deterministic', () => {
+    const spec = journeyLevel(38);
+    expect(spec.snow).toBeGreaterThan(0);
+    const b = buildBoard(spec);
+    const a = pickSnow(b, spec.snow, spec.seed);
+    expect([...a]).toEqual([...pickSnow(b, spec.snow, spec.seed)]);
+    for (const i of a) {
+      const r = Math.floor(i / b.cols);
+      const c = i % b.cols;
+      expect(r > 0 && c > 0 && r < b.rows - 1 && c < b.cols - 1).toBe(true);
+    }
+  });
+
+  it('hidden cards cannot be tapped', () => {
+    const s = new Session(journeyLevel(38), 0);
+    const [cell] = [...s.hidden];
+    expect(s.tap(cell, 0).kind).toBe('hidden');
+  });
+
+  it('every season mechanic appears where the design says', () => {
+    expect(journeyLevel(27).gravity).toBe(true); // first Autumn leaf-fall level
+    expect(journeyLevel(25).gravity).toBe(false);
+    expect(journeyLevel(38).snow).toBeGreaterThan(0); // first Winter snow level
+    for (let n = 1; n <= 120; n++) {
+      const sp = journeyLevel(n);
+      expect(sp.gravity && sp.snow > 0).toBe(false); // never both at once
+    }
+  });
+
+  it('greedy play finishes every board with gravity, snow and stones (levels 1–120 + a week of dailies)', () => {
+    const specs = [
+      ...Array.from({ length: 120 }, (_, i) => journeyLevel(i + 1)),
+      ...['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'].map(dailyLevel),
+    ];
+    for (const spec of specs) {
+      const s = new Session(spec, 0);
+      let t = 0;
+      let guard = 0;
+      while (!s.done && guard++ < 400) {
+        const m = findMove(s.board, s.hidden);
+        expect(m, `stuck on ${spec.mode} ${spec.number}`).not.toBeNull();
+        s.tap(m![0], (t += 700));
+        const r = s.tap(m![1], (t += 700));
+        expect(r.kind).toBe('match');
+      }
+      expect(s.done).toBe(true);
+    }
+  });
+
+  it('weekday themes rotate', () => {
+    const names = new Set(['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10'].map((d) => dailyTheme(d).name));
+    expect(names.size).toBe(7);
+    expect(dailyTheme('2026-10-07').gravity).toBe(true); // a Wednesday
   });
 });

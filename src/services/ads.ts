@@ -3,9 +3,7 @@
  *
  *  • Consent first (Google UMP), then SDK init — ads are never requested
  *    when UMP says we can't.
- *  • Age-appropriate requests: players under 13 get child-directed,
- *    non-personalised, G-rated ads (Google Play Families policy). 13–15 are
- *    tagged under the EU age of consent.
+ *  • Audience is 13+ (not Families); ads are capped at PG content.
  *  • Interstitials only between boards, rate-limited by AD_POLICY.
  *  • On the web (dev / demo) every call is a harmless stub.
  */
@@ -19,24 +17,21 @@ import {
   MaxAdContentRating,
 } from '@capacitor-community/admob';
 import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
-import { ageOf, persist, save } from './storage';
+import { persist, save } from './storage';
 
 const native = Capacitor.isNativePlatform();
 
-interface AgeProfile {
-  child: boolean;
-  underConsent: boolean;
-  rating: MaxAdContentRating;
-}
-
-function profile(): AgeProfile {
-  const age = ageOf(save.birthYear);
-  // Unknown age is treated as a child — the safe default under Families policy.
-  if (age == null || age < 13) return { child: true, underConsent: true, rating: MaxAdContentRating.General };
-  if (age < 16) return { child: false, underConsent: true, rating: MaxAdContentRating.ParentalGuidance };
-  if (age < 18) return { child: false, underConsent: false, rating: MaxAdContentRating.ParentalGuidance };
-  return { child: false, underConsent: false, rating: MaxAdContentRating.Teen };
-}
+/**
+ * Jjak's Play Console target audience is 13+, so it is not in the Families
+ * programme: no age gate, no child-directed tagging. Ads are capped at
+ * Parental Guidance so they stay in keeping with an "Everyone"-rated game
+ * played by teens.
+ */
+const AD_PROFILE = {
+  child: false,
+  underConsent: false,
+  rating: MaxAdContentRating.ParentalGuidance,
+};
 
 class AdService {
   private ready = false;
@@ -59,7 +54,7 @@ class AdService {
   }
 
   private async doStart() {
-    const p = profile();
+    const p = AD_PROFILE;
     let info = await AdMob.requestConsentInfo({ tagForUnderAgeOfConsent: p.underConsent });
     if (info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) {
       info = await AdMob.showConsentForm();
@@ -81,10 +76,8 @@ class AdService {
     void this.preloadRewarded();
   }
 
-  private get npa(): boolean {
-    // Non-personalised for children; UMP handles everyone else.
-    return profile().child;
-  }
+  /** Personalisation is decided by the user's UMP consent, not by us. */
+  private readonly npa = false;
 
   async showBanner(): Promise<void> {
     if (!native) {

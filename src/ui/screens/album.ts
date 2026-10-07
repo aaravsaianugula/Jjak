@@ -1,5 +1,6 @@
 import { cardSvg } from '../../art/cards';
 import { KIND_LABEL, MONTHS, cardDef, monthDef } from '../../data/deck';
+import { SEALS } from '../../services/achievements';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { esc, frag } from '../dom';
@@ -66,6 +67,7 @@ function openDetail(id: number, have: boolean) {
         </div>
         ${special}
         <p class="detail__note">${esc(m.note)}</p>
+        ${sets(id)}
       </div>`)
     : frag(`<div class="detail">
         <div class="detail__card">${cardSvg('back')}</div>
@@ -73,4 +75,16 @@ function openDetail(id: number, have: boolean) {
         <p class="muted">Clear a new Journey level or today’s Daily to draw a card. This one belongs to <b>${esc(m.en)}</b> — month ${m.index + 1}.</p>
       </div>`);
   openSheet(content, { label: m.en });
+}
+
+/** Card-set seals this card belongs to (Go-Stop / Koi-Koi yaku). */
+function sets(id: number): string {
+  const mine = SEALS.filter((s) => s.cards?.includes(id));
+  if (!mine.length) return '';
+  return `<div class="sets">${mine
+    .map((s) => {
+      const have = s.cards!.filter((c) => save.album.includes(c)).length;
+      return `<span class="set ${have === s.cards!.length ? 'set--done' : ''}">${esc(s.title)}${s.native ? ` · <span class="serif">${s.native}</span>` : ''} <b>${have}/${s.cards!.length}</b></span>`;
+    })
+    .join('')}</div>`;
 }

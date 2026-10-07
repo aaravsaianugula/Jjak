@@ -7,4 +7,6 @@ export const nav = {
   album: (): void => {},
   settings: (): void => {},
   welcome: (): void => {},
+  map: (): void => {},
+  seals: (): void => {},
 };

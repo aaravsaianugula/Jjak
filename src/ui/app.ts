@@ -27,7 +27,7 @@ export function show(next: Screen): void {
     setTimeout(() => prev.el.remove(), 190);
   }
   root().append(next.el);
-  if (AD_POLICY.bannerScreens.includes(next.name) && save.birthYear != null) void ads.showBanner();
+  if (AD_POLICY.bannerScreens.includes(next.name) && save.onboarded) void ads.showBanner();
   else void ads.hideBanner();
 }
 

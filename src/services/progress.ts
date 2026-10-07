@@ -32,10 +32,13 @@ export function drawCard(): number | null {
 
 /** Apply a finished board to the save file and report what the player earned. */
 export function recordClear(s: Session): ClearSummary {
-  const stars = starCount(s.stars());
+  const st = s.stars();
+  const stars = starCount(st);
   save.stats.pairs += s.pairsMade;
   save.stats.clears++;
   save.stats.bestCombo = Math.max(save.stats.bestCombo, s.bestCombo);
+  if (st.noAssist) save.stats.cleanClears++;
+  if (st.underPar) save.stats.fastClears++;
 
   const out: ClearSummary = { stars, firstClear: false, petals: 0, drawn: null };
 
@@ -58,7 +61,9 @@ export function recordClear(s: Session): ClearSummary {
     const key = s.spec.seed.replace('daily-', '');
     const counted = key === today && !save.daily.results[key];
     if (counted) {
-      save.daily.results[key] = { ms: s.elapsedMs(s.finishedAt), score: s.score, combo: s.bestCombo, stars };
+      const ms = s.elapsedMs(s.finishedAt);
+      save.daily.results[key] = { ms, score: s.score, combo: s.bestCombo, stars };
+      save.stats.bestDailyMs = save.stats.bestDailyMs ? Math.min(save.stats.bestDailyMs, ms) : ms;
       save.daily.streak = save.daily.lastDate === yesterdayKey(today) ? save.daily.streak + 1 : 1;
       save.daily.best = Math.max(save.daily.best, save.daily.streak);
       save.daily.lastDate = today;
@@ -91,4 +96,34 @@ export function shareTextFor(s: Session, summary: ClearSummary, storeUrl: string
   const claps = '짝'.repeat(Math.min(5, Math.max(1, s.bestCombo)));
   const streak = summary.daily && summary.daily.streak > 1 ? ` · ${summary.daily.streak}-day streak` : '';
   return `Jjak 짝 · Daily #${s.spec.number}\n${flowers}  ${time}  ${claps}${streak}\n${storeUrl}`;
+}
+
+/** Months whose four cards are all in the album (unlocks that board paper). */
+export function completedMonths(): number[] {
+  const out: number[] = [];
+  for (let m = 0; m < 12; m++) if ([0, 1, 2, 3].every((v) => save.album.includes(m * 4 + v))) out.push(m);
+  return out;
+}
+
+/** Milliseconds until the next local midnight (next Daily). */
+export function msToNextDaily(now = new Date()): number {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+export function formatCountdown(ms: number): string {
+  const m = Math.ceil(ms / 60000);
+  const h = Math.floor(m / 60);
+  return h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
+}
+
+/** Last 7 days of Daily results, oldest first, for the home calendar strip. */
+export function lastWeek(today = new Date()): { key: string; day: string; solved: boolean; isToday: boolean }[] {
+  const out = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const key = localDateKey(d);
+    out.push({ key, day: 'SMTWTFS'[d.getDay()], solved: !!save.daily.results[key], isToday: i === 0 });
+  }
+  return out;
 }

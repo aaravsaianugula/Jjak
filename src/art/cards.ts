@@ -333,6 +333,28 @@ export function cardInner(id: number): string {
   return bg + art + over + num;
 }
 
+/** A card under snow (First snow levels): pale, soft drifts, a faint flake. */
+export function cardSnowInner(): string {
+  const flake = (cx: number, cy: number, r: number, o: number) => {
+    let d = '';
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3;
+      d += `M${cx} ${cy} L${f(cx + Math.cos(a) * r)} ${f(cy + Math.sin(a) * r)} `;
+    }
+    return `<path d="${d}" stroke="#9fb3c4" stroke-width="1.3" stroke-linecap="round" opacity="${o}"/>`;
+  };
+  return (
+    `<rect width="100" height="140" rx="9" fill="${PAPER}"/>` +
+    `<rect x="4" y="4" width="92" height="132" rx="6" fill="#e9eef2"/>` +
+    `<path d="M4 96 Q30 84 52 94 T96 90 L96 136 L4 136Z" fill="#f7f9fb"/>` +
+    `<path d="M4 116 Q36 104 64 114 T96 112 L96 136 L4 136Z" fill="#ffffff"/>` +
+    flake(50, 52, 15, 0.9) + flake(24, 26, 6, 0.5) + flake(78, 74, 7, 0.5) + flake(30, 82, 4, 0.4)
+  );
+}
+
+/** Large faint flower used as the watermark on board papers. */
+export const MONTH_TINTS = STYLES.map((st) => st.tint);
+
 /** Back of a card (album locked state). */
 export function cardBackInner(): string {
   let pattern = '';
@@ -363,11 +385,13 @@ export function installCardSprite(): void {
   let inner = '<defs><clipPath id="card-clip"><rect x="4" y="4" width="92" height="132" rx="6"/></clipPath></defs>';
   for (let id = 0; id < 48; id++) inner += `<symbol id="card-${id}" viewBox="0 0 100 140">${cardInner(id)}</symbol>`;
   inner += `<symbol id="card-back" viewBox="0 0 100 140">${cardBackInner()}</symbol>`;
+  inner += `<symbol id="card-snow" viewBox="0 0 100 140">${cardSnowInner()}</symbol>`;
+  for (let m = 0; m < 12; m++) inner += `<symbol id="motif-${m}" viewBox="0 0 100 140">${motif(m)}</symbol>`;
   svg.innerHTML = inner;
   document.body.prepend(svg);
 }
 
-export const cardSvg = (id: number | 'back', cls = 'card-art') =>
+export const cardSvg = (id: number | 'back' | 'snow', cls = 'card-art') =>
   `<svg class="${cls}" viewBox="0 0 100 140" aria-hidden="true"><use href="#card-${id}"/></svg>`;
 
 export const monthName = (id: number) => MONTHS[id >> 2].en;

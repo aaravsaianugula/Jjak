@@ -10,6 +10,8 @@ import { nav } from './ui/nav';
 import { albumScreen } from './ui/screens/album';
 import { gameScreen } from './ui/screens/game';
 import { homeScreen } from './ui/screens/home';
+import { mapScreen } from './ui/screens/map';
+import { sealsScreen } from './ui/screens/seals';
 import { settingsScreen } from './ui/screens/settings';
 import { welcomeScreen } from './ui/screens/welcome';
 
@@ -18,6 +20,8 @@ nav.game = (spec) => show(gameScreen(spec));
 nav.album = () => show(albumScreen());
 nav.settings = () => show(settingsScreen());
 nav.welcome = () => show(welcomeScreen());
+nav.map = () => show(mapScreen());
+nav.seals = () => show(sealsScreen());
 
 async function boot() {
   await loadSave();
@@ -34,7 +38,7 @@ async function boot() {
     /* fonts API unavailable */
   }
 
-  if (save.birthYear == null) nav.welcome();
+  if (!save.onboarded) nav.welcome();
   else {
     nav.home();
     void ads.start().then(() => {

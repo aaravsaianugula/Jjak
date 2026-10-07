@@ -8,17 +8,23 @@ and collect every card with its Korean and Japanese name.
 
 ![Feature graphic](store/feature-graphic.png)
 
-| Home | Game | Result | Album |
+| Home | Falling leaves | First snow | Result |
 |---|---|---|---|
-| ![](store/screenshots/04-home.png) | ![](store/screenshots/05-game.png) | ![](store/screenshots/08-result.png) | ![](store/screenshots/10-card-detail.png) |
+| ![](store/screenshots/03-home.png) | ![](store/screenshots/11-falling-leaves.png) | ![](store/screenshots/13-snow.png) | ![](store/screenshots/06-result.png) |
+
+| Journey map | Seals | Card detail | Daily |
+|---|---|---|---|
+| ![](store/screenshots/07-map.png) | ![](store/screenshots/08-seals.png) | ![](store/screenshots/10-card-detail.png) | ![](store/screenshots/16-daily.png) |
 
 ## What's inside
 
 | | |
 |---|---|
-| **Modes** | Journey (4 seasonal chapters, endless), Daily Jjak (same board worldwide + streak + share), Zen (untimed), Album (48 collectible cards) |
+| **Modes** | Journey (4 seasonal chapters, endless, with a level map), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed), Album (48 collectible cards) |
+| **Mechanics** | Stones (Summer), Falling leaves (Autumn), First snow (Winter), mixed from Year 2 |
+| **Meta** | 28 Seals (achievements, incl. real Go-Stop / Koi-Koi card sets), 12 unlockable board papers, lifetime stats |
 | **Engine** | Shisen-sho path rule (≤ 2 turns, edge routing), boards that are **solvable by construction**, deterministic seeds, auto-reshuffle on dead ends |
-| **Monetization** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, age-appropriate requests (Families policy) |
+| **Monetization** | AdMob rewarded / interstitial / banner under a fair-ads policy, Google UMP consent, ads capped at PG content (13+ audience) |
 | **Tech** | TypeScript + Vite (no UI framework) + Capacitor 8 (Android target SDK 36, min SDK 24) |
 | **Art & sound** | Original SVG cards drawn in code, OFL fonts subset to the glyphs used, WebAudio-synthesized sound |
 
@@ -35,7 +41,7 @@ and collect every card with its Korean and Japanese name.
 ```bash
 npm install
 npm run dev          # http://localhost:5173 — plays in any browser (ads are stubbed)
-npm test             # engine tests: path finding, 1,000-board solvability fuzz, daily determinism, scoring
+npm test             # 24 engine tests: path finding, 1,000-board solvability fuzz, gravity/snow, 120-level play-through, daily themes
 npm run typecheck
 ```
 

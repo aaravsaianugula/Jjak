@@ -1,13 +1,14 @@
-import { cardSvg } from '../../art/cards';
+import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
 import { type Point, STONE, cardsLeft, isCard } from '../../engine/board';
-import { type LevelSpec, chapterOf, journeyLevel, zenLevel } from '../../engine/levels';
+import { type LevelSpec, chapterOf, dailyTheme, journeyLevel, zenLevel } from '../../engine/levels';
 import { Session, formatTime } from '../../engine/session';
+import { checkSeals, type Seal } from '../../services/achievements';
 import { ads } from '../../services/ads';
 import { sfx, unlockAudio } from '../../services/audio';
 import { haptic } from '../../services/haptics';
-import { type ClearSummary, drawCard, recordClear, shareTextFor } from '../../services/progress';
+import { type ClearSummary, completedMonths, drawCard, formatCountdown, msToNextDaily, recordClear, shareTextFor } from '../../services/progress';
 import { shareText } from '../../services/share';
 import { persist, save } from '../../services/storage';
 import { type Screen } from '../app';
@@ -45,7 +46,14 @@ export function gameScreen(spec: LevelSpec): Screen {
   const shuffleBtn = h('button', { class: 'tool', 'aria-label': 'Shuffle', html: ICONS.shuffle }, h('span', {}, 'Shuffle'), shuffleBadge);
   const restartBtn = h('button', { class: 'tool', 'aria-label': 'Restart', html: ICONS.restart }, h('span', {}, 'Restart'));
 
-  const sub = spec.mode === 'journey' ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ja}` : spec.mode === 'daily' ? 'Same board for everyone today' : 'No clock, no pressure';
+  const twist = spec.gravity ? ' · Falling leaves' : spec.snow ? ' · First snow' : '';
+  const sub =
+    spec.mode === 'journey'
+      ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ja}${twist}`
+      : spec.mode === 'daily'
+        ? `${dailyTheme(spec.seed.replace('daily-', '')).name} · same board worldwide`
+        : 'No clock, no pressure';
+  const comboBar = h('div', { class: 'combo-bar', 'aria-hidden': 'true' }, h('i'));
   const el = h(
     'section',
     { class: 'screen game' },
@@ -63,6 +71,7 @@ export function gameScreen(spec: LevelSpec): Screen {
       h('div', { class: 'hud__stat' }, h('span', { class: 'hud__k' }, 'Score'), scoreEl),
     ),
     h('div', { class: 'progress' }, bar),
+    comboBar,
     stage,
     coach,
     h('nav', { class: 'toolbar' }, hintBtn, shuffleBtn, restartBtn),
@@ -73,6 +82,13 @@ export function gameScreen(spec: LevelSpec): Screen {
   let ch = 56;
   let margin = 16;
   const cardEls = new Map<number, HTMLElement>();
+  const paperMonth = save.paper === 'plain' ? -1 : Number(save.paper);
+  const paper = h('div', {
+    class: 'paper',
+    'aria-hidden': 'true',
+    html: paperMonth >= 0 ? `<svg viewBox="0 0 100 140"><use href="#motif-${paperMonth}"/></svg>` : '',
+  });
+  if (paperMonth >= 0) paper.style.setProperty('--paper-tint', MONTH_TINTS[paperMonth]);
   const paths = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   paths.classList.add('paths');
 
@@ -108,7 +124,7 @@ export function gameScreen(spec: LevelSpec): Screen {
   }
 
   function renderBoard() {
-    board.replaceChildren();
+    board.replaceChildren(paper);
     cardEls.clear();
     session.board.cells.forEach((v, i) => {
       if (v === STONE) {
@@ -116,7 +132,13 @@ export function gameScreen(spec: LevelSpec): Screen {
         cardEls.set(i, s);
         board.append(s);
       } else if (isCard(v)) {
-        const c = h('button', { class: 'card', 'data-cell': i, 'aria-label': faceLabel(v), html: cardSvg(v) });
+        const snowy = session.hidden.has(i);
+        const c = h('button', {
+          class: `card${snowy ? ' is-snow' : ''}`,
+          'data-cell': i,
+          'aria-label': snowy ? 'Card under snow' : faceLabel(v),
+          html: cardSvg(snowy ? 'snow' : v),
+        });
         cardEls.set(i, c);
         board.append(c);
       }
@@ -129,9 +151,11 @@ export function gameScreen(spec: LevelSpec): Screen {
     session.board.cells.forEach((v, i) => {
       const c = cardEls.get(i);
       if (!c || !isCard(v) || c.classList.contains('stone')) return;
+      const snowy = session.hidden.has(i);
       const swap = () => {
-        c.innerHTML = cardSvg(v);
-        c.setAttribute('aria-label', faceLabel(v));
+        c.innerHTML = cardSvg(snowy ? 'snow' : v);
+        c.classList.toggle('is-snow', snowy);
+        c.setAttribute('aria-label', snowy ? 'Card under snow' : faceLabel(v));
       };
       if (flip) {
         c.classList.remove('is-flip');
@@ -250,27 +274,65 @@ export function gameScreen(spec: LevelSpec): Screen {
       case 'match':
         onMatch(res);
         break;
+      case 'hidden':
+        target.classList.remove('is-shake');
+        void target.offsetWidth;
+        target.classList.add('is-shake');
+        sfx.deselect();
+        setCoach('This card is under snow. Clear a card next to it to reveal it.');
+        break;
     }
   });
 
   function onMatch(res: Extract<ReturnType<Session['tap']>, { kind: 'match' }>) {
     clearHint();
     drawPath(res.path);
-    for (const i of [res.a, res.b]) {
-      const c = cardEls.get(i);
-      c?.classList.remove('is-selected');
-      c?.classList.add('is-gone');
-      petals(i);
+    const gone = [res.a, res.b].map((i) => cardEls.get(i)).filter((x): x is HTMLElement => !!x);
+    for (const i of [res.a, res.b]) petals(i);
+    for (const c of gone) {
+      c.classList.remove('is-selected');
+      c.classList.add('is-gone');
     }
-    setTimeout(() => {
-      for (const i of [res.a, res.b]) {
-        cardEls.get(i)?.remove();
-        cardEls.delete(i);
+    cardEls.delete(res.a);
+    cardEls.delete(res.b);
+    setTimeout(() => gone.forEach((c) => c.remove()), 380);
+
+    // Falling leaves: re-key the moved cards now, slide them once the pair has faded.
+    if (res.moved.length) {
+      for (const [from, to] of res.moved) {
+        const c = cardEls.get(from);
+        if (!c) continue;
+        cardEls.delete(from);
+        cardEls.set(to, c);
+        c.dataset.cell = String(to);
+        c.classList.add('is-falling');
       }
-    }, 380);
+      setTimeout(() => {
+        layout();
+        setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-falling')), 320);
+      }, 200);
+    }
+    if (res.revealed.length) {
+      setTimeout(() => {
+        for (const i of res.revealed) {
+          const c = cardEls.get(i);
+          const v = session.board.cells[i];
+          if (!c || !isCard(v)) continue;
+          c.classList.add('is-flip');
+          setTimeout(() => {
+            c.innerHTML = cardSvg(v);
+            c.classList.remove('is-snow');
+            c.setAttribute('aria-label', faceLabel(v));
+          }, 200);
+          setTimeout(() => c.classList.remove('is-flip'), 440);
+        }
+      }, res.moved.length ? 420 : 160);
+    }
+
     sfx.match(res.combo);
     haptic.medium();
     showCombo(res.combo);
+    restartComboBar();
     updateHud();
     tutorialStep();
     if (res.reshuffled) {
@@ -278,9 +340,15 @@ export function gameScreen(spec: LevelSpec): Screen {
         sfx.shuffle();
         refreshFaces(true);
         toast('No moves left — the cards were reshuffled.');
-      }, 420);
+      }, 520);
     }
     if (res.cleared) void finish();
+  }
+
+  function restartComboBar() {
+    comboBar.classList.remove('on');
+    void comboBar.offsetWidth;
+    comboBar.classList.add('on');
   }
 
   // ── Tools ─────────────────────────────────────────────────────────
@@ -382,6 +450,10 @@ export function gameScreen(spec: LevelSpec): Screen {
       }
     }
     if (spec.number === 6 && !save.seenTips.includes('variants')) showVariantTip();
+    if (spec.gravity && !save.seenTips.includes('gravity'))
+      showMechanicTip('gravity', 'Falling leaves', '낙엽 · 落葉', 'From now on, cards drop down to fill the gaps after every pair — like leaves settling. Plan from the bottom up, and watch new pairs line up as things fall.', [36, 37, 38, 39]);
+    else if (spec.snow > 0 && !save.seenTips.includes('snow'))
+      showMechanicTip('snow', 'First snow', '첫눈 · 初雪', 'Some cards start under snow. They can’t be picked until a card next to them is cleared. Snowy cards still block paths.', ['snow', 44, 'snow', 45]);
     if (spec.stones > 0 && !save.seenTips.includes('stones')) {
       save.seenTips.push('stones');
       persist();
@@ -409,6 +481,25 @@ export function gameScreen(spec: LevelSpec): Screen {
     void sheet.closed.then(resume);
   }
 
+  function showMechanicTip(id: string, title: string, native: string, body: string, cards: (number | 'snow')[]) {
+    save.seenTips.push(id);
+    persist();
+    const content = frag(`<div>
+      <div class="detail__kind">New this season</div>
+      <h2>${esc(title)} <span class="muted serif" style="font-size:18px;font-weight:400">${native}</span></h2>
+      <p class="muted">${esc(body)}</p>
+      <div class="month__cards" style="margin:16px 0">${cards.map((c) => `<div>${cardSvg(c)}</div>`).join('')}</div>
+    </div>`);
+    content.querySelectorAll('svg').forEach((s) => ((s as SVGElement).style.cssText = 'width:100%;height:auto;border-radius:6px;box-shadow:var(--card-shadow)'));
+    const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
+    content.append(btn);
+    paused = true;
+    pausedAt = performance.now();
+    const sheet = openSheet(content, { label: title });
+    btn.addEventListener('click', () => sheet.close());
+    void sheet.closed.then(resume);
+  }
+
   // ── Finish ────────────────────────────────────────────────────────
   async function finish() {
     busy = true;
@@ -421,11 +512,13 @@ export function gameScreen(spec: LevelSpec): Screen {
     sfx.stamp();
     haptic.success();
     await wait(900);
+    const papersBefore = completedMonths().length;
     const summary = recordClear(session);
-    showResult(summary);
+    const seals = checkSeals();
+    showResult(summary, seals, completedMonths().length > papersBefore);
   }
 
-  function showResult(summary: ClearSummary) {
+  function showResult(summary: ClearSummary, seals: Seal[], newPaper: boolean) {
     const st = session.stars();
     const secs = session.elapsedMs(session.finishedAt);
     const starBox = (on: boolean, label: string) =>
@@ -471,6 +564,9 @@ export function gameScreen(spec: LevelSpec): Screen {
     }
 
     if (summary.drawn != null) content.append(drawPanel(summary.drawn, 'New card'));
+    if (newPaper) content.append(frag(`<p class="unlock">A flower is complete — a new board paper is ready in Settings.</p>`));
+    if (seals.length) content.append(sealRow(seals));
+    if (spec.mode === 'daily') content.append(frag(`<p class="muted" style="text-align:center;margin-top:14px">Next Daily in ${formatCountdown(msToNextDaily())}</p>`));
 
     const actions = h('div', { class: 'sheet__actions' });
     content.append(actions);
@@ -518,6 +614,14 @@ export function gameScreen(spec: LevelSpec): Screen {
     if (summary.drawn != null) setTimeout(() => sfx.reveal(), 350);
   }
 
+  function sealRow(seals: Seal[]): HTMLElement {
+    const shown = seals.slice(0, 3);
+    const more = seals.length - shown.length;
+    return frag(`<div class="earned-seals">${shown
+      .map((sl) => `<div class="earned-seal"><span class="seal seal--sm">印</span><span><b>${esc(sl.title)}</b>${sl.native ? ` <span class="muted serif">${sl.native}</span>` : ''}<br><span class="muted">Seal earned · +${sl.reward} petals</span></span></div>`)
+      .join('')}${more > 0 ? `<p class="muted" style="margin:0;font-size:13px">…and ${more} more in your seal book.</p>` : ''}</div>`);
+  }
+
   function drawPanel(id: number, label: string): HTMLElement {
     const m = monthDef(id);
     const d = cardDef(id);
@@ -539,6 +643,8 @@ export function gameScreen(spec: LevelSpec): Screen {
           if (extra != null) {
             more.replaceWith(drawPanel(extra, 'Bonus card'));
             sfx.reveal();
+            const won = checkSeals();
+            if (won.length) toast(`Seal earned: ${won.map((w) => w.title).join(', ')}`);
           }
         } else more.removeAttribute('disabled');
       });
