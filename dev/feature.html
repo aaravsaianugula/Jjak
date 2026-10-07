@@ -3,31 +3,65 @@
 <style>
 html,body{margin:0}
 #f{width:1024px;height:500px;position:relative;overflow:hidden;background:#f3ecdf;font-family:'Gowun Batang',serif;color:#2a2724}
-#f::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-.left{position:absolute;left:72px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:18px}
-.row{display:flex;align-items:center;gap:22px}
-.seal{width:104px;height:104px;border-radius:14%;background:#c4472f;color:#fbf5ea;display:grid;place-items:center;font-size:60px;font-weight:700;transform:rotate(-5deg);position:relative}
-.seal::after{content:'';position:absolute;inset:8%;border:2px solid rgba(251,245,234,.8);border-radius:9%}
-.word{font-size:92px;font-weight:700;line-height:1}
-.tag{font-size:30px;line-height:1.35;max-width:430px}
-.sub{font-family:'Gowun Dodum',sans-serif;font-size:20px;color:#6e665c}
+/* spring landscape from the Home screen, dissolving into paper toward the text */
+.scene{position:absolute;right:0;top:0;width:780px;height:500px;-webkit-mask-image:linear-gradient(to right,transparent 0,rgba(0,0,0,.55) 22%,#000 46%);mask-image:linear-gradient(to right,transparent 0,rgba(0,0,0,.55) 22%,#000 46%)}
+.scene svg{width:100%;height:100%;display:block}
+.scene::after{content:'';position:absolute;inset:auto 0 0;height:46%;background:linear-gradient(to bottom,rgba(243,236,223,0),rgba(243,236,223,.85))}
+.paper{position:absolute;inset:0;pointer-events:none}
+.left{position:absolute;left:62px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:16px;z-index:3}
+.row{display:flex;align-items:center;gap:14px;margin-left:-14px}
+.seal{width:150px;height:150px;border:0;background:transparent;display:block}
+.word{font-size:104px;font-weight:700;line-height:1;letter-spacing:.01em;margin-top:-6px}
+.rule{width:56px;height:2px;background:#c4472f;opacity:.85;margin:6px 0 2px}
+.tag{font-size:35px;line-height:1.3;max-width:440px}
+.sub{font-size:22px;color:#6e665c;letter-spacing:.04em}
+.sub b{color:#c4472f;font-weight:400;margin:0 .35em}
 .ja{font-family:'Zen Old Mincho',serif}
-.fan{position:absolute;right:50px;top:0;width:470px;height:500px}
-.fan svg{position:absolute;left:50%;bottom:150px;width:150px;height:210px;margin-left:-75px;transform-origin:50% 135%;filter:drop-shadow(0 10px 16px rgba(60,40,20,.28))}
+.fan{position:absolute;right:24px;top:0;width:520px;height:500px;z-index:2}
+.fan svg{position:absolute;left:50%;bottom:118px;width:166px;height:232px;margin-left:-83px;transform-origin:50% 150%;filter:drop-shadow(0 14px 18px rgba(70,40,20,.28)) drop-shadow(0 2px 3px rgba(70,40,20,.18))}
+.petals{position:absolute;inset:0;z-index:4;pointer-events:none}
 </style></head><body><div id="f">
-<div class="left">
-  <div class="row"><div class="seal">짝</div><div class="word">Jjak</div></div>
-  <div class="tag">Pair the flowers of the four seasons.</div>
-  <div class="sub"><span>꽃을 맞추다</span> · <span class="ja">花を合わせる</span> · calm puzzles, daily</div>
-</div>
+<div class="scene" id="scene"></div>
+<svg class="paper" viewBox="0 0 1024 500" id="paper"></svg>
 <div class="fan" id="fan"></div>
+<div class="left">
+  <div class="row"><iframe class="seal" id="seal" src="brand.html?size=150&seal=112&bg=" scrolling="no"></iframe><div class="word">Jjak</div></div>
+  <div class="rule"></div>
+  <div class="tag">Pair the flowers<br>of the four seasons</div>
+  <div class="sub"><span>꽃을 맞추다</span><b>·</b><span class="ja">花を合わせる</span></div>
+</div>
+<svg class="petals" viewBox="0 0 1024 500" id="petals"></svg>
 </div>
 <script type="module">
 import '../src/styles/fonts.css';
 import { installCardSprite } from '../src/art/cards.ts';
+import { sceneSvg } from '../src/art/scene.ts';
 installCardSprite();
-const ids = [11, 23, 31, 39, 47];
-document.getElementById('fan').innerHTML = ids.map((id, i) => `<svg viewBox="0 0 100 140" style="transform:rotate(${(i - 2) * 13}deg)"><use href="#card-${id}"/></svg>`).join('');
+document.getElementById('scene').innerHTML = sceneSvg(0);
+
+// paper fibres over everything (very faint)
+let s = 7; const r = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
+let d = '';
+for (let k = 0; k < 240; k++) { const x = r() * 1024, y = r() * 500, L = 5 + r() * 18, a = r() * Math.PI; d += `M${x.toFixed(1)} ${y.toFixed(1)}q${(Math.cos(a) * L / 2 + (r() - .5) * 5).toFixed(1)} ${(Math.sin(a) * L / 2 + (r() - .5) * 5).toFixed(1)} ${(Math.cos(a) * L).toFixed(1)} ${(Math.sin(a) * L).toFixed(1)}`; }
+document.getElementById('paper').innerHTML = `<path d="${d}" stroke="#bfae8c" stroke-width=".8" fill="none" opacity=".28"/>`;
+
+// a fan of five brights and animals across the year: outer cards first, the cherry curtain on top
+const ids = [3, 39, 23, 31, 11];
+const angle = { 3: -26, 23: -13, 11: 0, 31: 13, 39: 26 };
+document.getElementById('fan').innerHTML = ids.map((id) => `<svg viewBox="0 0 100 140" style="transform:rotate(${angle[id]}deg)"><use href="#card-${id}"/></svg>`).join('');
+
+// a few drifting petals between the words and the cards
+const PET = 'M0 0C-3.2 -1 -3.6 -4.6 -1.4 -5.4Q-.6 -5.5 0 -4.7Q.6 -5.5 1.4 -5.4C3.6 -4.6 3.2 -1 0 0Z';
+const pts = [[520, 88, 1.6, 30, '#efbcc8'], [566, 140, 1.2, 140, '#f4d0d8'], [498, 300, 1.4, 210, '#eab0bf'], [952, 420, 1.5, 80, '#f2c6cf'], [585, 395, 1.1, 300, '#f4d0d8'], [960, 92, 1.2, 250, '#efbcc8']];
+document.getElementById('petals').innerHTML = pts.map(([x, y, sc, rot, c]) => `<path d="${PET}" transform="translate(${x} ${y}) rotate(${rot}) scale(${sc * 1.6})" fill="${c}" opacity=".9"/>`).join('');
+
+await Promise.all([
+  document.fonts.load("700 104px 'Gowun Batang'", 'Jjak'),
+  document.fonts.load("400 33px 'Gowun Batang'", 'Pair the flowers 꽃을 맞추다'),
+  document.fonts.load("400 22px 'Zen Old Mincho'", '花を合わせる'),
+]);
 await document.fonts.ready;
+const frame = document.getElementById('seal');
+await new Promise((res) => { const t = () => (frame.contentDocument?.body?.dataset.ready ? res() : setTimeout(t, 50)); t(); });
 document.body.dataset.ready = '1';
 </script></body></html>
