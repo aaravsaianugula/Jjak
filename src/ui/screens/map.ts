@@ -12,7 +12,7 @@ import {
   routeOf,
 } from '../../data/route';
 import { type LevelSpec, windOf } from '../../engine/levels';
-import { levelPlan } from '../../director';
+import { shownSpec } from '../../director';
 import { GOALS } from '../../engine/goals';
 import { MECHANICS } from '../../engine/mechanics';
 
@@ -122,7 +122,7 @@ export function mapScreen(): Screen {
     for (let n = first; n < first + ROUTE_LEVELS_PER_CHAPTER; n++) {
       const stars = save.stars[n] ?? 0;
       const isLocked = n > unlocked;
-      const spec = levelPlan(n).spec;
+      const spec = shownSpec(n);
       const tw = twistOf(spec);
       const fest = !!spec.festival;
       const lantern = n >= unlocked && levelsToLantern(n) === 0;

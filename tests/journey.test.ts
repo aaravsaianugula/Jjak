@@ -20,7 +20,7 @@ import { type Wind, applyGravity, findMove } from '../src/engine/moves';
 import { createRng } from '../src/engine/rng';
 import { LUCKY_PETALS, LUCKY_SCORE, Session } from '../src/engine/session';
 import { possibleYaku, newYaku } from '../src/engine/yaku';
-import { defaultJourney, hydrateJourney } from '../src/services/save-journey';
+import { defaultEndless, defaultJourney, hydrateJourney } from '../src/services/save-journey';
 
 const grid = (rows: string[]): Board => {
   // '.' empty, '#' stone, digit/letter = month (card id = month * 4)
@@ -470,7 +470,7 @@ describe('solvability fuzz across the mechanics', () => {
 describe('journey save slice and stamps', () => {
   it('hydrates old and broken slices', () => {
     expect(hydrateJourney(undefined)).toEqual(defaultJourney());
-    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false });
+    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false, endless: defaultEndless() });
     const h = hydrateJourney({ v: 1, stamps: { gyeongju: '2026-10-07', bad: 3 }, luckyPairs: -2, luckyPetals: 30 });
     expect(h.stamps).toEqual({ gyeongju: '2026-10-07' });
     expect(h.luckyPairs).toBe(0);

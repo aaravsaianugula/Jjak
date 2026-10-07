@@ -77,3 +77,24 @@ export function roadGoesOn(): Promise<void> {
     requestAnimationFrame(() => go.focus({ preventScroll: true }));
   });
 }
+
+let waitEl: HTMLElement | null = null;
+
+/**
+ * A quiet ink line while an endless board is still being made ("preparing the
+ * road"): shown only if it takes more than a moment. No spinner, no numbers.
+ */
+export function roadWait(on: boolean): void {
+  if (on) {
+    if (waitEl) return;
+    waitEl = frag(`<div class="road-wait" role="status"><span class="road-wait__line" aria-hidden="true"></span><span>Preparing the road · <span lang="ko">길을 닦는 중</span></span></div>`);
+    document.body.append(waitEl);
+    requestAnimationFrame(() => waitEl?.classList.add('is-on'));
+    return;
+  }
+  const el = waitEl;
+  waitEl = null;
+  if (!el) return;
+  el.classList.remove('is-on');
+  setTimeout(() => el.remove(), 300);
+}

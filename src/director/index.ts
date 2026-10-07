@@ -22,12 +22,21 @@ import { type LevelSpec } from '../engine/levels';
 import { bankSpec } from './bank';
 import { chooseTier } from './director';
 import { endlessSpec, prepareEndless } from './endless';
+import { levelPlan } from './plan';
 
 export { type LevelPlan, designedBase, levelPlan } from './plan';
 
 export function playLevel(n: number): LevelSpec {
   if (n > ROUTE_LEVELS) return endlessSpec(n);
   return bankSpec(n, chooseTier(n).tier);
+}
+
+/**
+ * The spec to *show* for level n (Home, the Map): its identity, or for an endless
+ * level the board already made for this player. No side effects (unlike playLevel).
+ */
+export function shownSpec(n: number): LevelSpec {
+  return n > ROUTE_LEVELS ? endlessSpec(n) : levelPlan(n).spec;
 }
 
 export async function prepareLevel(n: number): Promise<LevelSpec> {

@@ -6,7 +6,7 @@ import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
 import { LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
-import { levelPlan } from '../../director';
+import { shownSpec } from '../../director';
 import { formatTime } from '../../engine/session';
 import { ROUTE_CHAPTERS, ROUTE_LEVELS, routeOf } from '../../data/route';
 import { roadGoesOn } from '../reveal';
@@ -47,7 +47,7 @@ export function homeScreen(): Screen {
     const lantern = i >= slot && levelsToLantern(chapterStart + i) === 0;
     return `<span class="${i < slot ? 'done' : i === slot ? 'now' : ''}${lantern ? ' lan' : ''}"></span>`;
   }).join('');
-  const spec = levelPlan(level).spec;
+  const spec = shownSpec(level);
   music.setSeason(season);
   // Where the road has reached: the place, its season, and the board's twist.
   const road = routeOf(level);

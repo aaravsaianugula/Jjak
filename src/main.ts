@@ -21,6 +21,9 @@ import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
 import { prepareLevel } from './director';
+import { prepareEndless } from './director/endless';
+import { ROUTE_LEVELS } from './data/route';
+import { roadWait } from './ui/reveal';
 import { trackSessions } from './services/analytics';
 import { albumScreen } from './ui/screens/album';
 import { gameScreen } from './ui/screens/game';
@@ -37,7 +40,22 @@ import { welcomeScreen } from './ui/screens/welcome';
 
 nav.home = () => show(homeScreen());
 nav.game = (spec) => show(gameScreen(spec));
-nav.journey = (n) => void prepareLevel(n).then((spec) => nav.game(spec));
+/** A Journey level, generated first if it is an endless one (past 600) that isn't ready yet. */
+let journeyPending: number | null = null;
+nav.journey = (n) => {
+  if (journeyPending === n) return;
+  journeyPending = n;
+  // Usually instant (the next endless board is prepared in the background); if not,
+  // a quiet "preparing the road" line appears after a moment.
+  const slow = setTimeout(() => roadWait(true), 150);
+  void prepareLevel(n)
+    .then((spec) => nav.game(spec))
+    .finally(() => {
+      clearTimeout(slow);
+      roadWait(false);
+      journeyPending = null;
+    });
+};
 nav.album = () => show(albumScreen());
 nav.settings = () => show(settingsScreen());
 nav.welcome = () => show(welcomeScreen());
@@ -62,6 +80,8 @@ document.addEventListener('jjak:petals', () => {
 async function boot() {
   await loadSave();
   trackSessions();
+  // Past 600: make the current endless board in the background, so Continue is instant.
+  if (save.level > ROUTE_LEVELS && save.journey.revealed) void prepareEndless(save.level);
   if (import.meta.env.DEV) void import('./director/dev-panel').then((m) => m.mountDevPanel());
   applyTheme();
   installCardSprite();
