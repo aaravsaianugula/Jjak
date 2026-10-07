@@ -1,0 +1,395 @@
+/*
+ * Board mechanics that aren't cards: gates (門), bamboo fences (垣) and the
+ * goal chip / goal lines for goal boards. Art lives in src/art/mechanics.ts.
+ * Motion: transform and opacity only; reduced motion skips it.
+ */
+
+/* ───────────────────────────── Gates ───────────────────────────── */
+.gate {
+  position: absolute;
+  perspective: 240px;
+  touch-action: manipulation;
+}
+.gate > * {
+  position: absolute;
+  display: block;
+}
+.gate__frame {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 20%;
+}
+.gate__door svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.gate__door--l {
+  transform-origin: 0 50%;
+}
+.gate__door--r {
+  transform-origin: 100% 50%;
+}
+/* The way through, glimpsed as the doors swing. */
+.gate__dark {
+  background: linear-gradient(180deg, rgba(34, 24, 16, 0.5), rgba(34, 24, 16, 0.18));
+}
+/* A picked card of this gate's flower: the gate it would open lifts a touch. */
+.gate::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 8%/6%;
+  border: 2px solid transparent;
+  pointer-events: none;
+  transition: border-color 200ms ease;
+}
+.gate.is-keyed::after {
+  border-color: color-mix(in srgb, var(--gold) 75%, transparent);
+}
+.gate.is-keyed .gate__frame {
+  transform: translateY(-2px);
+  transition: transform 220ms var(--g-ease-out, ease);
+}
+.game .gate.is-deal {
+  animation: g-deal 400ms var(--g-ease-out) var(--deal, 0ms) both;
+}
+.game .gate.is-shake {
+  animation: g-shake 400ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* Opening: the doors swing in on their hinges, then the frame lifts away. */
+.gate.is-open {
+  z-index: 2;
+  pointer-events: none;
+}
+.gate.is-open::after {
+  border-color: transparent;
+}
+.gate.is-open .gate__door--l {
+  animation: gate-swing-l 440ms cubic-bezier(0.35, 0.1, 0.3, 1) forwards;
+}
+.gate.is-open .gate__door--r {
+  animation: gate-swing-r 440ms cubic-bezier(0.35, 0.1, 0.3, 1) forwards;
+}
+.gate.is-open .gate__dark {
+  animation: gate-fade 360ms ease 260ms forwards;
+}
+.gate.is-open .gate__frame {
+  animation: gate-lift 460ms cubic-bezier(0.5, 0, 0.75, 0.4) 220ms forwards;
+}
+@keyframes gate-swing-l {
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotateY(-96deg);
+  }
+}
+@keyframes gate-swing-r {
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotateY(96deg);
+  }
+}
+@keyframes gate-fade {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes gate-lift {
+  to {
+    opacity: 0;
+    transform: translateY(-16%) scale(0.92);
+  }
+}
+.gate.is-gone {
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+
+/* ───────────────────────────── Fences ───────────────────────────── */
+.fences {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+}
+.fence__shade {
+  fill: rgba(40, 28, 16, 0.3);
+}
+.fence__pole {
+  fill: #c9b870;
+  stroke: #2f2a22;
+  stroke-width: 1.1;
+}
+.fence__hi {
+  fill: none;
+  stroke: rgba(255, 250, 226, 0.7);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.fence__node {
+  fill: none;
+  stroke: #5a5a2a;
+  stroke-width: 1.5;
+}
+.fence-post circle {
+  fill: #6e4b30;
+  stroke: #2a2724;
+  stroke-width: 1.1;
+}
+.fence-post path {
+  fill: none;
+  stroke: #e2cf9c;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+:root[data-theme='ink'] .fence__pole {
+  fill: #c2b46e;
+  stroke: #15130f;
+}
+:root[data-theme='ink'] .fence__shade {
+  fill: rgba(0, 0, 0, 0.5);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .fence__pole {
+    fill: #c2b46e;
+    stroke: #15130f;
+  }
+  :root:not([data-theme='paper']):not([data-theme='light']) .fence__shade {
+    fill: rgba(0, 0, 0, 0.5);
+  }
+}
+/* A lifted card rides over the fence it leans on. */
+.game .card.is-selected,
+.game .card.is-gone {
+  z-index: 4;
+}
+
+/* ───────────────────────────── Goal chip (rhythm row) ───────────────────────────── */
+.goal-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 9px 3px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 9%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 32%, transparent);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color 300ms ease, box-shadow 300ms ease, color 300ms ease;
+}
+.wind-vane + .goal-chip {
+  margin-left: 0;
+}
+.goal-chip__bloom {
+  display: inline-flex;
+}
+.goal-chip__bloom svg {
+  width: 14px;
+  height: 14px;
+  color: color-mix(in srgb, var(--line) 60%, var(--muted));
+  transition: color 300ms ease, transform 300ms ease;
+}
+.goal-chip b {
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.goal-chip b.ja {
+  font-family: var(--font-ja);
+}
+.goal-chip__n {
+  display: inline-block;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.goal-chip.is-met {
+  background: color-mix(in srgb, var(--gold) 16%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 55%, transparent);
+}
+.goal-chip.is-met .goal-chip__bloom svg {
+  color: var(--gold);
+}
+.goal-chip.is-met .goal-chip__n {
+  color: var(--good-text);
+}
+/* Clean read: a brushed ring (원) that breaks on the first blocked tap. */
+.goal-chip__ring {
+  width: 15px;
+  height: 15px;
+  overflow: visible;
+}
+.goal-chip__arc {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  transform-origin: 10px 10px;
+  transition: transform 360ms var(--g-ease-out, ease), opacity 360ms ease;
+}
+.goal-chip--clean.is-met .goal-chip__n {
+  color: var(--ink-soft);
+}
+.goal-chip.is-broken {
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--g-hairline, var(--line));
+  color: var(--muted);
+}
+.goal-chip.is-broken .goal-chip__arc {
+  stroke: var(--muted);
+}
+.goal-chip.is-broken .goal-chip__arc--a {
+  transform: translate(-2px, 1.5px) rotate(-16deg);
+}
+.goal-chip.is-broken .goal-chip__arc--b {
+  transform: translate(2px, -1px) rotate(14deg);
+}
+.goal-chip.is-tick .goal-chip__n {
+  animation: goal-tick 380ms var(--g-ease-spring, ease);
+}
+.goal-chip.is-win {
+  animation: goal-win 620ms var(--g-ease-spring, ease);
+}
+.goal-chip.is-win .goal-chip__bloom svg {
+  animation: goal-bloom 700ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.goal-chip.is-break {
+  animation: g-shake 400ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes goal-tick {
+  45% {
+    transform: translateY(-2px) scale(1.18);
+  }
+}
+@keyframes goal-win {
+  40% {
+    transform: scale(1.08);
+  }
+}
+@keyframes goal-bloom {
+  0% {
+    transform: scale(0.4) rotate(-60deg);
+  }
+}
+
+/* ───────────────────────────── Goal on the title card and the result sheet ───────────────────────────── */
+.game .intro__goal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 14px 9px 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--gold) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  animation: g-rise 420ms var(--g-ease-out) 320ms both;
+}
+.game .intro__goal b {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+.intro__goal-mark svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  color: var(--gold);
+}
+.intro__goal-native {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.result .stars--goal .star span {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 2.6em;
+}
+.result .star--goal span small {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate.is-open .gate__door--l,
+  .gate.is-open .gate__door--r,
+  .gate.is-open .gate__dark,
+  .gate.is-open .gate__frame,
+  .goal-chip.is-tick .goal-chip__n,
+  .goal-chip.is-win,
+  .goal-chip.is-win .goal-chip__bloom svg,
+  .goal-chip.is-break {
+    animation: none;
+  }
+  .goal-chip__arc,
+  .gate.is-keyed .gate__frame {
+    transition: none;
+  }
+}
+
+/* ───────────────────────────── Map: goal mark ───────────────────────────── */
+.lvl__goal {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  color: var(--gold-text);
+}
+.lvl__goal svg,
+.road__legend .goal-key svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.lvl--now .lvl__goal {
+  color: var(--accent-ink);
+}
+.road__legend .goal-key {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  color: var(--gold-text);
+}
+
+/* On ink paper the dark roof needs a lit edge to hold its shape. */
+:root[data-theme='ink'] .gate__roof {
+  stroke: #9a8f80;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .gate__roof {
+    stroke: #9a8f80;
+  }
+}
+
+/* A narrow rhythm row with a goal chip keeps the combo count and drops its word. */
+@media (max-width: 400px) {
+  .rhythm:has(.goal-chip) .combo__word {
+    display: none;
+  }
+}

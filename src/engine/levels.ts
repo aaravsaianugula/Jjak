@@ -458,30 +458,71 @@ export function pickGateCells(rows: number, cols: number, count: number, rng: Rn
 }
 
 /**
- * Fences (울타리 · 垣): short bamboo fences on the edges between two cells. At
- * most two per cell, never between two stones, never on the board's outer rim.
+ * Fences (울타리 · 垣): bamboo fences on the edges between two cells, laid as
+ * short straight runs (one to three segments) so they read as real fences and
+ * force a detour rather than a one-cell nudge. Runs favour the board's inside
+ * (a fence on the rim is easy to walk round through the outer lane), never
+ * touch a stone (a fence there would change nothing), and keep every cell open
+ * on at least two sides, counting fences, stones and gates, so nothing is
+ * sealed in. `count` is the number of segments.
  */
 export function pickFences(rows: number, cols: number, count: number, rng: Rng, blocked: ReadonlySet<number>): Uint8Array {
   const walls = new Uint8Array(rows * cols);
-  const per = new Uint8Array(rows * cols);
-  const edges: [cell: number, bit: number, other: number][] = [];
+  // Closed sides of each cell (blocked neighbours on the board, then fences too).
+  const sides = new Uint8Array(rows * cols);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
-      if (c < cols - 1) edges.push([i, FENCE_RIGHT, i + 1]);
-      if (r < rows - 1) edges.push([i, FENCE_DOWN, i + cols]);
+      if (c > 0 && blocked.has(i - 1)) sides[i]++;
+      if (c < cols - 1 && blocked.has(i + 1)) sides[i]++;
+      if (r > 0 && blocked.has(i - cols)) sides[i]++;
+      if (r < rows - 1 && blocked.has(i + cols)) sides[i]++;
     }
   }
-  rng.shuffle(edges);
+  const touched = new Set<number>();
+  const depth = (i: number) => {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    return Math.min(r, c, rows - 1 - r, cols - 1 - c);
+  };
+  // A run starts on an edge: [cell, vertical?]. Vertical = a fence on the cell's right edge.
+  const starts: { i: number; v: boolean; key: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      if (c < cols - 1) starts.push({ i, v: true, key: Math.min(depth(i), depth(i + 1)) + rng.next() * 1.6 });
+      if (r < rows - 1) starts.push({ i, v: false, key: Math.min(depth(i), depth(i + cols)) + rng.next() * 1.6 });
+    }
+  }
+  starts.sort((a, b) => b.key - a.key);
+  const ok = (i: number, j: number, bit: number, apart: boolean) =>
+    !blocked.has(i) && !blocked.has(j) && !(walls[i] & bit) && sides[i] < 2 && sides[j] < 2 && (!apart || (!touched.has(i) && !touched.has(j)));
   let placed = 0;
-  for (const [i, bit, j] of edges) {
-    if (placed >= count) break;
-    if (blocked.has(i) && blocked.has(j)) continue;
-    if (per[i] >= 2 || per[j] >= 2) continue;
-    walls[i] |= bit;
-    per[i]++;
-    per[j]++;
-    placed++;
+  for (const apart of [true, false]) {
+    for (const s of starts) {
+      if (placed >= count) break;
+      const len = Math.min(count - placed, rng.pick([1, 2, 2, 3]));
+      // Extend the run along its line: down a column boundary, or along a row boundary.
+      const run: [number, number, number][] = [];
+      for (let k = 0; k < len; k++) {
+        const i = s.v ? s.i + k * cols : s.i + k;
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        if (s.v ? r >= rows || c >= cols - 1 : c >= cols || r >= rows - 1 || Math.floor(i / cols) !== Math.floor(s.i / cols)) break;
+        const j = s.v ? i + 1 : i + cols;
+        const bit = s.v ? FENCE_RIGHT : FENCE_DOWN;
+        if (!ok(i, j, bit, apart)) break;
+        run.push([i, j, bit]);
+      }
+      if (!run.length) continue;
+      for (const [i, j, bit] of run) {
+        walls[i] |= bit;
+        sides[i]++;
+        sides[j]++;
+        touched.add(i).add(j);
+        placed++;
+      }
+    }
   }
   return walls;
 }

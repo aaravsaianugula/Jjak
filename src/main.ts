@@ -6,6 +6,7 @@ import './styles/market.css';
 import './styles/garden.css';
 import './styles/meta.css';
 import './styles/cards-extra.css';
+import './styles/mechanics.css';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import { installCardSprite } from './art/cards';
@@ -100,7 +101,10 @@ async function boot() {
 
   void store.init();
   void planReminders();
-  if (!save.onboarded) nav.welcome();
+  // DEV only: ?play=<url-encoded JSON LevelSpec> opens that board directly.
+  const play = import.meta.env.DEV ? new URLSearchParams(location.search).get('play') : null;
+  if (play) nav.game({ mode: 'journey', number: 99, seed: 'dev', rows: 8, cols: 6, stones: 0, months: 12, variants: true, par: 120, gravity: false, snow: 0, ...JSON.parse(play) });
+  else if (!save.onboarded) nav.welcome();
   else {
     nav.home();
     void ads.start().then(() => {

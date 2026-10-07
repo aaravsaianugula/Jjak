@@ -516,6 +516,9 @@ on('clear', ({ session, summary }) => {
   if (spec.stones > 0) bump('stones');
   if (spec.knots) bump('knots');
   if (mx.wind) bump('wind');
+  if (spec.gates) bump('gates');
+  if (spec.fences) bump('fences');
+  if (spec.goal && st.goal) bump('goal');
   persist();
 });
 

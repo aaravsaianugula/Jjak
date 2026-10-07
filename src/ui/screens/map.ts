@@ -12,6 +12,11 @@ import {
 } from '../../data/route';
 import { type LevelSpec, windOf } from '../../engine/levels';
 import { levelPlan } from '../../director';
+import { GOALS } from '../../engine/goals';
+import { MECHANICS } from '../../engine/mechanics';
+
+/** A small brushed ring: the mark of a level with a goal (its third blossom). */
+const GOAL_MARK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8C5.8 2.8 2.8 6 2.8 10s3 7.2 7.2 7.2 7.2-3 7.2-7.2c0-3.2-1.8-5.6-4.6-6.7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 import { levelsToLantern, syncStamps } from '../../services/progress';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
@@ -40,6 +45,8 @@ function twistOf(spec: LevelSpec): { glyph: string; name: string } {
   if (w) return { glyph: '風', name: `wind ${w}` };
   if (spec.snow) return { glyph: '雪', name: 'first snow' };
   if (spec.knots) return { glyph: '結', name: 'knots' };
+  if (spec.gates) return { glyph: MECHANICS.gates.glyph, name: 'gates' };
+  if (spec.fences) return { glyph: MECHANICS.fences.glyph, name: 'fences' };
   if (spec.stones) return { glyph: '石', name: 'stones' };
   return { glyph: '', name: '' };
 }
@@ -87,6 +94,9 @@ export function mapScreen(): Screen {
         <span><span class="ja" aria-hidden="true">雪</span>First snow</span>
         <span><span class="ja" aria-hidden="true">結</span>Knots</span>
         <span><span class="ja" aria-hidden="true">風</span>Wind</span>
+        <span><span class="ja" aria-hidden="true">${MECHANICS.gates.glyph}</span>Gates</span>
+        <span><span class="ja" aria-hidden="true">${MECHANICS.fences.glyph}</span>Fences</span>
+        <span><span class="goal-key" aria-hidden="true">${GOAL_MARK}</span>Level goal</span>
         <span><span class="ja lucky-key" aria-hidden="true">福</span>Lucky cards</span>
         <span>${ICONS.lantern}Lantern gift</span>
       </div>
@@ -110,12 +120,14 @@ export function mapScreen(): Screen {
       const tw = twistOf(spec);
       const fest = !!spec.festival;
       const lantern = n >= unlocked && levelsToLantern(n) === 0;
-      const extras = [tw.name, spec.lucky ? 'lucky cards' : '', fest ? 'festival board' : '', lantern ? 'lantern gift' : ''].filter(Boolean).join(', ');
+      const goal = spec.goal ? GOALS[spec.goal] : null;
+      const extras = [tw.name, goal ? `goal: ${goal.name.toLowerCase()}` : '', spec.lucky ? 'lucky cards' : '', fest ? 'festival board' : '', lantern ? 'lantern gift' : ''].filter(Boolean).join(', ');
       const label = `Level ${n}${n === unlocked ? ', next to play' : ''}${isLocked ? ', locked' : n < unlocked ? `, ${stars} of 3 blossoms` : ''}${extras ? `, ${extras}` : ''}`;
       cells += `<button class="lvl${n === unlocked ? ' lvl--now' : ''}${fest ? ' lvl--fest' : ''}" data-level="${n}" ${isLocked ? 'disabled' : ''} aria-label="${label}"${n === unlocked ? ' aria-current="step"' : ''}>
         <span class="lvl__n">${n}</span>
         <span class="lvl__stars" aria-hidden="true">${[0, 1, 2].map((k) => `<i class="${k < stars ? 'on' : ''}"></i>`).join('')}</span>
         ${tw.glyph ? `<span class="lvl__twist ja" aria-hidden="true">${tw.glyph}</span>` : ''}
+        ${goal ? `<span class="lvl__goal" aria-hidden="true">${GOAL_MARK}</span>` : ''}
         ${lantern ? `<span class="lvl__lan" aria-hidden="true">${ICONS.lantern}</span>` : spec.lucky ? '<span class="lvl__luck ja" aria-hidden="true">福</span>' : ''}
       </button>`;
     }

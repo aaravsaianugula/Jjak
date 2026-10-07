@@ -2,7 +2,7 @@ import { ECONOMY, GIFTS } from '../config';
 import { ALL_CARD_IDS } from '../data/deck';
 import { ROUTE, ROUTE_LEVELS_PER_CHAPTER, routeOf } from '../data/route';
 import { localDateKey } from '../engine/levels';
-import { LUCKY_PETALS, type Session, starCount } from '../engine/session';
+import { LUCKY_PETALS, type Session, starCount, thirdStar } from '../engine/session';
 import { persist, save } from './storage';
 
 export interface ClearSummary {
@@ -166,7 +166,7 @@ export function liveStreak(): number {
 
 export function shareTextFor(s: Session, summary: ClearSummary, storeUrl: string): string {
   const st = s.stars();
-  const flowers = [st.clear, st.noAssist, st.underPar].map((on) => (on ? '🌸' : '▫️')).join('');
+  const flowers = [st.clear, st.noAssist, thirdStar(st)].map((on) => (on ? '🌸' : '▫️')).join('');
   const secs = Math.floor(s.elapsedMs(s.finishedAt) / 1000);
   const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   const claps = '짝'.repeat(Math.min(5, Math.max(1, s.bestCombo)));
