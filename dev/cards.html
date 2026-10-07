@@ -1,13 +1,28 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Card gallery</title>
+<!--
+  Card gallery for checking the art.
+  ?w=60            card width in CSS px (default 110)
+  ?only=3,7,back   render just these ids (numbers, "back", "snow")
+  ?cols=8          grid columns
+  ?bg=dark         dark table background
+-->
 <style>body{background:#efe8da;margin:0;padding:16px;font-family:sans-serif}
-.g{display:grid;grid-template-columns:repeat(8,110px);gap:10px}
-.g svg{width:110px;height:154px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}</style></head>
+body.dark{background:#24252b}
+.g{display:grid;grid-template-columns:repeat(var(--cols,8),var(--w,110px));gap:calc(var(--w,110px) * .09)}
+.g svg{width:var(--w,110px);height:calc(var(--w,110px) * 1.4);display:block;filter:drop-shadow(0 2px 3px rgba(0,0,0,.18))}</style></head>
 <body><div class="g" id="g"></div>
 <script type="module">
 import '../src/styles/fonts.css';
 import { installCardSprite, cardSvg } from '../src/art/cards.ts';
 installCardSprite();
-let h=''; for (let i=0;i<48;i++) h+=cardSvg(i); h+=cardSvg('back');
-document.getElementById('g').innerHTML=h;
+const q = new URLSearchParams(location.search);
+const g = document.getElementById('g');
+if (q.get('w')) g.style.setProperty('--w', q.get('w') + 'px');
+if (q.get('cols')) g.style.setProperty('--cols', q.get('cols'));
+if (q.get('bg') === 'dark') document.body.classList.add('dark');
+const ids = q.get('only')
+  ? q.get('only').split(',').map((s) => (/^\d+$/.test(s) ? +s : s))
+  : [...Array.from({ length: 48 }, (_, i) => i), 'back', 'snow'];
+g.innerHTML = ids.map((i) => cardSvg(i)).join('');
 </script></body></html>
