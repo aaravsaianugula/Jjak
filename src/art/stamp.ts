@@ -97,7 +97,7 @@ export function stampSvg(c: RouteChapter, index: number, date: string | null, op
   const chars = [...c.ja.replace(/\s+/g, '')];
   const season = SEASON_NAMES[c.season].ja;
   const d = earned ? stampDate(date) : '';
-  const line = earned ? '' : 'stroke-dasharray="5 4"';
+  const line = earned ? '' : 'stroke-opacity=".7"';
   let body = '';
 
   if (shape === 'round') {

@@ -1054,7 +1054,7 @@ button.panel:active {
   display: grid;
   place-items: center;
   background: var(--bg-deep);
-  border-top: 1px dashed var(--line);
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.12em;
@@ -1126,7 +1126,7 @@ button.panel:active {
   margin-top: 14px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px dashed var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
   color: var(--ink-soft);
   font-size: 14px;
 }
@@ -2603,7 +2603,7 @@ button.panel:active {
 /* Locked: an empty slot in the album page with the faintest ghost of the card. */
 .month__cards button.locked {
   background: var(--surface-2);
-  outline: 1.5px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--muted) 28%, transparent);
   outline-offset: -1.5px;
 }
 .month__cards button.locked svg {
@@ -3244,7 +3244,7 @@ a.row:active {
   font-weight: 600;
   line-height: 1;
   color: color-mix(in srgb, var(--muted) 55%, transparent);
-  outline: 1.5px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--muted) 28%, transparent);
   outline-offset: -1.5px;
 }
 /* Progress meters in the seal book fill in once as the page arrives. */
@@ -3468,7 +3468,7 @@ a.row:active {
 .chapter.is-locked .chapter__glyph {
   background: transparent;
   box-shadow: none;
-  outline: 1.5px dashed color-mix(in srgb, var(--season) 45%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--season) 30%, transparent);
   outline-offset: -1.5px;
 }
 .lvl-grid {
@@ -3496,7 +3496,7 @@ a.row:active {
 .lvl[disabled] {
   background: transparent;
   box-shadow: none;
-  outline: 1px dashed var(--line);
+  outline: 1px solid var(--line);
   outline-offset: -1px;
   color: var(--muted);
   cursor: default;

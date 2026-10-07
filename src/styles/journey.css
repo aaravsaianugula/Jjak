@@ -136,10 +136,9 @@
 }
 .stop__road path {
   fill: none;
-  stroke: var(--line);
-  stroke-width: 2.4;
+  stroke: color-mix(in srgb, var(--line) 85%, transparent);
+  stroke-width: 1.6;
   stroke-linecap: round;
-  stroke-dasharray: 1 7;
 }
 .stop.is-done .stop__road path,
 .stop.is-here .stop__road path {

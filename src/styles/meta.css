@@ -444,7 +444,7 @@ ol.road::before {
   bottom: 24px;
   width: 2px;
   border-radius: 1px;
-  background: repeating-linear-gradient(to bottom, var(--line) 0 7px, transparent 7px 11px);
+  background: linear-gradient(to bottom, var(--line), color-mix(in srgb, var(--line) 35%, transparent));
 }
 .road__step {
   position: relative;
@@ -537,14 +537,14 @@ ol.road::before {
 }
 .road__step--locked .road__node {
   box-shadow: none;
-  border: 1.5px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--muted) 28%, transparent);
 }
 .road__step--ex .road__node::after {
   content: '';
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 1.5px dashed color-mix(in srgb, var(--gold) 70%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--gold) 50%, transparent);
 }
 .road__body {
   flex: 1;

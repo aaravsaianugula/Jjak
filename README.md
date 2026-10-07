@@ -8,13 +8,13 @@ and collect every card with its Korean and Japanese name.
 
 ![Feature graphic](store/feature-graphic.png)
 
-| Home | Falling leaves | First snow | Result |
+| Home | Gates | Flower Road | Market |
 |---|---|---|---|
-| ![](store/screenshots/03-home.png) | ![](store/screenshots/11-falling-leaves.png) | ![](store/screenshots/13-snow.png) | ![](store/screenshots/06-result.png) |
+| ![](store/screenshots/01-home.png) | ![](store/screenshots/02-gates.png) | ![](store/screenshots/03-map.png) | ![](store/screenshots/04-market-decks.png) |
 
-| Fever (×5 combo) | Rush | Seals | Card detail |
+| Garden at night | Flower Path | Passport stamp | Fever (×5 combo) |
 |---|---|---|---|
-| ![](store/screenshots/18-fever.png) | ![](store/screenshots/20-rush-end.png) | ![](store/screenshots/08-seals.png) | ![](store/screenshots/10-card-detail.png) |
+| ![](store/screenshots/05-garden-night.png) | ![](store/screenshots/06-flower-path.png) | ![](store/screenshots/07-result-stamp.png) | ![](store/screenshots/08-fever.png) |
 
 ## What's inside
 

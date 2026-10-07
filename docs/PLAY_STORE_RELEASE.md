@@ -236,8 +236,8 @@ pack and petal pouches. In the IARC questionnaire, answer **Yes** to "digital pu
 
 * App icon 512×512: `store/icon-512.png`
 * Feature graphic 1024×500: `store/feature-graphic.png`
-* Phone screenshots, 2–8 at 1080×1920: `store/screenshots/` (regenerate with
-  `SCALE=2.62 VIEW=412x732 npm run screens -- http://localhost:5173/ store/screenshots`)
+* Phone screenshots, 8 at 1080×1920 (9:16, 24-bit PNG, no alpha): `store/screenshots/` (regenerate with
+  `SCALE=2.5 VIEW=432x768 npm run screens -- http://localhost:5173/ store/screenshots`)
 
 ## 7. Release tracks
 

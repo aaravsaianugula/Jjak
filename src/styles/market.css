@@ -1009,7 +1009,7 @@
   align-items: flex-start;
   padding: 14px;
   border-radius: var(--radius-md);
-  border: 1px dashed color-mix(in srgb, var(--gold) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent);
   background: color-mix(in srgb, var(--gold) 7%, transparent);
 }
 .mk-lock__icon {
