@@ -4,6 +4,7 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import { installCardSprite } from './art/cards';
 import { ads } from './services/ads';
+import { haptic } from './services/haptics';
 import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
@@ -30,6 +31,11 @@ async function boot() {
   installWebBannerPreview();
   setBackFallback(() => nav.home());
   installPlatformHooks(() => void flush(), () => {});
+  // A light tick on every button press (cards handle their own feedback).
+  document.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('button');
+    if (b && !b.classList.contains('card') && !b.disabled) haptic.light();
+  });
 
   // Wait for fonts so card glyphs never flash in a fallback face.
   try {

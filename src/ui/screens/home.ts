@@ -1,3 +1,4 @@
+import { sceneParticles, sceneSvg } from '../../art/scene';
 import { CHAPTERS, LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, journeyLevel, localDateKey, zenLevel } from '../../engine/levels';
 import { formatTime } from '../../engine/session';
 import { SEALS } from '../../services/achievements';
@@ -8,6 +9,9 @@ import { type Screen } from '../app';
 import { esc, frag } from '../dom';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
+
+/** Last petal total shown on Home, to animate gains. */
+let shownPetals: number | null = null;
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -36,12 +40,15 @@ export function homeScreen(): Screen {
       <span class="petals" aria-label="${save.petals} petals">${ICONS.petal}${save.petals}</span>
       <button class="icon-btn" data-go="settings" aria-label="Settings">${ICONS.gear}</button>
     </header>
-    <div class="brand">
-      <div class="seal" aria-hidden="true">짝</div>
-      <div class="brand__word">Jjak</div>
-      <div class="brand__tag">Pair the flowers of the four seasons<br><span class="serif">꽃을 맞추다</span> · <span class="ja">花を合わせる</span></div>
+    <div class="scene" data-season="${chapterIndex % 4}">
+      ${sceneSvg(chapterIndex % 4)}
+      <div class="scene__particles" aria-hidden="true">${sceneParticles(chapterIndex % 4)}</div>
+      <div class="scene__brand">
+        <div class="seal" aria-hidden="true">짝</div>
+        <div class="brand__word">Jjak</div>
+        <div class="brand__tag">Pair the flowers of the four seasons<br><span class="serif">꽃을 맞추다</span> · <span class="ja">花を合わせる</span></div>
+      </div>
     </div>
-    <div class="home__fill"></div>
     <div class="panel journey">
       <span class="journey__season" aria-hidden="true">${chapter.ja}</span>
       <div class="journey__top">
@@ -81,5 +88,24 @@ export function homeScreen(): Screen {
     if (go === 'seals') nav.seals();
     if (go === 'settings') nav.settings();
   });
+  // Count up petals earned since the last visit.
+  const pet = el.querySelector<HTMLElement>('.petals')!;
+  const from = shownPetals ?? save.petals;
+  const to = save.petals;
+  shownPetals = to;
+  if (to > from) {
+    const icon = pet.innerHTML.slice(0, pet.innerHTML.indexOf('</svg>') + 6);
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const k = Math.min(1, (now - t0) / 700);
+      pet.innerHTML = `${icon}${Math.round(from + (to - from) * (1 - (1 - k) ** 3))}`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    pet.innerHTML = `${icon}${from}`;
+    setTimeout(() => {
+      pet.classList.add('is-bump');
+      requestAnimationFrame(step);
+    }, 350);
+  }
   return { name: 'home', el };
 }

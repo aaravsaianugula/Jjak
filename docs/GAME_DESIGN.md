@@ -106,10 +106,23 @@ Consent goes through Google UMP before any ad request.
   indigo #2F4A6D. **Ink (dark):** #1C1B19 background with warm paper text.
 * **Type:** Gowun Batang (display/Hangul), Gowun Dodum (UI), Zen Old Mincho (kanji/kana).
   All are SIL OFL, bundled, and subset by `npm run fonts`.
-* **Cards:** original SVG motifs for 12 flowers. The plain / ribbon (poetry, red, blue) /
-  animal (gold medallion with kanji) / bright (vermilion sun) overlays follow the real
-  deck's structure. Korean decks use blue ribbons where Japanese decks use purple; we use
-  the Korean blue.
+* **Cards:** original SVG art for all 48 cards, built in code (`src/art/`). Twelve flower
+  motifs (palmate maple leaves, stamened plum and cherry blossoms, hanging wisteria and
+  so on). The 14 special cards each have their own illustration: crane and red sun,
+  bush warbler, viewing curtain, cuckoo under a crescent, eight-plank bridge,
+  butterflies, boar, geese, full moon on a red sky, red-lacquer sake cup, the deer
+  looking away, swallow, the umbrella poet with his frog, and the phoenix. Every
+  illustration has a paper halo so it reads against the flowers, plus a kanji corner
+  tag (a vermilion ring for brights, gold for animals). Ribbons are folded tanzaku
+  slips; poetry ribbons carry あかよろし / みよしの. Korean decks use blue ribbons where
+  Japanese decks use purple, and we use the Korean blue. The card back uses a seigaiha
+  wave pattern (청해파 · 青海波) behind the seal.
+* **Home scene:** a layered landscape that follows the player's current season: cherry
+  and drifting petals, iris and fireflies, maple and falling leaves, plum and snow
+  under a moon.
+* **Game feel:** a title card at the start of each board, a two-layer ink-brush path with
+  blots at both ends, a seal stamp and petal shower on clear, and a pause menu (Back
+  never throws away a board in progress).
 * **Sound:** WebAudio synthesis only. A wood "tok" for taps and a pentatonic bell that
   climbs with the combo. The stamp sound is a low thump plus a chord.
 

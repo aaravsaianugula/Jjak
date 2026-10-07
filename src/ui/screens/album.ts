@@ -16,12 +16,13 @@ export function albumScreen(): Screen {
         <span class="month__num">${m.index + 1}</span>
         <span class="month__name">${esc(m.en)}</span>
         <span class="month__langs"><span class="serif">${m.ko}</span> · <span class="ja">${m.ja}</span></span>
+        <span class="month__progress">${[0, 1, 2, 3].filter((v) => owned.has(m.index * 4 + v)).length}/4</span>
       </div>
       <div class="month__cards">${[0, 1, 2, 3]
         .map((v) => {
           const id = m.index * 4 + v;
           const have = owned.has(id);
-          return `<button data-id="${id}" class="${have ? '' : 'locked'}" aria-label="${have ? esc(`${m.en} ${cardDef(id).en}`) : 'Locked card'}">${cardSvg(have ? id : 'back')}</button>`;
+          return `<button data-id="${id}" class="${have ? '' : 'locked'}" aria-label="${have ? esc(`${m.en} ${cardDef(id).en}`) : 'Not yet collected'}">${cardSvg(id)}</button>`;
         })
         .join('')}</div>
     </section>`,
@@ -70,7 +71,7 @@ function openDetail(id: number, have: boolean) {
         ${sets(id)}
       </div>`)
     : frag(`<div class="detail">
-        <div class="detail__card">${cardSvg('back')}</div>
+        <div class="detail__card" style="filter:grayscale(1);opacity:.35">${cardSvg(id)}</div>
         <h2>Not yet collected</h2>
         <p class="muted">Clear a new Journey level or today’s Daily to draw a card. This one belongs to <b>${esc(m.en)}</b> — month ${m.index + 1}.</p>
       </div>`);

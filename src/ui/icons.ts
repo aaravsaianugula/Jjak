@@ -10,9 +10,11 @@ export const ICONS = {
   shuffle: icon('<path d="M4 7h3.5c2.5 0 3.5 1.5 5 5s2.5 5 5 5H20"/><path d="M4 17h3.5c1.3 0 2.2-.4 2.9-1.2M13.6 8.2c.7-.8 1.6-1.2 2.9-1.2H20"/><path d="M17.5 4.5L20 7l-2.5 2.5M17.5 14.5L20 17l-2.5 2.5"/>'),
   restart: icon('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/>'),
   share: icon('<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/>'),
+  pause: icon('<path d="M9 5.5v13M15 5.5v13" stroke-width="2.2"/>'),
   play: icon('<path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/>'),
   ad: icon('<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.2-2.5z" fill="currentColor" stroke="none"/>'),
-  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 6 6.5.9-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.1 1.1-6.5L2.6 9.5l6.5-.9z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12.00" cy="6.70" r="4.5"/><circle cx="17.04" cy="10.36" r="4.5"/><circle cx="15.12" cy="16.29" r="4.5"/><circle cx="8.88" cy="16.29" r="4.5"/><circle cx="6.96" cy="10.36" r="4.5"/><circle cx="12" cy="12" r="4"/></g><circle cx="12" cy="12" r="2.1" style="fill:var(--surface)"/><circle cx="12" cy="12" r=".9" fill="currentColor"/></svg>',
+  blossom: '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><circle cx="12.00" cy="6.70" r="4.5"/><circle cx="17.04" cy="10.36" r="4.5"/><circle cx="15.12" cy="16.29" r="4.5"/><circle cx="8.88" cy="16.29" r="4.5"/><circle cx="6.96" cy="10.36" r="4.5"/><circle cx="12" cy="12" r="4"/></g><circle cx="12" cy="12" r="2.1" style="fill:var(--surface)"/><circle cx="12" cy="12" r=".9" fill="currentColor"/></svg>',
   petal:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#d98a98" d="M12 21c-4.5-2.6-7-6.3-7-10.2C5 6.6 8.2 3 12 3s7 3.6 7 7.8c0 3.9-2.5 7.6-7 10.2z"/><path fill="#c4677a" d="M12 21c-1.2-3.4-1.4-7-.2-11.2.3 4.1 1 7.6.2 11.2z" opacity=".6"/></svg>',
 };

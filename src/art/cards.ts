@@ -4,6 +4,7 @@
  * <symbol> in a hidden sprite, so a 48-card board is just <use> references.
  */
 import { MONTHS, cardDef, type CardDef } from '../data/deck';
+import { SPECIALS, renderParts } from './specials';
 
 export const INK = '#2a2724';
 const PAPER = '#f7f1e6';
@@ -34,6 +35,11 @@ function blossom(cx: number, cy: number, r: number, fill: string, center: string
     }
   }
   s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r * 0.22)}" fill="${center}"/>`;
+  // stamens
+  for (let i = 0; i < n; i++) {
+    const a = ((rot + (i * 360) / n + 36) * Math.PI) / 180;
+    s += `<circle cx="${f(cx + Math.cos(a) * r * 0.36)}" cy="${f(cy + Math.sin(a) * r * 0.36)}" r="${f(Math.max(0.6, r * 0.07))}" fill="#f4d58a"/>`;
+  }
   return s;
 }
 
@@ -42,17 +48,30 @@ function leaf(x: number, y: number, len: number, w: number, angle: number, fill:
   return `<path transform="rotate(${f(angle)} ${f(x)} ${f(y)})" d="M${f(x)} ${f(y)} Q${f(x + w)} ${f(y - len * 0.5)} ${f(x)} ${f(y - len)} Q${f(x - w)} ${f(y - len * 0.5)} ${f(x)} ${f(y)}Z" fill="${fill}"/>`;
 }
 
-/** Rounded star used for maple leaves. */
+/** Palmate maple leaf: seven pointed lobes, a notch at the stem, and veins. */
 function mapleLeaf(cx: number, cy: number, r: number, rot: number, fill: string) {
   const pts: string[] = [];
-  const lobes = 5;
-  for (let i = 0; i < lobes * 2; i++) {
-    const a = ((rot + (i * 180) / lobes - 90) * Math.PI) / 180;
-    const rr = i % 2 === 0 ? r : r * 0.45;
+  const N = 84;
+  for (let i = 0; i <= N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    // lobes point "up" (t = 0); the bottom fifth of the circle is the stem notch
+    const lobe = Math.pow(Math.abs(Math.cos((7 / 2) * t)), 1.5);
+    const notch = Math.abs(Math.PI - t) < 0.55 ? 0.35 : 1;
+    const rr = r * (0.56 + 0.44 * lobe) * notch;
+    const a = t - Math.PI / 2 + (rot * Math.PI) / 180;
     pts.push(`${f(cx + Math.cos(a) * rr)},${f(cy + Math.sin(a) * rr)}`);
   }
-  return `<polygon points="${pts.join(' ')}" fill="${fill}" stroke="${fill}" stroke-width="2.4" stroke-linejoin="round"/>` +
-    `<line x1="${f(cx)}" y1="${f(cy)}" x2="${f(cx + Math.cos(((rot + 90) * Math.PI) / 180) * r * 0.9)}" y2="${f(cy + Math.sin(((rot + 90) * Math.PI) / 180) * r * 0.9)}" stroke="${fill}" stroke-width="1.6" stroke-linecap="round"/>`;
+  let veins = '';
+  for (let k = -3; k <= 3; k++) {
+    const a = (k * 2 * Math.PI) / 7 - Math.PI / 2 + (rot * Math.PI) / 180;
+    veins += `M${f(cx)} ${f(cy)}L${f(cx + Math.cos(a) * r * 0.82)} ${f(cy + Math.sin(a) * r * 0.82)}`;
+  }
+  const sa = Math.PI / 2 + (rot * Math.PI) / 180;
+  return (
+    `<path d="M${f(cx)} ${f(cy)}L${f(cx + Math.cos(sa) * r * 1.15)} ${f(cy + Math.sin(sa) * r * 1.15)}" stroke="#7a3a24" stroke-width="1.3" stroke-linecap="round"/>` +
+    `<polygon points="${pts.join(' ')}" fill="${fill}"/>` +
+    `<path d="${veins}" stroke="#ffffff" stroke-opacity=".28" stroke-width=".7" fill="none"/>`
+  );
 }
 
 const STYLES: MonthStyle[] = [
@@ -283,21 +302,29 @@ const motif = (m: number) => {
 
 function ribbon(def: CardDef, month: number): string {
   const color = def.ribbon === 'blue' ? RIBBON_BLUE : RIBBON_RED;
-  let s = `<g transform="rotate(-10 50 86)"><rect x="40" y="56" width="20" height="62" rx="2" fill="${color}" stroke="${PAPER}" stroke-width="1.5"/>`;
+  const shade = def.ribbon === 'blue' ? '#22374f' : '#8f2c22';
+  // A tanzaku slip with a folded corner and a soft drop shadow.
+  let s = `<g transform="rotate(-10 50 86)">` +
+    `<path d="M42 58L62 58L62 118L52 114L42 118Z" fill="#000" opacity=".14" transform="translate(1.6 1.8)"/>` +
+    `<path d="M40 56L60 56L60 118L50 113L40 118Z" fill="${color}" stroke="${PAPER}" stroke-width="1.4" stroke-linejoin="round"/>` +
+    `<path d="M40 56L60 56L60 61L40 61Z" fill="${shade}"/>` +
+    `<path d="M57 56L60 56L60 118L57 116.5Z" fill="#fff" opacity=".12"/>`;
   if (def.ribbon === 'poetry') {
     const text = month === 2 ? ['み', 'よ', 'し', 'の'] : ['あ', 'か', 'よ', 'ろ', 'し'];
     text.forEach((ch, i) => {
-      s += `<text x="50" y="${70 + i * 11}" text-anchor="middle" font-size="9.5" font-family="'Zen Old Mincho', serif" fill="${PAPER}">${ch}</text>`;
+      s += `<text x="50" y="${73 + i * 9.6}" text-anchor="middle" font-size="8.6" font-family="'Zen Old Mincho', serif" font-weight="600" fill="${PAPER}">${ch}</text>`;
     });
   }
   return s + '</g>';
 }
 
-function medallion(glyph: string, cx: number, cy: number, r: number, fill: string, ink: string): string {
+/** Small corner tag naming a special card in kanji (vermilion = bright, gold = animal). */
+function glyphTag(glyph: string, bright: boolean): string {
+  const ring = bright ? VERMILION : GOLD;
   return (
-    `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}"/>` +
-    `<circle cx="${cx}" cy="${cy}" r="${r - 2.2}" fill="none" stroke="${PAPER}" stroke-width="0.9" opacity="0.8"/>` +
-    `<text x="${cx}" y="${cy + r * 0.36}" text-anchor="middle" font-size="${f(r * 1.05)}" font-family="'Zen Old Mincho', serif" font-weight="600" fill="${ink}">${glyph}</text>`
+    `<rect x="73" y="115" width="20" height="19" rx="4.5" fill="${PAPER}" opacity=".94"/>` +
+    `<rect x="74.3" y="116.3" width="17.4" height="16.4" rx="3.6" fill="none" stroke="${ring}" stroke-width="1.1"/>` +
+    `<text x="83" y="128.6" text-anchor="middle" font-size="11" font-family="'Zen Old Mincho', serif" font-weight="600" fill="${INK}">${glyph}</text>`
   );
 }
 
@@ -307,13 +334,9 @@ export function cardInner(id: number): string {
   const variant = id & 3;
   const def = cardDef(id);
   const style = STYLES[month];
+  const special = SPECIALS[id];
   let bg = `<rect width="100" height="140" rx="9" fill="${PAPER}"/><rect x="4" y="4" width="92" height="132" rx="6" fill="${style.tint}"/>`;
-
-  // Bright cards get a sky disc behind the motif (moon is pale on a warm sky).
-  if (def.kind === 'bright') {
-    if (month === 7) bg += `<rect x="4" y="4" width="92" height="132" rx="6" fill="#c9583e"/><circle cx="50" cy="44" r="27" fill="#f3ead2"/>`;
-    else bg += `<circle cx="66" cy="36" r="24" fill="${VERMILION}" opacity="0.92"/>`;
-  }
+  if (special?.back) bg += `<g clip-path="url(#card-clip)">${special.back}</g>`;
 
   // A second plain card is the mirror image, so pairs aren't pixel-identical.
   const plainAlt = def.kind === 'plain' && variant > 0;
@@ -323,14 +346,19 @@ export function cardInner(id: number): string {
 
   let over = '';
   if (def.kind === 'ribbon') over = ribbon(def, month);
-  if (def.kind === 'animal' && def.glyph) over = medallion(def.glyph, 76, 26, 13, GOLD, PAPER);
-  if (def.kind === 'bright' && def.glyph) {
-    over = month === 7 ? medallion(def.glyph, 50, 44, 11, VERMILION, PAPER) : medallion(def.glyph, 66, 36, 12, PAPER, VERMILION);
+  if (special) {
+    over += `<g clip-path="url(#card-clip)">${renderParts(special.parts)}${special.front ?? ''}</g>`;
+    over += glyphTag(special.glyph, def.kind === 'bright');
   }
 
+  // Sheen + thin inner rule give the printed-card finish.
+  const finish =
+    `<rect x="4" y="4" width="92" height="132" rx="6" fill="url(#card-sheen)"/>` +
+    `<rect x="4.5" y="4.5" width="91" height="131" rx="5.6" fill="none" stroke="${INK}" stroke-opacity=".08"/>`;
+
   const chipW = month + 1 >= 10 ? 19 : 13;
-  const num = `<rect x="6" y="7" width="${chipW}" height="15" rx="4" fill="${PAPER}" opacity="0.85"/><text x="${6 + chipW / 2}" y="18.5" text-anchor="middle" font-size="11" font-family="'Gowun Batang', serif" font-weight="700" fill="${INK}" opacity="0.62">${month + 1}</text>`;
-  return bg + art + over + num;
+  const num = `<rect x="6" y="7" width="${chipW}" height="15" rx="4" fill="${PAPER}" opacity="0.88"/><text x="${6 + chipW / 2}" y="18.5" text-anchor="middle" font-size="11" font-family="'Gowun Batang', serif" font-weight="700" fill="${INK}" opacity="0.66">${month + 1}</text>`;
+  return bg + art + over + finish + num;
 }
 
 /** A card under snow (First snow levels): pale, soft drifts, a faint flake. */
@@ -357,20 +385,29 @@ export const MONTH_TINTS = STYLES.map((st) => st.tint);
 
 /** Back of a card (album locked state). */
 export function cardBackInner(): string {
-  let pattern = '';
-  for (let r = 0; r < 7; r++)
-    for (let c = 0; c < 5; c++) {
-      const x = 14 + c * 18 + (r % 2) * 9;
-      const y = 16 + r * 18;
-      pattern += `<circle cx="${x}" cy="${y}" r="5.5" fill="none" stroke="#4a5a7a" stroke-width="1"/>`;
+  // Seigaiha (청해파 · 青海波) waves: overlapping fans of concentric arcs.
+  let waves = '';
+  const R = 10;
+  for (let row = 0; row < 21; row++) {
+    const y = 8 + row * 6.5;
+    const off = row % 2 ? R : 0;
+    for (let col = -1; col < 7; col++) {
+      const x = col * R * 2 + off;
+      for (let k = 0; k < 3; k++) {
+        const rr = R - k * 3;
+        waves += `M${f(x - rr)} ${f(y + 6)}A${rr} ${rr} 0 0 1 ${f(x + rr)} ${f(y + 6)}`;
+      }
     }
+  }
   return (
-    `<rect width="100" height="140" rx="9" fill="#2d3850"/>` +
-    `<rect x="5" y="5" width="90" height="130" rx="6" fill="none" stroke="#56688c" stroke-width="1"/>` +
-    pattern +
-    `<rect x="32" y="52" width="36" height="36" rx="5" fill="${VERMILION}"/>` +
-    `<rect x="35" y="55" width="30" height="30" rx="3" fill="none" stroke="${PAPER}" stroke-width="1"/>` +
-    `<text x="50" y="78" text-anchor="middle" font-size="19" font-family="'Gowun Batang', serif" font-weight="700" fill="${PAPER}">짝</text>`
+    `<rect width="100" height="140" rx="9" fill="#2a3550"/>` +
+    `<g clip-path="url(#card-clip)"><path d="${waves}" fill="none" stroke="#3f4d6e" stroke-width="1"/></g>` +
+    `<rect x="5" y="5" width="90" height="130" rx="6" fill="none" stroke="#6b7da3" stroke-width=".8"/>` +
+    `<rect x="8" y="8" width="84" height="124" rx="4.5" fill="none" stroke="#6b7da3" stroke-opacity=".5" stroke-width=".6"/>` +
+    `<circle cx="50" cy="70" r="24" fill="#2a3550"/>` +
+    `<rect x="32" y="52" width="36" height="36" rx="5" fill="${VERMILION}" transform="rotate(-5 50 70)"/>` +
+    `<rect x="35" y="55" width="30" height="30" rx="3" fill="none" stroke="${PAPER}" stroke-width="1" transform="rotate(-5 50 70)"/>` +
+    `<text x="50" y="78" text-anchor="middle" font-size="19" font-family="'Gowun Batang', serif" font-weight="700" fill="${PAPER}" transform="rotate(-5 50 70)">짝</text>`
   );
 }
 
@@ -382,7 +419,11 @@ export function installCardSprite(): void {
   svg.id = 'card-sprite';
   svg.setAttribute('aria-hidden', 'true');
   svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
-  let inner = '<defs><clipPath id="card-clip"><rect x="4" y="4" width="92" height="132" rx="6"/></clipPath></defs>';
+  let inner =
+    '<defs><clipPath id="card-clip"><rect x="4" y="4" width="92" height="132" rx="6"/></clipPath>' +
+    '<linearGradient id="card-sheen" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#5a4630" stop-opacity=".07"/></linearGradient>' +
+    '<linearGradient id="sky-red" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4472f" stop-opacity=".95"/><stop offset=".42" stop-color="#d0583e" stop-opacity=".75"/><stop offset=".62" stop-color="#d0583e" stop-opacity="0"/></linearGradient>' +
+    '<linearGradient id="sky-storm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55606a" stop-opacity=".5"/><stop offset=".5" stop-color="#55606a" stop-opacity="0"/></linearGradient></defs>';
   for (let id = 0; id < 48; id++) inner += `<symbol id="card-${id}" viewBox="0 0 100 140">${cardInner(id)}</symbol>`;
   inner += `<symbol id="card-back" viewBox="0 0 100 140">${cardBackInner()}</symbol>`;
   inner += `<symbol id="card-snow" viewBox="0 0 100 140">${cardSnowInner()}</symbol>`;

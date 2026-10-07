@@ -15,6 +15,7 @@ import { type Screen } from '../app';
 import { esc, frag, h, toast, wait } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
+import { showHowToPlay } from './settings';
 import { nav } from '../nav';
 
 const MARGIN = 0.32; // outer lane for paths, in card widths
@@ -36,6 +37,7 @@ export function gameScreen(spec: LevelSpec): Screen {
   // ── Layout ────────────────────────────────────────────────────────
   const timeEl = h('b', { class: 'hud__v' }, spec.mode === 'zen' ? `0/${total / 2}` : '0:00');
   const scoreEl = h('b', { class: 'hud__v' }, '0');
+  const leftEl = h('b', { class: 'hud__v' }, String(total / 2));
   const bar = h('i');
   const board = h('div', { class: 'board', role: 'grid', 'aria-label': 'Card board' });
   const stage = h('div', { class: 'stage' }, board);
@@ -62,12 +64,13 @@ export function gameScreen(spec: LevelSpec): Screen {
       { class: 'topbar' },
       h('button', { class: 'icon-btn', 'aria-label': 'Back', html: ICONS.back, onclick: () => leave() }),
       h('div', { class: 'topbar__title' }, titleFor(spec), h('div', { class: 'muted', style: 'font-size:12px;font-weight:400;font-family:var(--font-sans)' }, sub)),
-      h('span', { style: 'width:44px' }),
+      h('button', { class: 'icon-btn', 'aria-label': 'Pause', html: ICONS.pause, onclick: () => openPause() }),
     ),
     h(
       'div',
       { class: 'hud' },
       h('div', { class: 'hud__stat' }, h('span', { class: 'hud__k' }, spec.mode === 'zen' ? 'Pairs' : 'Time'), timeEl),
+      h('div', { class: 'hud__stat hud__stat--mid' }, h('span', { class: 'hud__k' }, 'Pairs left'), leftEl),
       h('div', { class: 'hud__stat' }, h('span', { class: 'hud__k' }, 'Score'), scoreEl),
     ),
     h('div', { class: 'progress' }, bar),
@@ -167,17 +170,33 @@ export function gameScreen(spec: LevelSpec): Screen {
     });
   }
 
+  /** Ink-brush stroke: a wide wash under a crisp line, with a blot at each end. */
   function drawPath(pts: Point[]) {
     const coords = pts.map((p) => `${xOf(p.c).toFixed(1)},${yOf(p.r).toFixed(1)}`).join(' ');
     let len = 0;
     for (let i = 1; i < pts.length; i++) len += Math.abs(xOf(pts[i].c) - xOf(pts[i - 1].c)) + Math.abs(yOf(pts[i].r) - yOf(pts[i - 1].r));
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    line.setAttribute('points', coords);
-    line.setAttribute('stroke-width', String(Math.max(3, cw * 0.075)));
-    line.style.strokeDasharray = `${len}`;
-    line.style.setProperty('--len', `${len}`);
-    paths.append(line);
-    setTimeout(() => line.remove(), 560);
+    const ns = 'http://www.w3.org/2000/svg';
+    const g = document.createElementNS(ns, 'g');
+    g.classList.add('stroke');
+    for (const [cls, w] of [['wash', Math.max(7, cw * 0.2)], ['line', Math.max(3, cw * 0.07)]] as const) {
+      const line = document.createElementNS(ns, 'polyline');
+      line.setAttribute('points', coords);
+      line.setAttribute('stroke-width', String(w));
+      line.classList.add(cls);
+      line.style.strokeDasharray = `${len}`;
+      line.style.setProperty('--len', `${len}`);
+      g.append(line);
+    }
+    for (const p of [pts[0], pts[pts.length - 1]]) {
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', xOf(p.c).toFixed(1));
+      dot.setAttribute('cy', yOf(p.r).toFixed(1));
+      dot.setAttribute('r', String(Math.max(3, cw * 0.1)));
+      dot.classList.add('blot');
+      g.append(dot);
+    }
+    paths.append(g);
+    setTimeout(() => g.remove(), 620);
   }
 
   function petals(cell: number) {
@@ -211,6 +230,7 @@ export function gameScreen(spec: LevelSpec): Screen {
   function updateHud() {
     scoreEl.textContent = session.score.toLocaleString('en-US');
     const left = cardsLeft(session.board);
+    leftEl.textContent = String(left / 2);
     bar.style.width = `${((total - left) / total) * 100}%`;
     if (spec.mode === 'zen') timeEl.textContent = `${session.pairsMade}/${total / 2}`;
     const badge = (b: HTMLElement, n: number) => {
@@ -416,10 +436,7 @@ export function gameScreen(spec: LevelSpec): Screen {
       { key: 'no', label: 'Keep playing', style: 'quiet' },
     ]);
     if (ok !== 'yes') return;
-    session = new Session(spec, performance.now());
-    clearHint();
-    renderBoard();
-    updateHud();
+    restartBoard();
   });
 
   // ── Tutorial coach marks ──────────────────────────────────────────
@@ -509,6 +526,7 @@ export function gameScreen(spec: LevelSpec): Screen {
     await wait(420);
     const seal = h('div', { class: 'seal stamp' }, '짝');
     stage.append(seal);
+    shower();
     sfx.stamp();
     haptic.success();
     await wait(900);
@@ -518,11 +536,27 @@ export function gameScreen(spec: LevelSpec): Screen {
     showResult(summary, seals, completedMonths().length > papersBefore);
   }
 
+  /** Petal shower across the stage when a board is cleared. */
+  function shower() {
+    const colors = ['#e3a5b0', '#d98a98', '#f2d4da', '#c4472f', '#e6c27a'];
+    for (let k = 0; k < 28; k++) {
+      const p = h('i', { class: 'fall' });
+      p.style.left = `${Math.random() * 100}%`;
+      p.style.background = colors[k % colors.length];
+      p.style.animationDelay = `${Math.random() * 600}ms`;
+      p.style.animationDuration = `${1600 + Math.random() * 1200}ms`;
+      p.style.setProperty('--sway', `${(Math.random() - 0.5) * 80}px`);
+      p.style.setProperty('--spin', `${(Math.random() - 0.5) * 720}deg`);
+      stage.append(p);
+      setTimeout(() => p.remove(), 3200);
+    }
+  }
+
   function showResult(summary: ClearSummary, seals: Seal[], newPaper: boolean) {
     const st = session.stars();
     const secs = session.elapsedMs(session.finishedAt);
     const starBox = (on: boolean, label: string) =>
-      `<div class="star ${on ? 'on' : ''}">${ICONS.star}${esc(label)}</div>`;
+      `<div class="star ${on ? 'on' : ''}">${ICONS.blossom}${esc(label)}</div>`;
     const heading =
       spec.mode === 'daily' ? `Daily #${spec.number} cleared` : spec.mode === 'zen' ? 'Board cleared' : `Level ${spec.number} cleared`;
     const subline =
@@ -662,7 +696,84 @@ export function gameScreen(spec: LevelSpec): Screen {
   }
 
   function leave() {
-    nav.home();
+    if (session.done || session.pairsMade === 0) nav.home();
+    else openPause();
+  }
+
+  let pauseOpen = false;
+  function openPause() {
+    if (pauseOpen || session.done) return;
+    pauseOpen = true;
+    if (!paused) {
+      paused = true;
+      pausedAt = performance.now();
+    }
+    const tog = (k: 'sound' | 'haptics', label: string) =>
+      `<div class="row"><span>${label}</span><button class="switch" role="switch" data-toggle="${k}" aria-checked="${save.settings[k]}" aria-label="${label}"></button></div>`;
+    const content = frag(`<div>
+      <div class="detail__kind">Paused</div>
+      <h2>${esc(titleFor(spec))}</h2>
+      <p class="muted">${esc(sub)} · ${session.pairsMade} of ${total / 2} pairs · ${formatTime(session.elapsedMs(pausedAt))}</p>
+      <div class="list" style="margin:14px 0 0">${tog('sound', 'Sound')}${tog('haptics', 'Haptics')}</div>
+      <div class="sheet__actions">
+        <button class="btn btn--primary btn--block" data-p="resume">Resume ${ICONS.play}</button>
+        <div class="sheet__row">
+          <button class="btn btn--ghost" data-p="restart">${ICONS.restart}<span>Restart</span></button>
+          <button class="btn btn--ghost" data-p="how">${ICONS.hint}<span>Rules</span></button>
+        </div>
+        <button class="btn btn--quiet btn--block" data-p="home">Leave to Home</button>
+      </div>
+    </div>`);
+    const sheet = openSheet(content, { label: 'Paused' });
+    content.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const sw = t.closest<HTMLElement>('[data-toggle]');
+      if (sw) {
+        const k = sw.dataset.toggle as 'sound' | 'haptics';
+        save.settings[k] = !save.settings[k];
+        sw.setAttribute('aria-checked', String(save.settings[k]));
+        persist();
+        return;
+      }
+      const act = t.closest<HTMLElement>('[data-p]')?.dataset.p;
+      if (!act) return;
+      if (act === 'how') {
+        showHowToPlay();
+        return;
+      }
+      sheet.close();
+      if (act === 'home') nav.home();
+      if (act === 'restart') restartBoard();
+    });
+    void sheet.closed.then(() => {
+      pauseOpen = false;
+      resume();
+    });
+  }
+
+  function restartBoard() {
+    session = new Session(spec, performance.now());
+    clearHint();
+    renderBoard();
+    updateHud();
+    comboBar.classList.remove('on');
+  }
+
+  /** Title card at the start of a board; the clock starts when it clears. */
+  function intro(): Promise<void> {
+    const twistNote = spec.gravity ? 'Cards fall to fill the gaps' : spec.snow ? 'Some cards start under snow' : spec.stones ? 'Stones block the way' : '';
+    const card = frag(`<div class="intro" aria-hidden="true">
+      <div class="intro__kicker">${esc(spec.mode === 'journey' ? `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}` : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : 'Zen · 禅')}</div>
+      <div class="intro__title">${esc(titleFor(spec))}</div>
+      <div class="intro__sub">${total / 2} pairs${twistNote ? ` · ${esc(twistNote)}` : ''}</div>
+    </div>`);
+    stage.append(card);
+    busy = true;
+    return wait(spec.mode === 'journey' && spec.number === 1 ? 900 : 1150).then(() => {
+      card.classList.add('intro--out');
+      busy = false;
+      setTimeout(() => card.remove(), 400);
+    });
   }
 
   const ro = new ResizeObserver(() => layout());
@@ -678,13 +789,23 @@ export function gameScreen(spec: LevelSpec): Screen {
     renderBoard();
     ro.observe(stage);
     updateHud();
-    session.startedAt = performance.now();
-    startTutorial();
+    paused = true;
+    pausedAt = performance.now();
+    void intro().then(() => {
+      session.startedAt = performance.now();
+      paused = false;
+      startTutorial();
+    });
   });
 
   return {
     name: 'game',
     el,
+    onBack() {
+      if (session.done) return false;
+      leave();
+      return true;
+    },
     destroy() {
       clearInterval(tick);
       ro.disconnect();

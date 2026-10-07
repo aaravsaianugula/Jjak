@@ -60,7 +60,7 @@ const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 const results = {};
 for (const back of [1, 2, 3, 5]) results[key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - back))] = { ms: 98000, score: 4200, combo: 4, stars: 2 };
 const base17 = {
-  v: 1, onboarded: true, birthYear: null, level: 17, petals: 145, hints: 2, shuffles: 1,
+  v: 1, onboarded: true, birthYear: null, level: 17, petals: 145, hints: 9, shuffles: 1,
   stars: Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i + 1, 2 + (i % 2)])),
   album,
   daily: { streak: 3, best: 6, lastDate: key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)), results },
@@ -76,6 +76,9 @@ const base17 = {
 await open(null);
 await shot('01-welcome');
 await page.click('[data-begin]');
+await page.waitForTimeout(500);
+await shot('02a-intro');
+await page.waitForTimeout(900);
 await shot('02-level1-tutorial');
 
 // 2. Returning player
@@ -83,7 +86,13 @@ await open(base17);
 await shot('03-home');
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
+await page.waitForTimeout(1400);
 await shot('04-game');
+await playPairs(1, 700);
+await page.click('[aria-label="Pause"]');
+await shot('04b-pause');
+await page.click('[data-p="resume"]');
+await page.waitForTimeout(300);
 await playPairs(2, 120);
 await page.waitForTimeout(80);
 await page.screenshot({ path: `${out}/05-path.png` });
@@ -93,6 +102,7 @@ console.log('saved 05-path');
 await open({ ...base17, level: 2, stars: {}, hints: 99, seals: [] });
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
+await page.waitForTimeout(1400);
 await playPairs(40, 380);
 await page.waitForSelector('.sheet', { timeout: 6000 });
 await page.waitForTimeout(1000);
@@ -115,10 +125,12 @@ await shot('10-card-detail');
 await open({ ...base17, level: 30, seenTips: ['variants', 'stones', 'gravity', 'snow'], paper: '7', hints: 99 });
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
+await page.waitForTimeout(1400);
 await shot('11-falling-leaves');
 await open({ ...base17, level: 38, seenTips: ['variants', 'stones', 'gravity'], hints: 99, paper: '2' });
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
+await page.waitForTimeout(1400);
 await shot('12-snow-tip');
 await page.click('.sheet .btn');
 await shot('13-snow');
@@ -132,6 +144,7 @@ await shot('15-papers');
 await open(base17);
 await page.click('[data-go="daily"]');
 await page.waitForSelector('.card');
+await page.waitForTimeout(1400);
 await shot('16-daily');
 
 await browser.close();
