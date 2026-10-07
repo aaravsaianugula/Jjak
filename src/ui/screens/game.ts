@@ -1,14 +1,18 @@
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
-import { type Point, STONE, cardsLeft, isCard } from '../../engine/board';
+import { type Point, STONE, cardsLeft, gateMonth, isCard, isGate, monthOf } from '../../engine/board';
+import { GOALS, type GoalId, straightNeed } from '../../engine/goals';
+import { legalMoves } from '../../engine/moves';
+import { findPath } from '../../engine/path';
+import { fencesMarkup, gateInner, gateLabel } from '../../art/mechanics';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, rushLevel, zenLevel } from '../../engine/levels';
 import { levelPlan } from '../../director';
 import { isBonus } from '../../data/deck';
 import { SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
 import { breeze, knotTip, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windTip, windVane } from '../journey-fx';
-import { COMBO_WINDOW_MS, FEVER_MS, LUCKY_PETALS, Session, formatTime } from '../../engine/session';
+import { COMBO_WINDOW_MS, FEVER_MS, LUCKY_PETALS, Session, formatTime, thirdStar } from '../../engine/session';
 import { type Yaku, possibleYaku } from '../../engine/yaku';
 import { checkSeals, type Seal } from '../../services/achievements';
 import { emit } from '../../services/events';
@@ -120,7 +124,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   // Journey boards belong to a place on the Flower Road; wind boards name their direction.
   const place = spec.mode === 'journey' ? routeOf(spec.number).chapter : null;
   const wind = windOf(spec);
-  const twistName = wind || spec.snow || spec.knots ? mechanicLabel(spec) : '';
+  const twistName = wind || spec.snow || spec.knots || spec.gates || spec.fences ? mechanicLabel(spec) : '';
+  const goal = spec.goal ? GOALS[spec.goal] : null;
   const twist = twistName ? ` · ${twistName}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}` : '';
   const sub =
     spec.mode === 'journey'
@@ -142,6 +147,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   feverTag.style.setProperty('--fever-ms', `${FEVER_MS}ms`);
   const rhythm = h('div', { class: 'rhythm' }, comboEl, comboBar, feverTag);
   if (wind && wind !== 'down') rhythm.append(windVane(wind));
+  // Goal boards: a quiet chip with the goal and live progress (the third blossom).
+  const goalChip = goal ? h('div', { class: `goal-chip goal-chip--${goal.id}`, role: 'img' }) : null;
+  if (goalChip) rhythm.append(goalChip);
 
   const topTitle = h(
     'div',
@@ -192,6 +200,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   const paths = document.createElementNS(SVG_NS, 'svg');
   paths.classList.add('paths');
   paths.setAttribute('aria-hidden', 'true');
+  // Bamboo fences on cell edges: drawn over the cards' edges, never in the way of a tap.
+  const fenceLayer = document.createElementNS(SVG_NS, 'svg');
+  fenceLayer.classList.add('fences');
+  fenceLayer.setAttribute('aria-hidden', 'true');
 
   const xOf = (c: number) => (c < 0 ? margin / 2 : c >= spec.cols ? margin + spec.cols * cw + margin / 2 : margin + (c + 0.5) * cw);
   const yOf = (r: number) => (r < 0 ? margin / 2 : r >= spec.rows ? margin + spec.rows * ch + margin / 2 : margin + (r + 0.5) * ch);
@@ -218,6 +230,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       cel.style.width = `${cw - gap}px`;
       cel.style.height = `${ch - gap}px`;
     }
+    const walls = session.board.walls;
+    if (walls && fenceLayer.parentNode === board) fenceLayer.innerHTML = fencesMarkup(walls, spec.rows, spec.cols, margin, margin, cw, ch);
   }
 
   function faceLabel(id: number) {
@@ -234,6 +248,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         const s = h('div', { class: 'stone', 'aria-hidden': 'true' });
         cardEls.set(i, s);
         board.append(s);
+      } else if (isGate(v)) {
+        const g = h('div', { class: 'gate', role: 'img', 'aria-label': gateLabel(gateMonth(v)), 'data-gate': gateMonth(v), html: gateInner(gateMonth(v)) });
+        cardEls.set(i, g);
+        board.append(g);
       } else if (isCard(v)) {
         const snowy = session.hidden.has(i);
         const c = h('button', {
@@ -248,8 +266,30 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         board.append(c);
       }
     });
+    if (session.board.walls) board.append(fenceLayer);
     board.append(paths);
     layout();
+    markGates();
+  }
+
+  /** While a card is picked, the gates its flower would open stand out a little. */
+  function markGates() {
+    const sel = session.selected;
+    const m = sel >= 0 && isCard(session.board.cells[sel]) ? monthOf(session.board.cells[sel]) : -1;
+    for (const g of board.querySelectorAll<HTMLElement>('.gate')) g.classList.toggle('is-keyed', Number(g.dataset.gate) === m);
+  }
+
+  /** The doors swing open on their hinges and the frame lifts away. */
+  function openGate(g: HTMLElement, delay: number) {
+    g.removeAttribute('role');
+    g.setAttribute('aria-hidden', 'true');
+    g.classList.remove('is-keyed', 'is-deal');
+    const rm = reducedMotion();
+    setTimeout(() => {
+      g.classList.add(rm ? 'is-gone' : 'is-open');
+      if (!rm) sfx.clack();
+    }, rm ? 0 : delay);
+    setTimeout(() => g.remove(), (rm ? 0 : delay) + (rm ? 220 : 760));
   }
 
   /** Deal the cards in with a short diagonal cascade (skipped for reduced motion). */
@@ -577,6 +617,47 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     badge(shuffleBadge, shuffleNote, save.shuffles);
   }
 
+  /**
+   * The goal chip: the goal's mark and live progress. Rhythm and Full bloom count
+   * the best combo, Straight brush the straight pairs; Clean read is a brushed
+   * ring that breaks on the first blocked tap. A met goal fills its blossom.
+   */
+  let goalState = '';
+  /** The near-miss line's ending: what the goal still needs ("…clear it with a ×4 combo"). */
+  const goalMiss = () =>
+    goal?.id === 'combo' ? `with a ×4 combo along the way (your best was ×${session.bestCombo})`
+    : goal?.id === 'bloom' ? `reaching full bloom, a ×5 combo (your best was ×${session.bestCombo})`
+    : goal?.id === 'clean' ? 'without tapping a pair whose path is blocked'
+    : `with ${straightNeed(session.totalPairs)} straight-line pairs (you made ${session.straightPairs})`;
+  /** What the goal asks, in one line ("Join 6 pairs with straight lines"). */
+  const goalNeed = () => (goal?.id === 'straight' ? `Join ${straightNeed(session.totalPairs)} pairs with straight lines` : goal?.text ?? '');
+  function updateGoal(animate = false) {
+    if (!goalChip || !goal) return;
+    const [have, need] = goal.progress(session, session.totalPairs);
+    const met = session.goalMet();
+    const broken = goal.id === 'clean' && !met;
+    const state = `${have}/${need}/${met}`;
+    if (state === goalState) return;
+    const was = goalState;
+    goalState = state;
+    const mark: Record<GoalId, string> = { combo: '짝×4', bloom: '만개', straight: '一筆', clean: '' };
+    const ring = `<svg class="goal-chip__ring" viewBox="0 0 20 20" aria-hidden="true"><path class="goal-chip__arc goal-chip__arc--a" d="M10 2.6C5.6 2.6 2.6 5.8 2.6 10S5.4 17.3 9.4 17.4"/><path class="goal-chip__arc goal-chip__arc--b" d="M10.6 17.4C14.6 17.2 17.4 14 17.4 10S14.6 2.9 11.2 2.7"/></svg>`;
+    const count = goal.id === 'clean' ? (met ? 'Clean' : 'Missed') : met ? '✓' : `${have}/${need}`;
+    goalChip.innerHTML =
+      `<span class="goal-chip__bloom">${ICONS.blossom}</span>` +
+      (goal.id === 'clean' ? ring : `<b class="${goal.id === 'straight' ? 'ja' : ''}">${mark[goal.id]}</b>`) +
+      `<span class="goal-chip__n">${count}</span>`;
+    goalChip.classList.toggle('is-met', met);
+    goalChip.classList.toggle('is-broken', broken);
+    goalChip.setAttribute('aria-label', `Goal: ${goal.name}. ${goalNeed()}. ${goal.id === 'clean' ? (met ? 'So far, so clean.' : 'Missed this time.') : met ? 'Met.' : `${have} of ${need}.`}`);
+    if (!animate || !was) return;
+    retrigger(goalChip, broken ? 'is-break' : met ? 'is-win' : 'is-tick');
+    if (met && goal.id !== 'clean' && !was.endsWith('true')) {
+      sfx.hint();
+      live(`Goal met: ${goal.name}. The third blossom is yours when you clear the board.`);
+    }
+  }
+
   let paused = false;
   let pausedAt = 0;
   let lastSec = -1;
@@ -623,6 +704,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const now = performance.now();
     const res = session.tap(cell, now);
     emit('tap', { session, cell, result: res, now });
+    if (res.kind !== 'match') markGates();
     switch (res.kind) {
       case 'select':
         select(target, true);
@@ -644,7 +726,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         for (const i of [res.a, res.b]) retrigger(cardEls.get(i), 'is-shake');
         sfx.miss();
         haptic.warn();
-        live('No path between those two — the way is blocked.');
+        live(`No path between those two — the way is blocked.${goal?.id === 'clean' && session.blockedTaps === 1 ? ' The clean-read blossom slips away this time.' : ''}`);
+        updateGoal(true);
         if (spec.mode === 'journey' && spec.number <= 3) setCoach('Same flower — but the path between them needs more than two turns. Clear what’s in the way first.');
         break;
       case 'match':
@@ -666,6 +749,18 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   board.addEventListener('pointerdown', (e) => {
+    const gateEl = (e.target as HTMLElement).closest<HTMLElement>('.gate');
+    if (gateEl && !gateEl.classList.contains('is-open') && !busy && !session.done) {
+      // A gate isn't a card: say what opens it.
+      e.preventDefault();
+      const m = Number(gateEl.dataset.gate);
+      retrigger(gateEl, 'is-shake');
+      sfx.deselect();
+      const text = `This gate (門) opens when you pair ${MONTHS[m].en} (${m + 1}). Until then, paths can’t pass it.`;
+      live(text);
+      setCoach(text);
+      return;
+    }
     const target = (e.target as HTMLElement).closest<HTMLElement>('.card');
     if (!target || busy || session.done) return;
     e.preventDefault();
@@ -718,6 +813,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     cardEls.delete(res.b);
     setTimeout(() => gone.forEach((c) => c.remove()), 460);
 
+    // Gates of this flower open as the ink lands; any slide waits for them.
+    const gateMs = res.opened.length && !reducedMotion() ? 420 : 0;
+    for (const i of res.opened) {
+      const g = cardEls.get(i);
+      cardEls.delete(i);
+      if (g) openGate(g, 150);
+    }
     // Falling leaves: re-key the moved cards now, slide them once the pair has faded.
     if (res.moved.length) {
       for (const [from, to] of res.moved) {
@@ -732,14 +834,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         layout();
         if (wind) breeze(stage, wind);
         setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-falling', 'is-drift')), 380);
-      }, 200);
+      }, 200 + gateMs);
     }
     // Knots: a freed card's cord slips off once it has settled.
     if (res.untied.length) {
       setTimeout(() => {
         for (const i of res.untied) untieKnot(cardEls.get(i));
         sfx.deselect();
-      }, res.moved.length ? 460 : 180);
+      }, (res.moved.length ? 460 : 180) + gateMs);
     }
     if (res.lucky) {
       const p1 = cellXY(res.a);
@@ -762,7 +864,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           }, 200);
           setTimeout(() => c.classList.remove('is-flip'), 440);
         }
-      }, res.moved.length ? 420 : 160);
+      }, (res.moved.length ? 420 : 160) + gateMs);
     }
 
     sfx.match(res.combo);
@@ -783,7 +885,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     scoreGain(res.gained);
     updateHud();
     const left = cardsLeft(session.board) / 2;
-    live(`Pair${res.combo >= 2 ? `, combo ${res.combo}` : ''}. ${left} ${left === 1 ? 'pair' : 'pairs'} left.`);
+    const opened = res.opened.length ? ` ${res.opened.length === 1 ? 'A gate' : `${res.opened.length} gates`} opened.` : '';
+    live(`Pair${res.combo >= 2 ? `, combo ${res.combo}` : ''}. ${left} ${left === 1 ? 'pair' : 'pairs'} left.${opened}`);
+    markGates();
+    updateGoal(true);
     tutorialStep();
     if (res.reshuffled) {
       setTimeout(() => {
@@ -1267,7 +1372,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const starList = [
       { on: st.clear, label: 'Clear' },
       { on: st.noAssist, label: 'No assists' },
-      { on: st.underPar, label: `Under ${formatTime(spec.par * 1000)}` },
+      // On a goal board the goal takes the par blossom's place.
+      goal ? { on: thirdStar(st), label: goal.name, goal: true } : { on: st.underPar, label: `Under ${formatTime(spec.par * 1000)}` },
     ];
     const heading =
       spec.mode === 'daily' ? `Daily #${spec.number} cleared` : spec.mode === 'zen' ? 'Board cleared' : `Level ${spec.number} cleared`;
@@ -1293,8 +1399,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       ${
         spec.mode === 'zen'
           ? ''
-          : `<div class="stars" role="img" aria-label="${won} of 3 blossoms">${starList
-              .map((s, i) => `<div class="star ${s.on ? 'on' : ''}" style="--at:${STAR_AT + i * STAR_STEP}ms">${ICONS.blossom}<span>${esc(s.label)}</span></div>`)
+          : `<div class="stars${goal ? ' stars--goal' : ''}" role="img" aria-label="${won} of 3 blossoms${goal ? `, goal ${thirdStar(st) ? 'met' : 'not met'}` : ''}">${starList
+              .map((s, i) => `<div class="star ${s.on ? 'on' : ''}${'goal' in s ? ' star--goal' : ''}" style="--at:${STAR_AT + i * STAR_STEP}ms">${ICONS.blossom}<span>${'goal' in s ? `<small>Goal</small>` : ''}${esc(s.label)}</span></div>`)
               .join('')}</div>`
       }
       <div class="statline">
@@ -1372,7 +1478,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     }
     // Near miss: say what the missing blossom needs, next to the retry.
     if (spec.mode === 'journey' && summary.stars < 3) {
-      const missing = !st.noAssist ? 'without hints or shuffles' : `under ${formatTime(spec.par * 1000)}`;
+      const missing = !st.noAssist ? 'without hints or shuffles' : goal ? goalMiss() : `under ${formatTime(spec.par * 1000)}`;
       content.append(frag(`<p class="result__note result__note--miss">${ICONS.blossom}<span>One more blossom: clear it ${esc(missing)}.</span></p>`));
     }
 
@@ -1619,6 +1725,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     renderBoard();
     deal(0);
     updateHud();
+    goalState = '';
+    updateGoal();
     comboBar.classList.remove('on');
     showCombo(0);
     if (feverTimer) clearTimeout(feverTimer);
@@ -1631,16 +1739,19 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const setNote = sets.length ? `<div class="intro__set">This board holds a card set: <b>${esc(sets[0].native)}</b></div>` : '';
     const twistNote = rush
       ? `${RUSH.startMs / 1000} seconds · pairs add time`
-      : wind === 'down' ? 'Cards fall to fill the gaps' : wind ? `Wind ${windArrow(wind)} · cards drift after each pair` : spec.snow ? 'Some cards start under snow' : spec.knots ? 'Some cards are tied with a cord' : spec.stones ? 'Stones block the way' : spec.lucky ? 'A lucky pair is hidden here' : '';
+      : wind === 'down' ? 'Cards fall to fill the gaps' : wind ? `Wind ${windArrow(wind)} · cards drift after each pair` : spec.snow ? 'Some cards start under snow' : spec.knots ? 'Some cards are tied with a cord' : spec.gates ? 'Pair a gate’s flower to open it' : spec.fences ? 'Paths can’t cross the bamboo fences' : spec.stones ? 'Stones block the way' : spec.lucky ? 'A lucky pair is hidden here' : '';
+    const goalText = goal ? goalNeed() : '';
+    const goalNote = goal ? `<div class="intro__goal"><span class="intro__goal-mark" aria-hidden="true">${ICONS.blossom}</span><span><b>${esc(goal.name)}</b> <span class="intro__goal-native">${goal.native}</span><br>${esc(goalText)}</span></div>` : '';
     const card = frag(`<div class="intro${spec.festival ? ' intro--festival' : ''}" aria-hidden="true">
       <div class="intro__kicker">${esc(spec.mode === 'journey' ? (place ? (spec.festival ? `${festivalTitle(place)} · 祭` : placeLine(place)) : `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}`) : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : 'Zen · 禅')}</div>
       <div class="intro__title">${esc(titleFor(spec))}</div>
       <svg class="intro__rule" viewBox="0 0 120 8" preserveAspectRatio="none"><path d="M1 4.6C20 2.6 52 2.4 80 3.1S112 4.2 119 3.6C110 5.4 84 5.7 58 5.8S14 6.3 1 4.6Z"/></svg>
       <div class="intro__sub">${esc([rush ? '' : `${total / 2} pairs`, twistNote].filter(Boolean).join(' · '))}</div>
+      ${goalNote}
       ${setNote}
     </div>`);
     stage.append(card);
-    live(`${titleFor(spec)}. ${rush ? '' : `${total / 2} pairs.`} ${twistNote}`);
+    live(`${titleFor(spec)}. ${rush ? '' : `${total / 2} pairs.`} ${twistNote}${goal ? ` Goal for the third blossom: ${goalText}.` : ''}`);
     busy = true;
     return wait(ms).then(() => {
       card.classList.add('intro--out');
@@ -1650,6 +1761,17 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   const ro = new ResizeObserver(() => layout());
+  // DEV only: let screenshot scripts read the session and find pairs.
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__game = {
+      session: () => session,
+      path: (i: number, j: number) => findPath(session.board, i, j),
+      gateMove: () => {
+        const months = new Set(session.board.cells.filter(isGate).map(gateMonth));
+        return legalMoves(session.board, session.locked).find(([a]) => months.has(monthOf(session.board.cells[a]))) ?? null;
+      },
+    };
+  }
   const onVis = () => {
     if (document.hidden && !paused) {
       paused = true;
@@ -1659,12 +1781,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   document.addEventListener('visibilitychange', onVis);
 
   requestAnimationFrame(() => {
-    const introMs = spec.mode === 'journey' && spec.number === 1 ? 900 : 1150;
+    // Goal boards hold the title card a little longer, so the goal can be read.
+    const introMs = spec.mode === 'journey' && spec.number === 1 ? 900 : goal ? 1900 : 1150;
     renderBoard();
     // The cards start dealing just as the title card begins to lift.
     deal(Math.max(0, introMs - 320));
     ro.observe(stage);
     updateHud();
+    updateGoal();
     paused = true;
     pausedAt = performance.now();
     void intro(introMs).then(() => {

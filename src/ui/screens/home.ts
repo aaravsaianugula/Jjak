@@ -10,6 +10,7 @@ import { levelPlan } from '../../director';
 import { formatTime } from '../../engine/session';
 import { ROUTE_CHAPTERS, routeOf } from '../../data/route';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
+import { GOALS } from '../../engine/goals';
 import { SEALS } from '../../services/achievements';
 import { unlockAudio } from '../../services/audio';
 import { claimGift, formatCountdown, lastWeek, levelsToLantern, liveStreak, msToNextDaily, pendingGift } from '../../services/progress';
@@ -47,7 +48,7 @@ export function homeScreen(): Screen {
   // Where the road has reached: the place, its season, and the board's twist.
   const road = routeOf(level);
   const wind = windOf(spec);
-  const twist = `${mechanicLabel(spec)}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}`;
+  const twist = [`${mechanicLabel(spec)}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}`, spec.goal ? `Goal: ${GOALS[spec.goal].name}` : ''].filter(Boolean).join(' · ');
   const roadPlace = `<div class="journey__place"><b>${esc(road.chapter.en)}</b><span class="journey__place-native"><span lang="ko">${road.chapter.ko}</span> · <span class="ja" lang="${road.chapter.country === 'JP' ? 'ja' : 'ko'}">${road.chapter.ja}</span></span></div>`;
   const toLantern = levelsToLantern();
   const lanternText = toLantern === 0 ? 'This level hangs a lantern gift' : `Lantern gift in ${toLantern} level${toLantern > 1 ? 's' : ''}`;
