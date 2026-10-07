@@ -2,10 +2,14 @@
  * The adjustment policy (Hunicke's Hamlet) and pacing (Left 4 Dead's AI Director).
  *
  *   target = designedBase(n)                       the authored sawtooth curve
- *          + skillOffset                           clamp(R − base, ±0.2) · confidence
- *          + pacing                                relief −0.1 (−0.15 after 2+ struggles in a row)
- *                                                  after struggle; stretch +0.1 after 3+ fast clean clears
- *          + flow                                  a small nudge (±0.04) toward an 80 % clean-clear rate
+ *          + skillOffset                           clamp(R − chapterMean(n), ±0.2) · confidence
+ *            (measured against the chapter's average, so the sawtooth's peaks and rests
+ *            survive and a player of skill R averages boards of difficulty R)
+ *          + pacing                                relief −0.08 (−0.14 after 2+ struggles in a row)
+ *                                                  after struggle; stretch +0.08 after 3+ fast clean clears
+ *          + flow                                  a nudge (±0.06) toward an 80 % clean-clear rate
+ *
+ * mapped to a tier, moving at most one tier from the previous board (two for deep relief).
  *
  * mapped to the tier (0–4) whose board difficulty is closest. The aim is 75–85 % of
  * boards cleared without assists, with real peaks (the curve's sawtooth) and rests.
@@ -20,6 +24,7 @@ import type { AnalyticsSave } from '../services/save-analytics';
 import { TIERS, bankSpec } from './bank';
 import { MODEL, engagement, isClean } from './model';
 import { designedBase } from './plan';
+import { LEVELS_PER_CHAPTER } from '../engine/levels';
 
 export interface TierChoice {
   tier: number;
@@ -35,9 +40,9 @@ export const DIRECTOR = {
   designedTier: 2,
   /** the skill offset is clamped to ± this */
   maxOffset: 0.2,
-  relief: 0.1,
-  deepRelief: 0.15,
-  stretch: 0.1,
+  relief: 0.08,
+  deepRelief: 0.14,
+  stretch: 0.08,
   /** fast clean clears in a row before a stretch board */
   stretchAfter: 3,
   /** failed attempts at an uncleared level before re-pinning one tier lower */
@@ -48,8 +53,13 @@ export const DIRECTOR = {
   flowTarget: 0.8,
   flowWindow: 12,
   flowMin: 6,
-  flowGain: 0.25,
-  flowMax: 0.04,
+  /**
+   * Aim a touch below skill on average: the sawtooth's peaks cost more clean
+   * clears than its rests give back (success is concave above 50 %).
+   */
+  aim: -0.025,
+  flowGain: 0.5,
+  flowMax: 0.06,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -99,6 +109,14 @@ export interface TargetParts {
   reason: 'skill' | 'relief' | 'stretch';
 }
 
+/** Mean designed difficulty of the chapter that holds level n (the sawtooth's centre line). */
+export function chapterMean(n: number): number {
+  const first = Math.floor((n - 1) / LEVELS_PER_CHAPTER) * LEVELS_PER_CHAPTER + 1;
+  let sum = 0;
+  for (let k = first; k < first + LEVELS_PER_CHAPTER; k++) sum += designedBase(k);
+  return sum / LEVELS_PER_CHAPTER;
+}
+
 /** Recent clean-clear rate (null with too little data). */
 export function cleanRate(a: AnalyticsSave, window = DIRECTOR.flowWindow): number | null {
   const rs = a.recent.filter((r) => r.mode !== 'rush').slice(0, window);
@@ -109,7 +127,7 @@ export function cleanRate(a: AnalyticsSave, window = DIRECTOR.flowWindow): numbe
 export function targetFor(a: AnalyticsSave, n: number): TargetParts {
   const base = designedBase(n);
   const confidence = clamp(a.boards / DIRECTOR.fullConfidenceAt, 0, 1);
-  const skill = clamp(a.rating - base, -DIRECTOR.maxOffset, DIRECTOR.maxOffset) * confidence;
+  const skill = clamp(a.rating - chapterMean(n), -DIRECTOR.maxOffset, DIRECTOR.maxOffset) * confidence;
   const eng = engagement(a);
   let pacing = 0;
   let reason: TargetParts['reason'] = 'skill';
@@ -122,7 +140,7 @@ export function targetFor(a: AnalyticsSave, n: number): TargetParts {
   }
   const rate = cleanRate(a);
   const flow = rate == null ? 0 : clamp((rate - DIRECTOR.flowTarget) * DIRECTOR.flowGain, -DIRECTOR.flowMax, DIRECTOR.flowMax);
-  return { base, skill, pacing, flow, target: clamp(base + skill + pacing + flow, 0, 1), reason };
+  return { base, skill, pacing, flow, target: clamp(base + skill + pacing + flow + DIRECTOR.aim * confidence, 0, 1), reason };
 }
 
 /** Which tier this player gets for Journey level n (pins it on first call). */
@@ -152,7 +170,14 @@ export function decide(a: AnalyticsSave, n: number, cleared: boolean): TierChoic
     return { tier: pinned, target: tierD(n, pinned), reason: 'pinned' };
   }
   const t = targetFor(a, n);
-  const tier = tierFor(n, t.target);
+  let tier = tierFor(n, t.target);
+  // Smooth steps: at most one tier from the last Journey board (two for deep relief),
+  // so pacing reads as a breath, not a lurch.
+  const prev = a.recent.find((r) => r.mode === 'journey' && r.tier >= 0);
+  if (prev) {
+    const down = t.pacing <= -DIRECTOR.deepRelief ? 2 : 1;
+    tier = clamp(tier, prev.tier - down, prev.tier + 1);
+  }
   pinTier(a, n, tier);
   return { tier, target: t.target, reason: t.reason };
 }
