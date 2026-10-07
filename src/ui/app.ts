@@ -17,14 +17,20 @@ let current: Screen | null = null;
 const root = () => document.getElementById('app')!;
 let fallbackBack: () => void = () => {};
 
-/** Replace the visible screen with a short cross-fade. */
+/**
+ * Replace the visible screen with a short cross-fade. Going deeper drifts in from
+ * the right; returning Home drifts in from the left, so the motion reads as place.
+ */
 export function show(next: Screen): void {
   const prev = current;
   current = next;
+  const back = !!prev && next.name === 'home';
+  next.el.classList.toggle('screen--back', back);
   if (prev) {
     prev.destroy?.();
     prev.el.classList.add('screen--leaving');
-    setTimeout(() => prev.el.remove(), 190);
+    if (back) prev.el.classList.add('screen--leaving-back');
+    setTimeout(() => prev.el.remove(), 200);
   }
   root().append(next.el);
   if (AD_POLICY.bannerScreens.includes(next.name) && save.onboarded) void ads.showBanner();

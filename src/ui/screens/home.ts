@@ -28,12 +28,20 @@ export function homeScreen(): Screen {
   const level = save.level;
   const chapter = chapterOf(level);
   const chapterIndex = Math.floor((level - 1) / LEVELS_PER_CHAPTER);
+  const season = chapterIndex % 4;
   const slot = (level - 1) % LEVELS_PER_CHAPTER;
   const loop = Math.floor(chapterIndex / CHAPTERS.length);
-  const dots = Array.from({ length: LEVELS_PER_CHAPTER }, (_, i) => `<span class="${i < slot ? 'done' : i === slot ? 'now' : ''}"></span>`).join('');
+  const chapterStart = chapterIndex * LEVELS_PER_CHAPTER + 1;
+  // Twelve segments for the chapter; upcoming lantern levels carry a small gold mark.
+  const dots = Array.from({ length: LEVELS_PER_CHAPTER }, (_, i) => {
+    const lantern = i >= slot && levelsToLantern(chapterStart + i) === 0;
+    return `<span class="${i < slot ? 'done' : i === slot ? 'now' : ''}${lantern ? ' lan' : ''}"></span>`;
+  }).join('');
   const spec = journeyLevel(level);
-  music.setSeason(chapterIndex % 4);
+  music.setSeason(season);
   const twist = spec.gravity ? 'Falling leaves' : spec.snow ? 'First snow' : spec.stones ? 'Stones' : '';
+  const toLantern = levelsToLantern();
+  const lanternText = toLantern === 0 ? 'This level hangs a lantern gift' : `Lantern gift in ${toLantern} level${toLantern > 1 ? 's' : ''}`;
 
   const today = localDateKey();
   const daily = dailyLevel(today);
@@ -41,53 +49,78 @@ export function homeScreen(): Screen {
   const result = save.daily.results[today];
   const streak = liveStreak();
   const now = new Date();
-  const week = lastWeek(now)
-    .map((d) => `<span class="wk ${d.solved ? 'wk--on' : ''} ${d.isToday ? 'wk--today' : ''}" title="${d.key}">${d.day}</span>`)
+  const days = lastWeek(now);
+  const solvedThisWeek = days.filter((d) => d.solved).length;
+  const week = days
+    .map((d) => `<span class="wk${d.solved ? ' wk--on' : ''}${d.isToday ? ' wk--today' : ''}">${d.day}</span>`)
     .join('');
+  const untilNext = msToNextDaily(now);
+  const nextShort = untilNext >= 3600000 ? `${Math.floor(untilNext / 3600000)}h` : formatCountdown(untilNext);
+  const dailyStatus = result ? `Solved in ${formatTime(result.ms)} · next in ${nextShort}` : 'One board for the whole world';
+  const streakText = streak ? `${streak}-day streak` : result ? 'Streak started' : 'Start a streak';
+  const dailyLabel = `Daily Jjak number ${daily.number}, ${theme.name}. ${dailyStatus}. ${streak ? `${streak}-day streak. ` : ''}${solvedThisWeek} of the last 7 days solved.${result ? '' : ' Play.'}`;
+
+  const rushSub = save.rush.best ? `Best ${save.rush.best.toLocaleString('en-US')}` : '60 seconds';
+  const tile = (go: string, title: string, sub: string, glyph: string, label: string, extra = '') =>
+    `<button class="panel tile tile--${go}${extra}" data-go="${go}" aria-label="${esc(label)}">
+      <span class="tile__glyph ja" aria-hidden="true">${glyph}</span>
+      <span class="tile__text"><span class="tile__title">${title}</span><span class="tile__sub">${sub}</span></span>
+    </button>`;
 
   const el = frag(`<section class="screen home">
     <header class="home__head">
-      <span class="petals" aria-label="${save.petals} petals">${ICONS.petal}${save.petals}</span>
+      <span class="petals" role="img" aria-label="${save.petals} petals">${ICONS.petal}<span class="petals__n">${save.petals}</span></span>
       <span class="home__head-right">
-        ${pendingGift() ? `<button class="icon-btn gift-btn" data-go="gift" aria-label="Daily gift">${ICONS.gift}<i></i></button>` : ''}
+        ${pendingGift() ? `<button class="icon-btn gift-btn" data-go="gift" aria-label="Daily gift ready">${ICONS.gift}<i aria-hidden="true"></i></button>` : ''}
         <button class="icon-btn" data-go="settings" aria-label="Settings">${ICONS.gear}</button>
       </span>
     </header>
-    <div class="scene" data-season="${chapterIndex % 4}">
-      ${sceneSvg(chapterIndex % 4)}
-      <div class="scene__particles" aria-hidden="true">${sceneParticles(chapterIndex % 4)}</div>
+    <div class="scene" data-season="${season}">
+      ${sceneSvg(season)}
+      <div class="scene__particles" aria-hidden="true">${sceneParticles(season)}</div>
       <div class="scene__brand">
         <div class="seal" aria-hidden="true">짝</div>
-        <div class="brand__word">Jjak</div>
-        <div class="brand__tag">Pair the flowers of the four seasons<br><span class="serif">꽃을 맞추다</span> · <span class="ja">花を合わせる</span></div>
+        <h1 class="brand__word">Jjak</h1>
+        <p class="brand__tag"><span class="brand__en">Pair the flowers of the four seasons</span><span class="brand__native" lang="ko"><span class="serif">꽃을 맞추다</span> · <span class="ja" lang="ja">花を合わせる</span></span></p>
       </div>
     </div>
     <div class="panel journey">
-      <span class="journey__season" aria-hidden="true">${chapter.ja}</span>
+      <span class="journey__season ja" aria-hidden="true">${chapter.ja}</span>
       <div class="journey__top">
-        <span class="journey__label">Journey · ${esc(chapter.name)}${loop > 0 ? ` · Year ${loop + 1}` : ''}</span>
-        <button class="journey__map" data-go="map">Map ›</button>
+        <span class="eyebrow">Journey · ${esc(chapter.name)}${loop > 0 ? ` · Year ${loop + 1}` : ''}</span>
+        <button class="chip-btn journey__map" data-go="map" aria-label="Journey map">${ICONS.map}<span>Map</span></button>
       </div>
-      <span class="journey__title">Level ${level}${twist ? ` <span class="journey__twist">${twist}</span>` : ''}</span>
-      <span class="chapter-dots" aria-hidden="true">${dots}</span>
-      <span class="journey__lantern">${ICONS.lantern}${levelsToLantern() === 0 ? 'This level hangs a lantern gift' : `Lantern gift in ${levelsToLantern()} level${levelsToLantern() > 1 ? 's' : ''}`}</span>
+      <div class="journey__title"><span>Level ${level}</span>${twist ? `<span class="journey__twist">${twist}</span>` : ''}</div>
+      <div class="journey__progress">
+        <span class="chapter-dots" role="progressbar" aria-label="${esc(chapter.name)} chapter" aria-valuemin="0" aria-valuemax="${LEVELS_PER_CHAPTER}" aria-valuenow="${slot}" aria-valuetext="Level ${slot + 1} of ${LEVELS_PER_CHAPTER} in ${esc(chapter.name)}">${dots}</span>
+        <span class="journey__meta">
+          <span class="journey__lantern${toLantern === 0 ? ' is-now' : ''}">${ICONS.lantern}${lanternText}</span>
+          <span class="journey__count" aria-hidden="true">${slot + 1}<span class="muted">/${LEVELS_PER_CHAPTER}</span></span>
+        </span>
+      </div>
       <button class="btn btn--primary btn--block" data-go="journey">${level === 1 ? 'Begin' : 'Continue'} ${ICONS.play}</button>
     </div>
-    <button class="panel daily" data-go="daily" aria-label="Daily Jjak number ${daily.number}">
-      <span class="daily__cal"><small>${MONTH_ABBR[now.getMonth()]}</small><b>${now.getDate()}</b></span>
-      <span class="daily__body">
-        <span class="daily__title">Daily #${daily.number} <span class="daily__theme">${esc(theme.name)}</span></span>
-        <span class="daily__sub">${result ? `Solved in ${formatTime(result.ms)} · next in ${formatCountdown(msToNextDaily(now))}` : 'One board for the whole world'}${streak ? ` · ${streak}-day streak` : ''}</span>
-        <span class="week" aria-label="Last seven days">${week}</span>
+    <button class="panel daily${result ? ' is-done' : ''}" data-go="daily" aria-label="${esc(dailyLabel)}">
+      <span class="daily__main">
+        <span class="daily__cal" aria-hidden="true"><small>${MONTH_ABBR[now.getMonth()]}</small><b>${now.getDate()}</b></span>
+        <span class="daily__body">
+          <span class="daily__title">Daily <span class="daily__num">#${daily.number}</span></span>
+          <span class="daily__theme">${esc(theme.name)}</span>
+          <span class="daily__sub">${dailyStatus}</span>
+        </span>
+        <span class="daily__cta" aria-hidden="true">${result ? `${ICONS.check}Done` : 'Play'}</span>
       </span>
-      <span class="daily__cta ${result ? 'daily__cta--done' : ''}">${result ? 'Done' : 'Play'}</span>
+      <span class="daily__week" aria-hidden="true">
+        <span class="week">${week}</span>
+        <span class="daily__streak${streak ? ' is-on' : ''}">${streakText}</span>
+      </span>
     </button>
-    <div class="tiles">
-      <button class="panel tile tile--rush" data-go="rush"><span class="tile__title">Rush</span><span class="tile__sub">${save.rush.best ? `Best ${save.rush.best.toLocaleString('en-US')}` : '60s score attack'}</span><span class="tile__glyph ja" aria-hidden="true">速</span></button>
-      <button class="panel tile" data-go="zen"><span class="tile__title">Zen</span><span class="tile__sub">Untimed</span><span class="tile__glyph ja" aria-hidden="true">禅</span></button>
-      <button class="panel tile" data-go="album"><span class="tile__title">Album</span><span class="tile__sub">${save.album.length}/48</span><span class="tile__glyph ja" aria-hidden="true">札</span></button>
-      <button class="panel tile" data-go="seals"><span class="tile__title">Seals</span><span class="tile__sub">${save.seals.length}/${SEALS.length}</span><span class="tile__glyph ja" aria-hidden="true">印</span></button>
-    </div>
+    <nav class="tiles" aria-label="More ways to play">
+      ${tile('rush', 'Rush', rushSub, '速', `Rush, ${rushSub}`)}
+      ${tile('zen', 'Zen', 'No clock', '禅', 'Zen, untimed')}
+      ${tile('album', 'Album', `${save.album.length}<span class="muted">/48</span>`, '札', `Album, ${save.album.length} of 48 cards`)}
+      ${tile('seals', 'Seals', `${save.seals.length}<span class="muted">/${SEALS.length}</span>`, '印', `Seals, ${save.seals.length} of ${SEALS.length} earned`)}
+    </nav>
   </section>`);
 
   el.addEventListener('click', (e) => {
@@ -112,18 +145,18 @@ export function homeScreen(): Screen {
 
   // Count up petals earned since the last visit.
   const pet = el.querySelector<HTMLElement>('.petals')!;
+  const num = pet.querySelector<HTMLElement>('.petals__n')!;
   const from = shownPetals ?? save.petals;
   const to = save.petals;
   shownPetals = to;
   if (to > from) {
-    const icon = pet.innerHTML.slice(0, pet.innerHTML.indexOf('</svg>') + 6);
-    const t0 = performance.now();
+    const t0 = performance.now() + 350;
     const step = (now: number) => {
-      const k = Math.min(1, (now - t0) / 700);
-      pet.innerHTML = `${icon}${Math.round(from + (to - from) * (1 - (1 - k) ** 3))}`;
+      const k = Math.max(0, Math.min(1, (now - t0) / 700));
+      num.textContent = String(Math.round(from + (to - from) * (1 - (1 - k) ** 3)));
       if (k < 1) requestAnimationFrame(step);
     };
-    pet.innerHTML = `${icon}${from}`;
+    num.textContent = String(from);
     setTimeout(() => {
       pet.classList.add('is-bump');
       requestAnimationFrame(step);
@@ -136,18 +169,22 @@ export function homeScreen(): Screen {
 function openGift(home: HTMLElement): void {
   const p = pendingGift();
   if (!p) return;
-  const days = GIFTS.map(
-    (g, i) => `<div class="gday ${i < p.day ? 'gday--done' : i === p.day ? 'gday--now' : ''}">
-      <span class="gday__n">Day ${i + 1}</span>
-      <span class="gday__icon">${g.card ? '<span class="ja">札</span>' : g.hints ? ICONS.hint : g.shuffles ? ICONS.shuffle : ICONS.petal}</span>
+  const days = GIFTS.map((g, i) => {
+    const state = i < p.day ? 'done' : i === p.day ? 'now' : 'next';
+    const icon = g.card ? '<span class="ja">札</span>' : g.hints ? ICONS.hint : g.shuffles ? ICONS.shuffle : ICONS.petal;
+    return `<li class="gday gday--${state}" aria-label="Day ${i + 1}: ${esc(g.label)}${state === 'done' ? ', claimed' : state === 'now' ? ', today' : ''}">
+      <span class="gday__n">${state === 'now' ? 'Today' : `Day ${i + 1}`}</span>
+      <span class="gday__icon" aria-hidden="true">${state === 'done' ? ICONS.check : icon}</span>
       <span class="gday__label">${esc(g.label)}</span>
-    </div>`,
-  ).join('');
-  const content = frag(`<div>
-    <div class="detail__kind">Daily gift · 선물 · <span class="ja">贈り物</span></div>
-    <h2>${esc(p.gift.label)}</h2>
-    <p class="muted">Come back each day for the next gift. Missing a day never resets your calendar.</p>
-    <div class="gdays">${days}</div>
+    </li>`;
+  }).join('');
+  const content = frag(`<div class="gift">
+    <div class="sheet__head">
+      <div class="detail__kind">Daily gift · <span lang="ko">선물</span> · <span class="ja" lang="ja">贈り物</span></div>
+      <h2>${esc(p.gift.label)}</h2>
+      <p class="muted">Come back each day for the next gift. Missing a day never resets your calendar.</p>
+    </div>
+    <ol class="gdays" aria-label="Seven-day gift calendar">${days}</ol>
   </div>`);
   const actions = h('div', { class: 'sheet__actions' });
   content.append(actions);
@@ -159,13 +196,18 @@ function openGift(home: HTMLElement): void {
     home.querySelector('.gift-btn')?.remove();
     if (card != null) {
       const m = monthDef(card);
-      const c = frag(`<div class="detail"><div class="detail__card draw__card is-reveal" style="width:140px;height:auto">${cardSvg(card)}</div>
+      const c = frag(`<div class="detail"><div class="detail__card draw__card is-reveal">${cardSvg(card)}</div>
         <div class="detail__kind">New card · ${save.album.length}/48</div><h2>${esc(m.en)}${cardDef(card).kind === 'plain' ? '' : ` · ${esc(cardDef(card).en)}`}</h2>
-        <p class="muted"><span class="serif">${m.ko}</span> ${esc(m.koRoman)} · <span class="ja">${m.ja}</span> ${esc(m.jaRoman)}</p></div>`);
+        <p class="muted"><span class="serif" lang="ko">${m.ko}</span> ${esc(m.koRoman)} · <span class="ja" lang="ja">${m.ja}</span> ${esc(m.jaRoman)}</p></div>`);
       openSheet(c, { center: true, label: 'New card' });
     }
     const pet = home.querySelector('.petals');
-    if (pet) pet.innerHTML = `${ICONS.petal}${save.petals}`;
+    if (pet) {
+      pet.setAttribute('aria-label', `${save.petals} petals`);
+      const n = pet.querySelector('.petals__n');
+      if (n) n.textContent = String(save.petals);
+    }
+    shownPetals = save.petals;
   };
   actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => done(claimGift(1), 1) }, 'Claim'));
   if (ads.rewardedAvailable && !p.gift.card) {

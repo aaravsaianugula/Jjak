@@ -29,11 +29,14 @@ export function frag(html: string): HTMLElement {
 export const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/** A short, quiet note above the banner area. Long messages get a little more time. */
 export function toast(text: string): void {
   document.querySelectorAll('.toast').forEach((t) => t.remove());
-  const el = h('div', { class: 'toast', role: 'status' }, text);
+  const el = h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' }, h('span', { class: 'toast__dot', 'aria-hidden': 'true' }), h('span', {}, text));
+  const ms = Math.min(4200, 2400 + text.length * 25);
+  el.style.setProperty('--toast-ms', `${ms}ms`);
   document.body.append(el);
-  setTimeout(() => el.remove(), 2500);
+  setTimeout(() => el.remove(), ms + 100);
 }
 
 export const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

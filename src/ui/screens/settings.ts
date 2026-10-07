@@ -14,52 +14,61 @@ import { choose, openSheet } from '../modal';
 import { nav } from '../nav';
 
 export function settingsScreen(): Screen {
-  const el = frag(`<section class="screen">
+  const row = (icon: string, title: string, sub = '') => `<span class="row__icon" aria-hidden="true">${icon}</span><span class="row__text">${title}${sub ? `<small>${sub}</small>` : ''}</span>`;
+  const chevron = `<span class="row__end" aria-hidden="true">${ICONS.chevron}</span>`;
+  const el = frag(`<section class="screen settings">
     <header class="topbar">
       <button class="icon-btn" data-back aria-label="Back">${ICONS.back}</button>
-      <div class="topbar__title">Settings</div>
-      <span style="width:44px"></span>
+      <div class="topbar__title"><h1>Settings</h1></div>
+      <span class="topbar__spacer"></span>
     </header>
-    <div class="scroll" style="flex:1;padding-top:8px">
-      <div class="section-label">Play</div>
-      <div class="list">
-        <div class="row"><span>Sound effects</span><button class="switch" role="switch" data-toggle="sound" aria-label="Sound effects"></button></div>
-        <div class="row"><span>Music<small>Generative, changes with the seasons</small></span><button class="switch" role="switch" data-toggle="music" aria-label="Music"></button></div>
-        <div class="row"><span>Haptics</span><button class="switch" role="switch" data-toggle="haptics" aria-label="Haptics"></button></div>
-        <div class="row row--wrap"><span>Daily reminder<small>A quiet nudge when the new Daily is ready</small></span>
-          <div class="seg" role="group" aria-label="Daily reminder">
-            <button data-remind="off">Off</button>${REMINDER_TIMES.map((t) => `<button data-remind="${t.hour}">${t.hour}:00</button>`).join('')}
-          </div>
-        </div>
-        <button class="row" data-act="paper"><span>Board paper<small data-paper-name></small></span><span class="muted">›</span></button>
-        <div class="row"><span>Theme</span>
+    <div class="scroll screen__body">
+      <h2 class="section-label" id="set-sound">Sound &amp; feel</h2>
+      <div class="list list--icons" role="group" aria-labelledby="set-sound">
+        <div class="row">${row(ICONS.sound, 'Sound effects')}<button class="switch" role="switch" data-toggle="sound" aria-label="Sound effects"></button></div>
+        <div class="row">${row(ICONS.music, 'Music', 'Generative, changes with the seasons')}<button class="switch" role="switch" data-toggle="music" aria-label="Music"></button></div>
+        <div class="row">${row(ICONS.haptics, 'Haptics', 'A light tap when cards pair')}<button class="switch" role="switch" data-toggle="haptics" aria-label="Haptics"></button></div>
+      </div>
+      <h2 class="section-label" id="set-look">Look</h2>
+      <div class="list list--icons" role="group" aria-labelledby="set-look">
+        <div class="row">${row(ICONS.theme, 'Theme')}
           <div class="seg" role="group" aria-label="Theme">
             <button data-set-theme="auto">Auto</button><button data-set-theme="paper">Paper</button><button data-set-theme="ink">Ink</button>
           </div>
         </div>
+        <button class="row" data-act="paper">${row(ICONS.paper, 'Board paper', '<span data-paper-name></span>')}${chevron}</button>
       </div>
-      <div class="section-label">Support Jjak</div>
-      <div class="list">
+      <h2 class="section-label" id="set-daily">Daily</h2>
+      <div class="list list--icons" role="group" aria-labelledby="set-daily">
+        <div class="row row--stack">${row(ICONS.bell, 'Daily reminder', 'A quiet nudge when the new Daily is ready')}
+          <div class="seg" role="group" aria-label="Daily reminder time">
+            <button data-remind="off">Off</button>${REMINDER_TIMES.map((t) => `<button data-remind="${t.hour}">${t.hour}:00</button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <h2 class="section-label" id="set-support">Support Jjak</h2>
+      <div class="list list--icons" role="group" aria-labelledby="set-support">
         ${save.adFree
-          ? `<div class="row"><span>Ads removed<small>Thank you for supporting Jjak. Optional reward ads stay available.</small></span><span class="muted">✓</span></div>`
-          : `<button class="row" data-act="buy"><span>Remove ads<small>No ads between boards and no banners. Rewards you choose stay optional.</small></span><span class="price">${store.available ? esc(store.price) : 'Android'}</span></button>`}
-        <button class="row" data-act="restore"><span>Restore purchase<small>Already bought it on another device?</small></span><span class="muted">›</span></button>
+          ? `<div class="row row--feature">${row(ICONS.heart, 'Ads removed', 'Thank you for supporting Jjak. Optional reward ads stay available.')}<span class="row__end" style="color:var(--good-text)" aria-hidden="true">${ICONS.check}</span></div>`
+          : `<button class="row row--feature" data-act="buy">${row(ICONS.heart, 'Remove ads', 'No ads between boards and no banners. Rewards you choose stay optional.')}<span class="price${store.available ? '' : ' price--off'}">${store.available ? esc(store.price) : 'Android'}</span></button>`}
+        <button class="row" data-act="restore">${row(ICONS.restart, 'Restore purchase', 'Already bought it on another device?')}${chevron}</button>
       </div>
-      <div class="section-label">Help</div>
-      <div class="list">
-        <button class="row" data-act="how"><span>How to play</span><span class="muted">›</span></button>
+      <h2 class="section-label" id="set-help">Help &amp; privacy</h2>
+      <div class="list list--icons" role="group" aria-labelledby="set-help">
+        <button class="row" data-act="how">${row(ICONS.help, 'How to play')}${chevron}</button>
+        ${ads.privacyOptionsRequired ? `<button class="row" data-act="consent">${row(ICONS.shield, 'Ad privacy choices', 'Change your consent')}${chevron}</button>` : ''}
+        <a class="row" href="${esc(LINKS.privacy)}" target="_blank" rel="noopener">${row(ICONS.doc, 'Privacy policy')}<span class="row__end" aria-hidden="true">${ICONS.external}</span><span class="sr-only">(opens in browser)</span></a>
+        <button class="row row--danger" data-act="reset">${row(ICONS.trash, 'Reset progress', 'Clears levels, petals and album')}${chevron}</button>
       </div>
-      <div class="section-label">Privacy</div>
-      <div class="list">
-        ${ads.privacyOptionsRequired ? `<button class="row" data-act="consent"><span>Ad privacy choices<small>Change your consent</small></span><span class="muted">›</span></button>` : ''}
-        <a class="row" href="${esc(LINKS.privacy)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><span>Privacy policy</span><span class="muted">↗</span></a>
-        <button class="row" data-act="reset"><span>Reset progress<small>Clears levels, petals and album</small></span><span class="muted">›</span></button>
-      </div>
-      <p class="fineprint" style="text-align:center;margin:18px 0 8px">Jjak ${APP_VERSION} · Original artwork inspired by traditional Hwatu & Hanafuda.<br>Fonts: Gowun Batang, Gowun Dodum, Zen Old Mincho (SIL OFL).</p>
+      <footer class="about">
+        <span class="seal" aria-hidden="true">짝</span>
+        <span class="about__name">Jjak <span class="muted">${APP_VERSION}</span></span>
+        <p class="fineprint">Original artwork inspired by traditional Hwatu &amp; Hanafuda.<br>Fonts: Gowun Batang, Gowun Dodum, Zen Old Mincho (SIL OFL).</p>
+      </footer>
     </div>
   </section>`);
 
-  const paperName = () => (save.paper === 'plain' ? 'Plain hanji' : MONTHS[Number(save.paper)].en);
+  const paperName = () => (save.paper === 'plain' ? 'Plain hanji' : `${MONTHS[Number(save.paper)].en} paper`);
   const sync = () => {
     el.querySelectorAll<HTMLElement>('[data-remind]').forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.remind === (save.reminder.hour == null ? 'off' : String(save.reminder.hour)))),
@@ -136,17 +145,22 @@ export function settingsScreen(): Screen {
 
 export function showHowToPlay(): void {
   const content = frag(`<div>
-    <h2>How to play</h2>
-    <p><b>Make a jjak (짝).</b> Tap two cards of the same flower. Every card shows its month number in the corner — matching numbers always pair.</p>
-    <p><b>Mind the path.</b> The two cards must connect with a line of up to three straight strokes (two turns) that crosses only empty space. The line may travel around the outside of the board.</p>
-    <p><b>Chain combos.</b> Make your next pair within four seconds to build a combo: 짝짝, 짝짝짝…</p>
-    <p><b>Three blossoms per board:</b> clear it, use no hints or shuffles, and beat the par time.</p>
-    <p><b>Stuck?</b> If no pairs are possible the board reshuffles itself. Hints and shuffles are there when you want them.</p>
-    <p class="muted">Daily Jjak gives everyone in the world the same board each day. Zen has no clock at all.</p>
+    <div class="sheet__head">
+      <div class="detail__kind">How to play · <span lang="ko">방법</span></div>
+      <h2>Make a jjak</h2>
+    </div>
+    <ol class="howto">
+      <li><span><b>Tap two cards of the same flower.</b>Every card shows its month number in the corner. Matching numbers always pair.</span></li>
+      <li><span><b>Mind the path.</b>The two cards must connect with a line of up to three straight strokes (two turns) that crosses only empty space. The line may travel around the outside of the board.</span></li>
+      <li><span><b>Chain combos.</b>Make your next pair within four seconds to build a combo: 짝짝, 짝짝짝…</span></li>
+      <li><span><b>Three blossoms per board.</b>Clear it, use no hints or shuffles, and beat the par time.</span></li>
+      <li><span><b>Stuck?</b>If no pairs are possible the board reshuffles itself. Hints and shuffles are there when you want them.</span></li>
+    </ol>
+    <p class="howto__foot">Daily Jjak gives everyone in the world the same board each day. Zen has no clock at all.</p>
   </div>`);
-  const btn = h('button', { class: 'btn btn--primary btn--block', style: 'margin-top:12px' }, 'Close');
+  const btn = h('button', { class: 'btn btn--primary btn--block', style: 'margin-top:16px' }, 'Got it');
   content.append(btn);
-  const s = openSheet(content, { label: 'How to play' });
+  const s = openSheet(content, { label: 'How to play', close: true });
   btn.addEventListener('click', () => s.close());
 }
 
@@ -154,20 +168,23 @@ export function showHowToPlay(): void {
 function pickPaper(): Promise<void> {
   const done = new Set(completedMonths());
   const swatch = (key: string, name: string, tint: string, motif: number, locked: boolean) => `
-    <button class="swatch ${save.paper === key ? 'is-on' : ''}" data-paper="${key}" ${locked ? 'disabled' : ''} aria-label="${esc(name)}${locked ? ', locked' : ''}">
-      <span class="swatch__face" style="--paper-tint:${tint}">${motif >= 0 ? `<svg viewBox="0 0 100 140"><use href="#motif-${motif}"/></svg>` : ''}</span>
+    <button class="swatch ${save.paper === key ? 'is-on' : ''}" data-paper="${key}" ${locked ? 'disabled' : ''} aria-pressed="${save.paper === key}" aria-label="${esc(name)}${locked ? ', locked. Collect all four cards of this flower' : ''}">
+      <span class="swatch__face" style="--paper-tint:${tint}">${motif >= 0 ? `<svg class="swatch__motif" viewBox="0 0 100 140" aria-hidden="true"><use href="#motif-${motif}"/></svg>` : ''}${save.paper === key ? `<span class="swatch__check" aria-hidden="true">${ICONS.check}</span>` : ''}</span>
       <span class="swatch__name">${esc(name)}</span>
-      ${locked ? '<span class="swatch__lock">Collect all 4</span>' : ''}
+      ${locked ? '<span class="swatch__lock" aria-hidden="true">Collect all 4</span>' : ''}
     </button>`;
   const content = frag(`<div>
-    <h2>Board paper</h2>
-    <p class="muted">Collect all four cards of a flower in the Album to unlock its paper.</p>
+    <div class="sheet__head">
+      <div class="detail__kind">Board paper · ${done.size + 1} of 13 unlocked</div>
+      <h2>Choose a paper</h2>
+      <p class="muted">Collect all four cards of a flower in the Album to unlock its paper.</p>
+    </div>
     <div class="swatches">
       ${swatch('plain', 'Plain hanji', 'transparent', -1, false)}
       ${MONTHS.map((m) => swatch(String(m.index), m.en, MONTH_TINTS[m.index], m.index, !done.has(m.index))).join('')}
     </div>
   </div>`);
-  const sheet = openSheet(content, { label: 'Board paper' });
+  const sheet = openSheet(content, { label: 'Board paper', close: true });
   content.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-paper]');
     if (!b || b.disabled) return;

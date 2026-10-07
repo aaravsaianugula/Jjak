@@ -1,5 +1,6 @@
 import './styles/fonts.css';
 import './styles/main.css';
+import './styles/game.css';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { Capacitor } from '@capacitor/core';
 import { installCardSprite } from './art/cards';

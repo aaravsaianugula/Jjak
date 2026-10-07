@@ -748,14 +748,6 @@
   font-style: normal;
   font-display: block;
   font-weight: 500;
-  src: url(./fonts/zen-old-mincho-63-500-normal.woff2) format('woff2');
-  unicode-range: U+2ca-2cb,U+2229,U+2468,U+2669,U+266f,U+273f,U+4ec0,U+4f60,U+4fb6,U+5347,U+540e,U+543b,U+5b0c,U+5d4c,U+5f14,U+5f9e,U+6155,U+62d0,U+6602,U+6666,U+66f3,U+67a2,U+67ca,U+69cc,U+6d29,U+6d9b,U+6e3e,U+6f81,U+7109,U+73c0,U+73c2,U+7425,U+7435-7436,U+7525,U+7554,U+785d,U+786b,U+7ae3,U+7b94,U+7d18,U+81bf,U+8511,U+8549,U+9075,U+9640,U+98e2,U+9e9f,U+ff96;
-}
-@font-face {
-  font-family: 'Zen Old Mincho';
-  font-style: normal;
-  font-display: block;
-  font-weight: 500;
   src: url(./fonts/zen-old-mincho-66-500-normal.woff2) format('woff2');
   unicode-range: U+2020,U+3003,U+3231,U+4e9b,U+4f3d,U+4f47,U+51b6,U+51dc,U+53e1,U+5bc5,U+602f,U+60bc,U+61c9,U+633d,U+637b,U+6492,U+65fa,U+660f,U+66f0,U+6703,U+681e,U+6876,U+6893,U+6912,U+698e,U+6c7d,U+714c,U+7169,U+71d5,U+725f,U+72d7,U+745b,U+74dc,U+75e2,U+7891,U+7897,U+7dcb,U+810a,U+8218,U+8339,U+840e,U+852d,U+8823,U+8a0a,U+9089,U+919c,U+971c,U+9ad9,U+ff4a,U+ff5a;
 }
@@ -806,6 +798,22 @@
   font-weight: 500;
   src: url(./fonts/zen-old-mincho-78-500-normal.woff2) format('woff2');
   unicode-range: U+4e32,U+51db,U+53a8,U+53ea,U+5609,U+5674,U+5a92,U+5e7e,U+6115,U+611a,U+62cc,U+62ed,U+63c9,U+64b9,U+64e6,U+65cb,U+6606,U+6731,U+683d,U+6afb,U+7460,U+771e,U+78ef,U+7b26,U+7b51,U+7cde,U+7d10,U+7d2f,U+7d46,U+80de,U+819c,U+84b2,U+85cd,U+865a,U+8ecc,U+9022,U+90b8,U+9192,U+9675,U+96b7,U+99ff,U+ff44,U+ff55,U+ff6c,U+ff73,U+ff75,U+ff86,U+ff8d,U+ff92,U+ffe3;
+}
+@font-face {
+  font-family: 'Zen Old Mincho';
+  font-style: normal;
+  font-display: block;
+  font-weight: 500;
+  src: url(./fonts/zen-old-mincho-81-500-normal.woff2) format('woff2');
+  unicode-range: U+2010,U+2502,U+25b6,U+4f3a,U+514b,U+5265,U+52c3,U+5339,U+53ec,U+54c0,U+55b0,U+5854,U+5b8f,U+5cb3,U+5e84,U+60da,U+6247,U+6249,U+628a,U+62cd,U+65ac,U+6838,U+690e,U+6cf0,U+6f02,U+6f2c,U+6f70,U+708a,U+7434,U+75be,U+77ef,U+7c60,U+7c98,U+7d1b,U+7e2b,U+80a5,U+81e3,U+820c,U+8210,U+8475,U+862d,U+8650,U+8997,U+906d,U+91c8,U+9700,U+9727,U+9df9,U+ff3a,U+ff9a;
+}
+@font-face {
+  font-family: 'Zen Old Mincho';
+  font-style: normal;
+  font-display: block;
+  font-weight: 500;
+  src: url(./fonts/zen-old-mincho-82-500-normal.woff2) format('woff2');
+  unicode-range: U+2103,U+5049,U+52b1,U+5320,U+5553,U+572d,U+58c7,U+5b5d,U+5bc2,U+5de3,U+5e61,U+5f80,U+61a9,U+67d0,U+67f4,U+6c88,U+6ca1,U+6ce5,U+6d78,U+6e9c,U+6f54,U+731b,U+73b2,U+74a7,U+74f6,U+75e9,U+7b20,U+7c8b,U+7f72,U+809d,U+8108,U+82b3,U+82bd,U+84b8,U+84c4,U+88c2,U+8ae6,U+8ef8,U+902e,U+9065,U+9326,U+935b,U+938c,U+9676,U+9694,U+96f7,U+9ed9,U+ff48,U+ff4c,U+ff81;
 }
 @font-face {
   font-family: 'Zen Old Mincho';
@@ -1140,14 +1148,6 @@
   font-style: normal;
   font-display: block;
   font-weight: 600;
-  src: url(./fonts/zen-old-mincho-63-600-normal.woff2) format('woff2');
-  unicode-range: U+2ca-2cb,U+2229,U+2468,U+2669,U+266f,U+273f,U+4ec0,U+4f60,U+4fb6,U+5347,U+540e,U+543b,U+5b0c,U+5d4c,U+5f14,U+5f9e,U+6155,U+62d0,U+6602,U+6666,U+66f3,U+67a2,U+67ca,U+69cc,U+6d29,U+6d9b,U+6e3e,U+6f81,U+7109,U+73c0,U+73c2,U+7425,U+7435-7436,U+7525,U+7554,U+785d,U+786b,U+7ae3,U+7b94,U+7d18,U+81bf,U+8511,U+8549,U+9075,U+9640,U+98e2,U+9e9f,U+ff96;
-}
-@font-face {
-  font-family: 'Zen Old Mincho';
-  font-style: normal;
-  font-display: block;
-  font-weight: 600;
   src: url(./fonts/zen-old-mincho-66-600-normal.woff2) format('woff2');
   unicode-range: U+2020,U+3003,U+3231,U+4e9b,U+4f3d,U+4f47,U+51b6,U+51dc,U+53e1,U+5bc5,U+602f,U+60bc,U+61c9,U+633d,U+637b,U+6492,U+65fa,U+660f,U+66f0,U+6703,U+681e,U+6876,U+6893,U+6912,U+698e,U+6c7d,U+714c,U+7169,U+71d5,U+725f,U+72d7,U+745b,U+74dc,U+75e2,U+7891,U+7897,U+7dcb,U+810a,U+8218,U+8339,U+840e,U+852d,U+8823,U+8a0a,U+9089,U+919c,U+971c,U+9ad9,U+ff4a,U+ff5a;
 }
@@ -1198,6 +1198,22 @@
   font-weight: 600;
   src: url(./fonts/zen-old-mincho-78-600-normal.woff2) format('woff2');
   unicode-range: U+4e32,U+51db,U+53a8,U+53ea,U+5609,U+5674,U+5a92,U+5e7e,U+6115,U+611a,U+62cc,U+62ed,U+63c9,U+64b9,U+64e6,U+65cb,U+6606,U+6731,U+683d,U+6afb,U+7460,U+771e,U+78ef,U+7b26,U+7b51,U+7cde,U+7d10,U+7d2f,U+7d46,U+80de,U+819c,U+84b2,U+85cd,U+865a,U+8ecc,U+9022,U+90b8,U+9192,U+9675,U+96b7,U+99ff,U+ff44,U+ff55,U+ff6c,U+ff73,U+ff75,U+ff86,U+ff8d,U+ff92,U+ffe3;
+}
+@font-face {
+  font-family: 'Zen Old Mincho';
+  font-style: normal;
+  font-display: block;
+  font-weight: 600;
+  src: url(./fonts/zen-old-mincho-81-600-normal.woff2) format('woff2');
+  unicode-range: U+2010,U+2502,U+25b6,U+4f3a,U+514b,U+5265,U+52c3,U+5339,U+53ec,U+54c0,U+55b0,U+5854,U+5b8f,U+5cb3,U+5e84,U+60da,U+6247,U+6249,U+628a,U+62cd,U+65ac,U+6838,U+690e,U+6cf0,U+6f02,U+6f2c,U+6f70,U+708a,U+7434,U+75be,U+77ef,U+7c60,U+7c98,U+7d1b,U+7e2b,U+80a5,U+81e3,U+820c,U+8210,U+8475,U+862d,U+8650,U+8997,U+906d,U+91c8,U+9700,U+9727,U+9df9,U+ff3a,U+ff9a;
+}
+@font-face {
+  font-family: 'Zen Old Mincho';
+  font-style: normal;
+  font-display: block;
+  font-weight: 600;
+  src: url(./fonts/zen-old-mincho-82-600-normal.woff2) format('woff2');
+  unicode-range: U+2103,U+5049,U+52b1,U+5320,U+5553,U+572d,U+58c7,U+5b5d,U+5bc2,U+5de3,U+5e61,U+5f80,U+61a9,U+67d0,U+67f4,U+6c88,U+6ca1,U+6ce5,U+6d78,U+6e9c,U+6f54,U+731b,U+73b2,U+74a7,U+74f6,U+75e9,U+7b20,U+7c8b,U+7f72,U+809d,U+8108,U+82b3,U+82bd,U+84b8,U+84c4,U+88c2,U+8ae6,U+8ef8,U+902e,U+9065,U+9326,U+935b,U+938c,U+9676,U+9694,U+96f7,U+9ed9,U+ff48,U+ff4c,U+ff81;
 }
 @font-face {
   font-family: 'Zen Old Mincho';
