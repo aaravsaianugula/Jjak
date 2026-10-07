@@ -32,8 +32,8 @@
  */
 import { GOAL_IDS, type GoalId } from '../engine/goals';
 import { type LevelSpec, type Mechanic } from '../engine/levels';
-import { type Board } from '../engine/board';
-import { buildBoard } from '../engine/levels';
+import { type Board, isGate } from '../engine/board';
+import { buildBoard, maxStones } from '../engine/levels';
 import { createRng } from '../engine/rng';
 import { bendsOf, initialState, movesOf } from './bots';
 import { type MeasureOptions, type Metrics, measure } from './metrics';
@@ -60,8 +60,8 @@ export const ENDLESS = {
   peakLift: 0.07,
   peakFinale: 0.4,
   /** search sizes (the worker; the main-thread fallback uses `quick`) */
-  search: { K: 3, climb: 1, maxAttempts: 10, timeBudgetMs: 450, hardMs: 1300, candidateBudgetMs: 4000, measure: { random: 6, human: 3 } as MeasureOptions },
-  quick: { K: 1, climb: 0, maxAttempts: 3, timeBudgetMs: 120, hardMs: 400, candidateBudgetMs: 4000, measure: { random: 4, human: 2 } as MeasureOptions },
+  search: { K: 3, climb: 1, maxAttempts: 10, timeBudgetMs: 450, hardMs: 1300, candidateBudgetMs: 4000, measure: { random: 6, human: 3, budget: 800 } as MeasureOptions },
+  quick: { K: 1, climb: 0, maxAttempts: 3, timeBudgetMs: 120, hardMs: 400, candidateBudgetMs: 4000, measure: { random: 4, human: 2, budget: 400 } as MeasureOptions },
   /** a structure this close to a recent level counts as a repeat (features are 0–1 per term) */
   sameEps: 1e-6,
 };
@@ -369,6 +369,16 @@ function centreOf(b: Board, i: number): number {
   return Math.min(1, depth / Math.max(1, Math.floor((Math.min(b.rows, b.cols) - 1) / 2)));
 }
 
+/**
+ * Clustered stones crowd a board fast: at 60 % of the most stones a board can hold,
+ * one build in ten can't fit them (the generator retries for up to a second and then
+ * drops stones). Measured over years 1–2; lines and spread never do. So a crowded
+ * board lays its stones in lines instead.
+ */
+export function safeLayout(plan: Pick<LevelPlan, 'rows' | 'cols'>, k: Knobs): Knobs {
+  return k.layout === 'clusters' && k.stones >= 0.6 * maxStones(plan.rows, plan.cols) ? { ...k, layout: 'lines' } : k;
+}
+
 interface Built {
   knobs: Knobs;
   spec: LevelSpec;
@@ -428,7 +438,16 @@ export function runEndlessJob(job: EndlessJob, now: () => number = () => Date.no
     return { knobs, spec, board, cheap, ms: now() - t0 };
   };
   const fresh = (spec: LevelSpec, feature: Feature) => isFresh(spec, feature, job.recent, job.prevFeel);
-  const evaluate = (b: Built): Measured => {
+  const evaluate = (b: Built): Measured | null => {
+    // The cheap identity gates first (a stone layout that can't fit its count): no need to measure.
+    const stones = b.board.cells.filter((v) => v === -2).length;
+    const gates = b.board.cells.filter(isGate).length;
+    if (stones !== b.spec.stones || gates !== (b.spec.gates ?? 0)) {
+      tried++;
+      const r = stones !== b.spec.stones ? 'stones' : 'gates';
+      rejected[r] = (rejected[r] ?? 0) + 1;
+      return null;
+    }
     const t0 = now();
     const metrics = measure(b.spec, b.board, job.measure);
     b.spec.difficulty = metrics.d;
@@ -445,9 +464,11 @@ export function runEndlessJob(job: EndlessJob, now: () => number = () => Date.no
   };
   /** Build `1 + extra` boards for a knob setting and measure the one the tailoring likes best. */
   const extra = bias.centreFirst || bias.twoBend ? (bias.centreFirst >= 4 * ENDLESS.centreStep || bias.twoBend >= 4 * ENDLESS.twoBendStep ? 2 : 1) : 0;
-  const tryKnobs = (knobs: Knobs, screen = extra) => {
+  const tryKnobs = (raw: Knobs, screen = extra) => {
+    const knobs = safeLayout(plan, raw);
     let pick = build(knobs);
-    for (let i = 0; i < screen; i++) {
+    // Screening is a luxury: only in the first half of the budget.
+    for (let i = 0; i < screen && elapsed() < job.timeBudgetMs / 2; i++) {
       const b = build(knobs);
       if (b.cheap > pick.cheap) pick = b;
     }
@@ -491,7 +512,7 @@ export function runEndlessJob(job: EndlessJob, now: () => number = () => Date.no
     for (const knobs of variants(plan, sorted()[0].knobs)) {
       if (i++ >= 4 || elapsed() > hardMs) break;
       const c = tryKnobs(knobs, 0);
-      if (c.verdict.ok && fresh(c.spec, c.feature)) break;
+      if (c?.verdict.ok && fresh(c.spec, c.feature)) break;
     }
   }
   // 5. The winner: fresh first, and its rebuild must give the same board, cell for cell.
