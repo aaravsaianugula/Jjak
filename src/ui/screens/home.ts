@@ -22,7 +22,7 @@ import { openSheet } from '../modal';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
 import { fillStrip, pathStrip } from './path';
-import { petalBump } from '../motion';
+import { petalBump, reducedMotion } from '../motion';
 import { GARDEN_ITEMS } from '../../art/garden';
 import { hasAffordableNew, isOwned } from '../../services/market';
 
@@ -207,8 +207,15 @@ function openGift(home: HTMLElement): void {
   const done = (card: number | null, times: number) => {
     sheet.close();
     const won = checkSeals();
-    toast(`Gift claimed${times > 1 ? ' ×2' : ''}${won.length ? ` · Seal earned: ${won[0].title}` : ''}`);
-    home.querySelector('.gift-btn')?.remove();
+    // The note follows once the sheet has slid away, so the two never overlap.
+    const note = `Gift claimed${times > 1 ? ' ×2' : ''}${won.length ? ` · Seal earned: ${won[0].title}` : ''}`;
+    setTimeout(() => toast(note), reducedMotion() ? 0 : 240);
+    // The gift dot bows out instead of vanishing.
+    const giftBtn = home.querySelector<HTMLElement>('.gift-btn');
+    if (giftBtn) {
+      giftBtn.classList.add('is-leaving');
+      setTimeout(() => giftBtn.remove(), reducedMotion() ? 0 : 260);
+    }
     if (card != null) {
       const m = monthDef(card);
       const c = frag(`<div class="detail"><div class="detail__card draw__card is-reveal">${cardSvg(card)}</div>
@@ -219,14 +226,23 @@ function openGift(home: HTMLElement): void {
     petalBump(home.querySelector<HTMLElement>('.petals'), shownPetals ?? before, save.petals, { delay: 200 });
     shownPetals = save.petals;
   };
-  actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => done(claimGift(1), 1) }, 'Claim'));
+  /** Today's square gets its seal pressed on, then the sheet goes (the claim itself is saved at once). */
+  const stampThen = (card: number | null, times: number) => {
+    actions.querySelectorAll('button').forEach((b) => b.setAttribute('disabled', ''));
+    const today = content.querySelector<HTMLElement>('.gday--now');
+    if (!today || reducedMotion()) return done(card, times);
+    today.append(h('span', { class: 'gday__stamp', 'aria-hidden': 'true' }, '受'));
+    today.classList.add('is-claimed');
+    setTimeout(() => done(card, times), 640);
+  };
+  actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => stampThen(claimGift(1), 1) }, 'Claim'));
   if (ads.rewardedAvailable && !p.gift.card) {
     actions.append(
       h('button', {
         class: 'btn btn--ghost btn--block',
         html: `${ICONS.ad}<span>Claim ×2 · watch a short ad</span>`,
         onclick: async () => {
-          if (await ads.rewarded()) done(claimGift(2), 2);
+          if (await ads.rewarded()) stampThen(claimGift(2), 2);
           else toast('The ad didn’t finish. You can still claim the normal gift.');
         },
       }),

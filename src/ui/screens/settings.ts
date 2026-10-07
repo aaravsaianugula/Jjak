@@ -10,6 +10,7 @@ import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
 import { nav } from '../nav';
+import { slidePill } from '../motion';
 import { MECHANIC_IDS, MECHANICS } from '../../engine/mechanics';
 import { DemoPlayer } from '../demo';
 import { type DemoScript, BASIC_DEMOS, GOAL_DEMOS, MECHANIC_DEMOS, VARIANTS_DEMO } from '../demos';
@@ -80,6 +81,7 @@ export function settingsScreen(): Screen {
       b.setAttribute('aria-checked', String(save.settings[k]));
     });
     el.querySelectorAll<HTMLElement>('[data-set-theme]').forEach((b) => b.setAttribute('aria-pressed', String(save.settings.theme === b.dataset.setTheme)));
+    el.querySelectorAll<HTMLElement>('.seg').forEach(slidePill);
   };
   sync();
 

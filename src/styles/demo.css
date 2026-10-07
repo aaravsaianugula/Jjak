@@ -67,9 +67,7 @@
   border-radius: 7%/5%;
   box-shadow: var(--card-shadow);
   transition:
-    left 440ms cubic-bezier(0.3, 0.7, 0.35, 1.12),
-    top 440ms cubic-bezier(0.3, 0.7, 0.35, 1.12),
-    transform 220ms cubic-bezier(0.3, 1.4, 0.5, 1),
+    transform 220ms var(--ease-settle),
     opacity 200ms ease;
   cursor: default;
   -webkit-tap-highlight-color: transparent;
@@ -200,6 +198,11 @@
 }
 .demo__card.is-sliding {
   z-index: 2;
+  /* Moved cards glide on `translate` (FLIP from demo.ts), never on left/top. */
+  transition:
+    translate 440ms var(--ease-settle),
+    transform 220ms var(--ease-settle),
+    opacity 200ms ease;
 }
 .demo__card.is-lucky {
   background: linear-gradient(160deg, #fbf3e2, color-mix(in srgb, var(--luck, #c99a3e) 24%, #fbf3e2));
@@ -442,9 +445,11 @@
   animation: demo-ghost-fade 1500ms ease-out forwards;
 }
 
-/* The brush: tip at (left, top), held at a slant. */
+/* The brush: tip at its `translate` (set from demo.ts), held at a slant. */
 .demo__brush {
   position: absolute;
+  left: 0;
+  top: 0;
   z-index: 6;
   aspect-ratio: 40 / 132;
   pointer-events: none;
@@ -452,10 +457,9 @@
   transform-origin: 50% 100%;
   transform: translate(-50%, -100%) rotate(24deg);
   transition:
-    left 320ms cubic-bezier(0.45, 0.05, 0.3, 1),
-    top 320ms cubic-bezier(0.45, 0.05, 0.3, 1),
-    opacity 220ms ease,
-    transform 220ms ease;
+    translate 340ms cubic-bezier(0.45, 0.05, 0.3, 1),
+    opacity 240ms ease,
+    transform 240ms var(--ease-out);
   filter: drop-shadow(-3px 6px 5px rgba(40, 20, 5, 0.28));
 }
 .demo__brush svg {
@@ -575,23 +579,23 @@
   color: var(--ink-soft);
 }
 .demo__combo.is-centre {
-  top: 50%;
   padding: 8px 20px 10px;
   transform: translate(-50%, -50%) scale(1.5);
+  translate: 0 var(--centre-dy, 0px);
   transition:
     opacity 200ms,
-    top 420ms var(--demo-ease),
+    translate 420ms var(--demo-ease),
     transform 420ms var(--demo-ease);
 }
 .demo__combo.is-max b {
   color: var(--gold-text);
 }
 .demo__combo.is-pop b {
-  animation: demo-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1);
+  animation: demo-pop 420ms var(--ease-settle);
 }
 @keyframes demo-pop {
   40% {
-    transform: scale(1.25);
+    transform: scale(1.1);
   }
 }
 .demo--tile .demo__combo {
@@ -704,7 +708,7 @@
 }
 .demo__goal.is-met .demo__goal-ico svg {
   color: var(--accent);
-  animation: demo-pop 420ms cubic-bezier(0.3, 1.6, 0.5, 1);
+  animation: demo-pop 420ms var(--ease-settle);
 }
 .demo__goal.is-lost .demo__goal-n {
   color: var(--demo-miss);

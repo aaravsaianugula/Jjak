@@ -2243,6 +2243,57 @@ button.panel:active {
 .gday--now .gday__n {
   color: var(--accent-text);
 }
+/* Claimed: a small vermilion seal is pressed onto today's square. */
+.gday {
+  position: relative;
+}
+.gday__stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  transform: rotate(-8deg);
+  animation: gday-stamp 380ms linear both;
+}
+.gday.is-claimed .gday__icon,
+.gday.is-claimed .gday__label {
+  opacity: 0.35;
+  transition: opacity 200ms ease 140ms;
+}
+@keyframes gday-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) rotate(-16deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-8deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+.gift-btn.is-leaving {
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 220ms ease,
+    transform 240ms var(--ease-out);
+}
 
 /* ───────────────────────────── Sheets & dialogs ───────────────────────────── */
 .scrim {
@@ -2261,7 +2312,7 @@ button.panel:active {
   inset: 0;
   z-index: -1;
   background: var(--scrim);
-  animation: fade var(--dur-base) var(--ease-out) both;
+  animation: fade var(--dur-base) var(--ease-out) backwards; /* not "both": a held fill would swallow the closing transition */
   transition: opacity 240ms var(--ease-out);
 }
 .scrim--center {
@@ -2307,7 +2358,7 @@ button.panel:active {
   border-radius: 24px 24px 0 0;
   padding: 10px 20px calc(var(--safe-bottom) + 20px);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--raised) 70%, transparent), 0 -12px 40px rgba(20, 12, 4, 0.22);
-  animation: sheet-up var(--dur-sheet) cubic-bezier(0.22, 0.75, 0.25, 1) both;
+  animation: sheet-up var(--dur-sheet) cubic-bezier(0.22, 0.75, 0.25, 1) backwards;
 }
 .sheet::-webkit-scrollbar {
   display: none;
@@ -2329,7 +2380,7 @@ button.panel:active {
   max-width: 400px;
   border-radius: 22px;
   padding: 24px 20px 20px;
-  animation: dialog-in var(--dur-base) var(--ease-out) both;
+  animation: dialog-in var(--dur-base) var(--ease-out) backwards;
 }
 /* A sheet of paper slides up from the edge and settles by a hair. */
 @keyframes sheet-up {
@@ -2616,6 +2667,20 @@ button.panel:active {
     transform: translateY(14px) rotate(-3deg) scale(0.96);
   }
 }
+/* The album thumbnail in flight to the detail (motion.ts flyInto). */
+.fly-card {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.fly-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 18px rgba(40, 20, 5, 0.28));
+}
 .detail__card svg {
   display: block;
   width: 100%;
@@ -2874,7 +2939,7 @@ a.row:active {
   border-radius: 15px;
   background: var(--line);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: background 180ms;
+  transition: background 200ms ease;
 }
 .switch::before {
   content: '';
@@ -2891,7 +2956,7 @@ a.row:active {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
-  transition: transform 200ms var(--ease-out);
+  transition: transform 220ms var(--ease-settle);
 }
 .switch[aria-checked='true'] {
   background: var(--good);
@@ -2926,6 +2991,29 @@ a.row:active {
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(90, 64, 36, 0.06);
   font-weight: 700;
+}
+/* With a sliding pill (motion.ts slidePill) the pill carries the raised paper. */
+.seg.has-pill {
+  position: relative;
+}
+.seg__pill {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 9px;
+  background: var(--raised);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(90, 64, 36, 0.06);
+  transform-origin: 0 50%;
+  pointer-events: none;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.seg.has-pill button {
+  position: relative;
+}
+.seg.has-pill button[aria-pressed='true'] {
+  background: transparent;
+  box-shadow: none;
 }
 .price {
   flex: none;
