@@ -203,7 +203,10 @@ The cards come from the 48-card flower deck that Korea (Hwatu 화투) and Japan
   to Kyoto's maples and Shirakawa-go's snow. Every place ends with a festival board
   and a passport stamp for your collection
 ◆ NEW IDEAS AS YOU TRAVEL: stones, falling leaves, first snow, lucky cards, silk
-  knots and wind that slides the cards. Every board can be solved
+  knots, wind that slides the cards, wooden gates and bamboo fences. Each one is
+  shown to you in a short animation, then you try it. Every board can be solved
+◆ BOARDS THAT FIT YOU: the game notices how you play and keeps each board
+  challenging but fair, with a breather after a tough one. It all stays on your phone
 ◆ FLOWER PATH: a free 100-rank journey with a reward on every rank and exclusive
   decks, brushes and garden pieces you can only earn
 ◆ DAILY JJAK: one board for the whole world each day, three daily missions and a
@@ -218,7 +221,8 @@ The cards come from the 48-card flower deck that Korea (Hwatu 화투) and Japan
 ◆ RUSH and ZEN: a 60-second score attack, or endless boards with no clock at all
 ◆ CARD SETS and SEALS: clear Godori, the red ribbons or the Five Brights on one
   board for a bonus, and earn seals for the classic sets
-◆ Paper and Ink themes, gentle generative music, satisfying haptics
+◆ Paper and Ink themes that follow your phone's light or dark mode, gentle
+  generative music, satisfying haptics
 ◆ Plays offline. Short sessions. No account needed.
 
 Fair ads, promised: never in the middle of a puzzle, never in your first levels, and
