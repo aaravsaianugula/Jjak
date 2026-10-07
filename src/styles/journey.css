@@ -892,8 +892,11 @@
   --rv-l3: color-mix(in srgb, #5b5a52 30%, var(--bg));
   --rv-l4: color-mix(in srgb, #6e6a58 34%, var(--bg));
   --rv-line: color-mix(in srgb, var(--ink) 82%, var(--bg));
-  --rv-road: color-mix(in srgb, #fff8ea 88%, var(--bg));
-  --rv-road-far: color-mix(in srgb, #f6d7b3 70%, var(--bg));
+  --rv-road: color-mix(in srgb, #efe0c4 80%, var(--bg));
+  --rv-road-far: color-mix(in srgb, #f3cfa6 70%, var(--bg));
+  --rv-road-hi: #fbf4e6;
+  --rv-stone: color-mix(in srgb, #b9ad99 60%, var(--bg));
+  --rv-hat: #c9a66b;
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -913,8 +916,11 @@
   --rv-l3: #22252b;
   --rv-l4: #1a1b1f;
   --rv-line: #0e0f12;
-  --rv-road: #b9a88d;
-  --rv-road-far: #e3a374;
+  --rv-road: #8c7c66;
+  --rv-road-far: #d18c5e;
+  --rv-road-hi: #b6a283;
+  --rv-stone: #5f5547;
+  --rv-hat: #b08d55;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='paper']):not([data-theme='light']) .reveal {
@@ -1044,20 +1050,119 @@
   opacity: 0.55;
 }
 
-/* The road draws itself from the stamp to the horizon. */
-.rv-road__ribbon {
-  stroke: none;
+/* The road: a verge wash, packed earth with a lighter crown, ruts, paving stones,
+   tapered brush edges, grass and pebbles. It draws itself from the stamp to the pass. */
+.rv-road__verge {
+  fill: var(--rv-line);
+  opacity: 0.12;
+}
+.rv-road__packed {
+  fill: var(--rv-road);
+  opacity: 0.55;
+}
+.rv-road__crown {
+  fill: var(--rv-road-hi);
+  opacity: 0.6;
+}
+.rv-road__rut {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  stroke-dasharray: 14 5 3 6;
+  opacity: 0.22;
+}
+.rv-road__stones path {
+  fill: var(--rv-stone);
+  fill-opacity: 0.55;
+  stroke: var(--rv-line);
+  stroke-width: 0.5;
+  stroke-opacity: 0.22;
+  stroke-linejoin: round;
 }
 .rv-road__edge {
+  fill: var(--rv-line);
+  opacity: 0.78;
+}
+.rv-road__tufts path {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+.rv-road__pebbles ellipse {
+  fill: var(--rv-line);
+  opacity: 0.5;
+}
+.rv-road--far .rv-road__edge {
+  opacity: 0.6;
+}
+/* Far trees and the gateway at the pass. */
+.rv-trees path {
+  fill: var(--rv-l3);
+}
+.rv-trees {
+  opacity: 0;
+  transition: opacity 1200ms ease 900ms;
+}
+.reveal.is-on .rv-trees {
+  opacity: 0.9;
+}
+.rv-gate {
+  opacity: 0;
+  transition: opacity 900ms ease 2800ms;
+}
+.reveal.is-on .rv-gate {
+  opacity: 0.85;
+}
+.rv-gate__posts,
+.rv-gate__beam {
   fill: none;
   stroke: var(--rv-line);
   stroke-width: 1.6;
   stroke-linecap: round;
-  stroke-dasharray: 26 3 9 2;
+}
+.rv-gate__roof {
+  fill: var(--rv-line);
+}
+/* The wanderer walks up the road once it has been drawn. */
+.rv-walker {
+  opacity: 0;
+  transition: opacity 700ms ease 2400ms;
+}
+.reveal.is-on .rv-walker {
+  opacity: 1;
+}
+.rv-walker__shadow {
+  fill: var(--rv-line);
+  opacity: 0.18;
+}
+.rv-walker__robe,
+.rv-walker__head,
+.rv-walker__bundle {
+  fill: var(--rv-line);
+}
+.rv-walker__bundle {
   opacity: 0.8;
 }
-.rv-road__edge--far {
-  stroke-dasharray: 18 4 30 2;
+.rv-walker__hat {
+  fill: var(--rv-hat);
+  stroke: var(--rv-line);
+  stroke-width: 0.8;
+}
+.rv-walker__hatline,
+.rv-walker__sash {
+  fill: none;
+  stroke: var(--rv-hat);
+  stroke-width: 0.7;
+  opacity: 0.8;
+}
+.rv-walker__staff {
+  fill: none;
+  stroke: var(--rv-line);
+  stroke-width: 1.1;
+  stroke-linecap: round;
 }
 .rv-draw {
   fill: none;
@@ -1072,15 +1177,21 @@
   stroke-dashoffset: 0;
 }
 /* Waypoints: places walked are inked; past the stamp they are only outlines. */
+.rv-mark path,
 .rv-mark ellipse {
   fill: none;
   stroke: var(--rv-line);
-  stroke-width: 1.3;
-  stroke-dasharray: 3 2.2;
+  stroke-width: 1.1;
+  stroke-dasharray: 2.4 1.8;
+}
+.rv-mark.is-done path {
+  fill: var(--rv-line);
+  stroke-dasharray: none;
 }
 .rv-mark.is-done ellipse {
   fill: var(--rv-line);
-  stroke-dasharray: none;
+  opacity: 0.35;
+  stroke: none;
 }
 .rv-mark {
   opacity: 0;

@@ -1,0 +1,76 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Art gallery</title>
+<!--
+  Every non-card art family, large, for art review (cards: dev/cards.html).
+  ?view=scenes   the Home landscapes, four seasons
+  ?view=garden   the full garden in four seasons, day and night
+  ?view=pieces   every garden piece and visitor vignette
+  ?view=stamps   all 50 passport stamps (earned) and a few empty ones
+  ?view=mech     gates (12 months), a fenced board, a knotted card, the snow card
+  ?view=road     the "road goes on" landscape
+  ?bg=dark       ink theme colours
+-->
+<style>
+body{background:#f3ecdf;margin:0;padding:16px;font-family:system-ui,sans-serif;color:#2a2724}
+body.dark{background:#1c1b19;color:#eee6d7}
+h2{font:600 15px/1.2 system-ui,sans-serif;margin:24px 0 10px}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.cell{display:grid;gap:4px;justify-items:center;font-size:12px;opacity:.95}
+.scene{width:360px;height:260px;position:relative;overflow:hidden;border-radius:10px}
+.scene svg{width:100%;height:100%;display:block}
+.gd{width:420px;height:300px;border-radius:10px;overflow:hidden}
+.gd svg{width:100%;height:100%;display:block}
+.piece{width:140px;height:140px;border-radius:12px;background:#ebe2d1;display:grid;place-items:center;overflow:hidden}
+body.dark .piece{background:#2a2824}
+.piece svg{width:100%;height:100%}
+.stamp{width:110px;height:110px}
+.card{width:110px;height:154px}
+.road{width:360px;height:640px;position:relative;overflow:hidden;border-radius:10px}
+</style></head>
+<body><div id="out"></div>
+<script type="module">
+import '../src/styles/fonts.css';
+import '../src/styles/main.css';
+import '../src/styles/garden.css';
+import '../src/styles/journey.css';
+import '../src/styles/mechanics.css';
+import { installCardSprite, cardSvg } from '../src/art/cards.ts';
+import { sceneSvg, sceneParticles } from '../src/art/scene.ts';
+import { GARDEN_ITEMS, GARDEN_VISITORS, gardenSvg, gardenItemSvg, gardenVisitorSvg } from '../src/art/garden.ts';
+import { installStampDefs, stampSvg } from '../src/art/stamp.ts';
+import { ROUTE } from '../src/data/route.ts';
+import { gateSvg, fencesMarkup } from '../src/art/mechanics.ts';
+import { KNOT_SVG } from '../src/ui/journey-fx.ts';
+import { roadSceneSvg } from '../src/art/road-scene.ts';
+installCardSprite();
+installStampDefs();
+const q = new URLSearchParams(location.search);
+if (q.get('bg') === 'dark') { document.body.classList.add('dark'); document.documentElement.setAttribute('data-theme', 'ink'); }
+else document.documentElement.setAttribute('data-theme', 'paper');
+const out = document.getElementById('out');
+const view = q.get('view') ?? 'scenes';
+const S = ['Spring', 'Summer', 'Autumn', 'Winter'];
+let h = '';
+if (view === 'scenes') {
+  h += `<h2>Home landscapes</h2><div class="row">${[0, 1, 2, 3].map((s) => `<div class="cell"><div class="scene">${sceneSvg(s)}</div>${S[s]}</div>`).join('')}</div>`;
+} else if (view === 'garden') {
+  const all = GARDEN_ITEMS.map((g) => g.id);
+  for (const night of [false, true]) h += `<h2>Full garden · ${night ? 'night' : 'day'}</h2><div class="row">${[0, 1, 2, 3].map((s) => `<div class="cell"><div class="gd">${gardenSvg(s, all, { night, visitor: ['magpie', 'heron', 'squirrel', 'tanuki'][s] })}</div>${S[s]}</div>`).join('')}</div>`;
+  h += `<h2>Empty garden</h2><div class="row"><div class="gd">${gardenSvg(0, [])}</div><div class="gd">${gardenSvg(2, ['pond', 'lantern', 'maple'])}</div></div>`;
+} else if (view === 'pieces') {
+  h += `<h2>Garden pieces</h2><div class="row">${GARDEN_ITEMS.map((g) => `<div class="cell"><div class="piece">${gardenItemSvg(g.id, 0)}</div>${g.name}</div>`).join('')}</div>`;
+  h += `<h2>Visitors</h2><div class="row">${GARDEN_VISITORS.map((v) => `<div class="cell"><div class="piece">${gardenVisitorSvg(v.id, 0, GARDEN_ITEMS.map((g) => g.id))}</div>${v.name}</div>`).join('')}</div>`;
+} else if (view === 'stamps') {
+  h += `<h2>Passport stamps</h2><div class="row">${ROUTE.map((c, i) => `<div class="cell"><div class="stamp">${stampSvg(c, i, '2026-10-07')}</div>${c.en}</div>`).join('')}</div>`;
+  h += `<h2>Empty</h2><div class="row">${ROUTE.slice(0, 4).map((c, i) => `<div class="stamp">${stampSvg(c, i, null)}</div>`).join('')}</div>`;
+} else if (view === 'mech') {
+  h += `<h2>Gates</h2><div class="row">${Array.from({ length: 12 }, (_, m) => `<div class="card">${gateSvg(m)}</div>`).join('')}</div>`;
+  h += `<h2>Knot, snow, back</h2><div class="row"><div class="card" style="position:relative">${cardSvg(4)}<span class="knot" style="position:absolute;inset:0">${KNOT_SVG}</span></div><div class="card">${cardSvg('snow')}</div><div class="card">${cardSvg('back')}</div></div>`;
+  const walls = new Uint8Array(12); walls[1] = 1; walls[5] = 2; walls[6] = 3; walls[9] = 1;
+  h += `<h2>Fences</h2><svg width="400" height="420" viewBox="0 0 400 420">${[0,1,2,3,4,5,6,7,8,9,10,11].map((i) => `<svg x="${(i % 4) * 100 + 4}" y="${Math.floor(i / 4) * 140 + 4}" width="92" height="132" viewBox="0 0 100 140"><use href="#card-${i * 4}"/></svg>`).join('')}${fencesMarkup(walls, 3, 4, 0, 0, 100, 140)}</svg>`;
+} else if (view === 'road') {
+  h += `<div class="reveal is-on is-still" style="position:relative;width:360px;height:640px;opacity:1">${roadSceneSvg('g')}</div>`;
+}
+out.innerHTML = h;
+</script>
+</body></html>
