@@ -1746,3 +1746,180 @@
     display: none;
   }
 }
+
+/* ───────────────── Level 6 rule tip: example family + mini-quiz ───────────────── */
+.tip__lead {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.tip__lead b {
+  color: var(--ink);
+}
+.rule-family {
+  margin-top: 16px;
+  padding: 14px 12px 10px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.rule-family__cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.rule-card {
+  position: relative;
+  margin: 0;
+  text-align: center;
+  animation: g-tip-card 520ms cubic-bezier(0.2, 0.9, 0.3, 1.15) calc(140ms + var(--i, 0) * 90ms) both;
+}
+.rule-card svg,
+.quiz__card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 7%/5%;
+  box-shadow: var(--card-shadow);
+}
+.rule-card figcaption {
+  margin-top: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+/* Circle around the month number chip (top-left of every card face). */
+.num-ring {
+  position: absolute;
+  left: 2.5%;
+  top: 2.4%;
+  width: 22%;
+  aspect-ratio: 1;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: g-ring 1.8s ease-in-out 900ms infinite;
+}
+@keyframes g-ring {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.55;
+  }
+}
+.rule-family .tip__caption {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+.rule-family .tip__caption b {
+  color: var(--ink);
+}
+
+.quiz {
+  margin-top: 14px;
+  padding: 14px 12px 12px;
+  border-radius: 16px;
+  border: 1.5px dashed var(--line);
+  transition: border-color 200ms, background 200ms;
+}
+.quiz.is-solved {
+  border-style: solid;
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 8%, transparent);
+}
+.quiz__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14.5px;
+}
+.quiz__step {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.quiz__cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 18px 8px 8px;
+}
+.quiz__card {
+  position: relative;
+  border-radius: 9%/6%;
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.quiz__card .num-ring {
+  animation: none;
+  opacity: 0.55;
+}
+.quiz__card::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 11%/8%;
+  border: 3px solid transparent;
+  transition: border-color 140ms;
+}
+.quiz__card.is-picked {
+  transform: translateY(-5px) scale(1.04);
+}
+.quiz__card.is-picked::after {
+  border-color: var(--accent);
+}
+.quiz__card.is-right::after {
+  border-color: var(--good);
+}
+.quiz__card.is-right .num-ring {
+  border-color: var(--good);
+  opacity: 1;
+}
+.quiz__card.is-right::before {
+  content: '✓';
+  position: absolute;
+  z-index: 2;
+  right: -8px;
+  top: -8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--good);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  animation: pop 300ms both;
+}
+.quiz__card.is-wrong {
+  animation: shake 420ms;
+}
+.quiz__card.is-wrong::after {
+  border-color: #b5523a;
+}
+.quiz__feedback {
+  margin: 4px 0 0;
+  min-height: 3em;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.quiz__feedback b {
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .num-ring {
+    animation: none;
+  }
+}

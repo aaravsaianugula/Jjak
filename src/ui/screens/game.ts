@@ -1037,22 +1037,82 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   const tipCards = (cards: (number | 'snow')[]) =>
     `<div class="tip__cards">${cards.map((c, i) => `<div style="--i:${i}">${cardSvg(c)}</div>`).join('')}</div>`;
 
+  /**
+   * Level 6 teaches the one rule that changes: cards of the same flower stop
+   * looking identical. Shown by example (the four Pine cards, corner numbers
+   * circled) and then practised in a three-card mini-quiz.
+   */
   function showVariantTip() {
     save.seenTips.push('variants');
     persist();
     const m = MONTHS[0];
-    const content = frag(`<div class="tip">
-      <div class="tip__kicker">New rule</div>
+    const kinds = [0, 1, 2, 3].map((v) => KIND_LABEL[cardDef(v).kind].en);
+    // Quiz: two different-looking Pine cards (both 1) and a Plum card (2) that looks like the crane.
+    const quiz = [3, 7, 0];
+    const content = frag(`<div class="tip tip--rule">
+      <div class="tip__kicker">New rule · Level 6</div>
       <h2>Match the flower, not the picture</h2>
-      <p class="muted">From here on, each flower has four different cards — plain, ribbon, animal and bright. Any two cards of the same flower (and number) make a pair.</p>
-      ${tipCards([0, 1, 2, 3])}
-      <p class="tip__caption">${esc(m.en)} · <span class="serif">${m.ko}</span> · <span class="ja">${m.ja}</span> — all four are January.</p>
+      <p class="tip__lead">From now on, the four cards of each flower look different.<br><b>Same flower + same number in the corner = a pair.</b></p>
+
+      <div class="rule-family">
+        <div class="rule-family__cards">
+          ${[0, 1, 2, 3]
+            .map((id, i) => `<figure class="rule-card" style="--i:${i}">${cardSvg(id)}<span class="num-ring" aria-hidden="true"></span><figcaption>${esc(kinds[i])}</figcaption></figure>`)
+            .join('')}
+        </div>
+        <p class="tip__caption">All four are <b>${esc(m.en)}</b> · <span class="serif">${m.ko}</span> · <span class="ja">${m.ja}</span> — all show <b>1</b>. Any two of them pair.</p>
+      </div>
+
+      <div class="quiz" role="group" aria-label="Practice: tap the two cards that pair">
+        <div class="quiz__title"><span class="quiz__step">Try it</span> Tap the two cards that make a pair</div>
+        <div class="quiz__cards">
+          ${quiz.map((id) => `<button class="quiz__card" data-q="${id}" aria-label="${esc(faceLabel(id))}">${cardSvg(id)}<span class="num-ring" aria-hidden="true"></span></button>`).join('')}
+        </div>
+        <p class="quiz__feedback" aria-live="polite">Hint: look at the number in each corner.</p>
+      </div>
     </div>`);
     const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
     content.append(h('div', { class: 'sheet__actions' }, btn));
+
+    const feedback = content.querySelector<HTMLElement>('.quiz__feedback')!;
+    let picked: HTMLElement[] = [];
+    let solved = false;
+    content.querySelector('.quiz__cards')!.addEventListener('click', (e) => {
+      const card = (e.target as HTMLElement).closest<HTMLElement>('[data-q]');
+      if (!card || solved) return;
+      if (picked.includes(card)) {
+        card.classList.remove('is-picked');
+        picked = picked.filter((p) => p !== card);
+        return;
+      }
+      card.classList.add('is-picked');
+      picked.push(card);
+      sfx.tap();
+      if (picked.length < 2) return;
+      const [x, y] = picked.map((p) => Number(p.dataset.q) >> 2);
+      if (x === y) {
+        solved = true;
+        picked.forEach((p) => p.classList.add('is-right'));
+        content.querySelector('.quiz')!.classList.add('is-solved');
+        feedback.innerHTML = '<b>Yes!</b> Different pictures, but both are Pine with a 1. That’s a jjak.';
+        sfx.match(2);
+        haptic.success();
+        btn.textContent = 'Start Level 6';
+      } else {
+        picked.forEach((p) => {
+          p.classList.add('is-wrong');
+          setTimeout(() => p.classList.remove('is-wrong', 'is-picked'), 650);
+        });
+        feedback.innerHTML = '<b>Not quite.</b> The bird cards look alike, but one is Pine (1) and one is Plum (2). Match the number in the corner.';
+        sfx.miss();
+        haptic.warn();
+        picked = [];
+      }
+    });
+
     paused = true;
     pausedAt = performance.now();
-    const sheet = openSheet(content, { label: 'New rule' });
+    const sheet = openSheet(content, { label: 'New rule: match the flower' });
     btn.addEventListener('click', () => sheet.close());
     void sheet.closed.then(resume);
   }

@@ -208,7 +208,7 @@ rewarded ads are always your choice.
 ## 8. Pre-launch QA checklist
 
 - [ ] First launch: welcome (three rules) → Level 1 tutorial shows a hint and coach text
-- [ ] Level 6 shows the "four cards per flower" tip; Level 27 shows Falling leaves; Level 38 shows First snow
+- [ ] Level 6 shows the "Match the flower" tip with its tap-the-pair practice (wrong pick explains, right pick turns the button into "Start Level 6"); Level 27 shows Falling leaves; Level 38 shows First snow
 - [ ] Seals: earning one shows it on the result sheet and adds petals
 - [ ] Settings → Board paper: locked papers can't be picked; a completed flower unlocks its paper
 - [ ] EU test (UMP debug geography EEA): consent form appears, and Settings shows "Ad privacy choices"
