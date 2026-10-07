@@ -1,4 +1,3 @@
-import { journeyLevel } from '../../engine/levels';
 import { ads } from '../../services/ads';
 import { unlockAudio } from '../../services/audio';
 import { persist, save } from '../../services/storage';
@@ -33,7 +32,7 @@ export function welcomeScreen(): Screen {
     save.onboarded = true;
     persist();
     void ads.start();
-    nav.game(journeyLevel(1));
+    nav.journey(1);
   });
   return { name: 'welcome', el };
 }

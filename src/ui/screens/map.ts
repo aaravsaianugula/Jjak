@@ -10,7 +10,8 @@ import {
   festivalTitle,
   routeOf,
 } from '../../data/route';
-import { type LevelSpec, journeyLevel, windOf } from '../../engine/levels';
+import { type LevelSpec, windOf } from '../../engine/levels';
+import { levelPlan } from '../../director';
 import { levelsToLantern, syncStamps } from '../../services/progress';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
@@ -103,7 +104,7 @@ export function mapScreen(): Screen {
     for (let n = first; n < first + ROUTE_LEVELS_PER_CHAPTER; n++) {
       const stars = save.stars[n] ?? 0;
       const isLocked = n > unlocked;
-      const spec = journeyLevel(n);
+      const spec = levelPlan(n).spec;
       const tw = twistOf(spec);
       const fest = !!spec.festival;
       const lantern = n >= unlocked && levelsToLantern(n) === 0;
@@ -202,7 +203,7 @@ export function mapScreen(): Screen {
     const t = e.target as HTMLElement;
     const lvl = t.closest<HTMLButtonElement>('[data-level]');
     if (lvl && !lvl.disabled) {
-      nav.game(journeyLevel(Number(lvl.dataset.level)));
+      nav.journey(Number(lvl.dataset.level));
       return;
     }
     const head = t.closest<HTMLButtonElement>('[data-open]');

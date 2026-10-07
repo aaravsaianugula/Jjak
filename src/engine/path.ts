@@ -1,4 +1,4 @@
-import { type Board, type Point, EMPTY, pointOf } from './board';
+import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, pointOf } from './board';
 
 /**
  * Shisen-sho connection rule: a path of at most 3 straight segments (≤ 2 turns)
@@ -11,6 +11,21 @@ import { type Board, type Point, EMPTY, pointOf } from './board';
 const MAX_TURNS = 2;
 const DR = [-1, 0, 1, 0];
 const DC = [0, 1, 0, -1];
+
+/**
+ * A fence between padded cell (r, c) and its neighbour in direction d? Only
+ * edges between two board cells can carry a fence; the outer lane never does.
+ */
+function fenceAt(b: Board, r: number, c: number, d: number): boolean {
+  const w = b.walls!;
+  const nr = r + DR[d];
+  const nc = c + DC[d];
+  if (r < 1 || c < 1 || r > b.rows || c > b.cols || nr < 1 || nc < 1 || nr > b.rows || nc > b.cols) return false;
+  // Look the fence up on the upper / left cell of the two.
+  const ur = Math.min(r, nr) - 1;
+  const uc = Math.min(c, nc) - 1;
+  return (w[ur * b.cols + uc] & (d === 1 || d === 3 ? FENCE_RIGHT : FENCE_DOWN)) !== 0;
+}
 
 /**
  * Returns the corner points of the best path (fewest turns, then shortest),
@@ -49,10 +64,11 @@ export function findPath(
   // Small graphs (≤ 12×10×4 states): a simple bucket queue by cost is plenty.
   const queue: { s: number; cost: number }[] = [];
 
+  const walls = !!b.walls;
   for (let d = 0; d < 4; d++) {
     const r = sr + DR[d];
     const c = sc + DC[d];
-    if (!open(r, c)) continue;
+    if (!open(r, c) || (walls && fenceAt(b, sr, sc, d))) continue;
     const s = (r * W + c) * 4 + d;
     best[s] = 1;
     turnsAt[s] = 0;
@@ -84,7 +100,7 @@ export function findPath(
       if (nt > MAX_TURNS) continue;
       const nr = r + DR[nd];
       const nc = c + DC[nd];
-      if (!open(nr, nc)) continue;
+      if (!open(nr, nc) || (walls && fenceAt(b, r, c, nd))) continue;
       const ns = (nr * W + nc) * 4 + nd;
       const ncost = nt * 1000 + (cost % 1000) + 1;
       if (ncost < best[ns]) {
@@ -134,6 +150,7 @@ export function reachable(
   // axis with fewer segments used never needs revisiting on that axis.
   const seen = new Uint8Array(H * W * 2);
   let frontier: { r: number; c: number; axis: number }[] = [{ r: startR, c: startC, axis: -1 }];
+  const walls = !!b.walls;
 
   for (let seg = 0; seg <= MAX_TURNS && frontier.length; seg++) {
     const next: { r: number; c: number; axis: number }[] = [];
@@ -143,6 +160,7 @@ export function reachable(
         if (axis === f.axis) continue; // must turn (or first segment)
         let r = f.r + DR[d];
         let c = f.c + DC[d];
+        if (walls && fenceAt(b, f.r, f.c, d)) continue;
         while (r >= 0 && c >= 0 && r < H && c < W) {
           const margin = r === 0 || c === 0 || r === H - 1 || c === W - 1;
           if (!margin) {
@@ -159,6 +177,7 @@ export function reachable(
             seen[key] = 1;
             next.push({ r, c, axis });
           }
+          if (walls && fenceAt(b, r, c, d)) break;
           r += DR[d];
           c += DC[d];
         }

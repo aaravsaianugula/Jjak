@@ -1,4 +1,4 @@
-import { type Board, EMPTY, STONE, isCard, monthOf } from './board';
+import { type Board, EMPTY, STONE, gateMonth, gateOf, isBlock, isCard, isGate, monthOf } from './board';
 import { reachable } from './path';
 import { type Rng } from './rng';
 
@@ -12,6 +12,11 @@ import { type Rng } from './rng';
  *
  * Most-constrained-first (fewest partners) keeps late placements from being
  * boxed in, so retries are rare.
+ *
+ * Gates (門) open the first time a pair of their month is cleared. In reverse
+ * order that is the *last placed* pair of the month, so a gate counts as open
+ * for the placements before it and closed from then on. Fences live in
+ * `base.walls` and `reachable` respects them, so the guarantee holds for both.
  */
 function placePairs(
   base: Board,
@@ -29,15 +34,21 @@ function placePairs(
     return Math.min(r, c, rows - 1 - r, cols - 1 - c);
   };
 
+  const hasGates = base.cells.some(isGate);
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const b: Board = { rows, cols, cells: base.cells.slice() };
+    const b: Board = base.walls ? { rows, cols, cells: base.cells.slice(), walls: base.walls } : { rows, cols, cells: base.cells.slice() };
     for (const s of slots) b.cells[s] = EMPTY;
     const order = rng.shuffle(pairs.slice());
     const free = new Set(slots);
     let ok = true;
+    // Gates: index of the last pair of each month in `order` (the first one cleared in reverse).
+    const lastOf = new Array(13).fill(-1);
+    if (hasGates) order.forEach(([ca], k) => (lastOf[monthOf(ca)] = k));
+    let k = 0;
+    const passable = hasGates ? (v: number) => v === EMPTY || (isGate(v) && k < lastOf[gateMonth(v)]) : undefined;
 
     const partnersOf = (x: number): number[] => {
-      const reach = reachable(b, x);
+      const reach = reachable(b, x, passable);
       const out: number[] = [];
       for (const y of reach) if (y !== x && free.has(y)) out.push(y);
       return out;
@@ -48,7 +59,8 @@ function placePairs(
       return true;
     };
 
-    for (const [ca, cb] of order) {
+    for (; k < order.length; k++) {
+      const [ca, cb] = order[k];
       // Most constrained cell first.
       let x = -1;
       let xPartners: number[] = [];
@@ -105,6 +117,10 @@ export interface GenerateOptions {
   cols: number;
   /** cell indices that hold permanent stones */
   stones?: number[];
+  /** gates: cell index and the month whose pair opens it */
+  gates?: { cell: number; month: number }[];
+  /** fence bits per cell (see FENCE_RIGHT / FENCE_DOWN) */
+  walls?: Uint8Array;
   /** card ids, length must equal playable cells; consecutive entries form pairs */
   cards: number[];
 }
@@ -112,7 +128,9 @@ export interface GenerateOptions {
 export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   const { rows, cols } = opts;
   const base: Board = { rows, cols, cells: new Array(rows * cols).fill(EMPTY) };
+  if (opts.walls) base.walls = opts.walls;
   for (const s of opts.stones ?? []) base.cells[s] = STONE;
+  for (const g of opts.gates ?? []) base.cells[g.cell] = gateOf(g.month);
   const slots: number[] = [];
   base.cells.forEach((v, i) => v === EMPTY && slots.push(i));
   if (slots.length !== opts.cards.length) {
@@ -123,6 +141,9 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
 
   const b = placePairs(base, slots, pairs, rng);
   if (b) return b;
+  // Fences and gates are extras: lose the fences first, then turn gates into stones.
+  if (opts.walls) return generateBoard({ ...opts, walls: undefined }, rng);
+  if (opts.gates?.length) return generateBoard({ ...opts, gates: [], stones: (opts.stones ?? []).concat(opts.gates.map((g) => g.cell)) }, rng);
   // Stones can occasionally wall a region off: drop two at a time and fill the
   // freed cells with a copy of an existing pair.
   const stones = (opts.stones ?? []).slice();
@@ -150,13 +171,13 @@ export function reshuffle(b: Board, rng: Rng): Board {
     rng.shuffle(list);
     for (let i = 0; i + 1 < list.length; i += 2) pairs.push([list[i], list[i + 1]]);
   }
-  const base: Board = { rows: b.rows, cols: b.cols, cells: b.cells.slice() };
+  const base: Board = b.walls ? { rows: b.rows, cols: b.cols, cells: b.cells.slice(), walls: b.walls } : { rows: b.rows, cols: b.cols, cells: b.cells.slice() };
   const out = placePairs(base, slots, pairs, rng, 200);
   if (out) return out;
   // The cells themselves can be a dead end (say, a card in a stone pocket with
   // its partner walled off behind it). Re-deal onto open cells, rim first.
   const open: number[] = [];
-  b.cells.forEach((v, i) => v !== STONE && open.push(i));
+  b.cells.forEach((v, i) => !isBlock(v) && open.push(i));
   const rim = (i: number) => {
     const r = Math.floor(i / b.cols);
     const c = i % b.cols;
@@ -167,12 +188,13 @@ export function reshuffle(b: Board, rng: Rng): Board {
     .sort((p, q) => p.k - q.k)
     .slice(0, slots.length)
     .map((p) => p.i);
-  const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (v === STONE ? STONE : EMPTY)) };
+  const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (isBlock(v) ? v : EMPTY)) };
+  if (b.walls) cleared.walls = b.walls;
   const moved = placePairs(cleared, target, pairs, rng, 200);
   if (moved) return moved;
   // Extremely unlikely; a plain shuffle at least changes the position.
   const vals = rng.shuffle(slots.map((s) => b.cells[s]));
   const cells = b.cells.slice();
   slots.forEach((s, k) => (cells[s] = vals[k]));
-  return { rows: b.rows, cols: b.cols, cells };
+  return b.walls ? { rows: b.rows, cols: b.cols, cells, walls: b.walls } : { rows: b.rows, cols: b.cols, cells };
 }

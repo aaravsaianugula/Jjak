@@ -1,9 +1,11 @@
 import { isBonus } from '../data/deck';
-import { type Board, type Point, EMPTY, cardsLeft, cloneBoard, sameMonth } from './board';
+import { type Board, type Point, cardsLeft, cloneBoard, sameMonth } from './board';
 import { reshuffle } from './generate';
+import { GOALS, type GoalStats } from './goals';
 import { type LevelSpec, buildBoard, pickKnots, pickSnow, windOf } from './levels';
-import { applyGravity, findMove } from './moves';
+import { findMove } from './moves';
 import { findPath } from './path';
+import { type PlayState, applyPair, lockedOf, releaseIfStuck } from './rules';
 import { createRng, type Rng } from './rng';
 import { type Yaku, newYaku } from './yaku';
 
@@ -39,6 +41,10 @@ export type TapResult =
       revealed: number[];
       /** knotted cells untied by this pair (cell numbers after any slide) */
       untied: number[];
+      /** gate cells opened by this pair (now empty) */
+      opened: number[];
+      /** bends in the path (0, 1 or 2) */
+      turns: number;
       /** this was the lucky bonus pair (LUCKY_SCORE already added to `gained`) */
       lucky: boolean;
       /** Fever is active for this pair (score doubled) */
@@ -57,15 +63,19 @@ export interface Stars {
   clear: boolean;
   noAssist: boolean;
   underPar: boolean;
+  /** goal boards only: the goal was met (it takes the par blossom's place) */
+  goal?: boolean;
 }
 
-export const starCount = (s: Stars) => Number(s.clear) + Number(s.noAssist) + Number(s.underPar);
+/** The third blossom: the goal on goal boards, otherwise the par time. */
+export const thirdStar = (s: Stars) => s.goal ?? s.underPar;
+export const starCount = (s: Stars) => Number(s.clear) + Number(s.noAssist) + Number(thirdStar(s));
 
 /**
  * One play-through of a board. Pure game state: the UI feeds it taps and the
  * current time, and renders whatever it reports back.
  */
-export class Session {
+export class Session implements PlayState, GoalStats {
   readonly spec: LevelSpec;
   board: Board;
   selected = -1;
@@ -89,6 +99,12 @@ export class Session {
   knots: Set<number>;
   /** lucky bonus pairs made on this board */
   luckyPairs = 0;
+  /** same-flower taps that had no legal path (mis-reads) */
+  blockedTaps = 0;
+  /** different-flower taps that moved the selection */
+  reselects = 0;
+  /** pairs by bends in their path: [straight, one bend, two bends] */
+  readonly turns: [number, number, number] = [0, 0, 0];
   private lastMatchAt = -Infinity;
   /** Fever ends at this timestamp */
   feverUntil = -Infinity;
@@ -103,6 +119,7 @@ export class Session {
     this.board = board ?? buildBoard(spec);
     this.startedAt = now;
     this.rng = createRng(`${spec.seed}-play`);
+    this.totalPairs = cardsLeft(this.board) / 2;
     this.hidden = pickSnow(this.board, spec.snow, spec.seed);
     this.knots = pickKnots(this.board, spec.knots ?? 0, spec.seed, this.hidden);
     // A walled-in card can still pair with its neighbour; never cover or tie the only way in.
@@ -114,9 +131,11 @@ export class Session {
 
   /** Cells that can't be picked right now (under snow or tied), though they still block paths. */
   get locked(): Set<number> {
-    if (!this.knots.size) return this.hidden;
-    if (!this.hidden.size) return this.knots;
-    return new Set([...this.hidden, ...this.knots]);
+    return lockedOf(this);
+  }
+
+  get straightPairs(): number {
+    return this.turns[0];
   }
 
   /** A legal pair the player could make now (respects snow and knots), or null. */
@@ -149,11 +168,13 @@ export class Session {
     if (!sameMonth(this.board, a, cell)) {
       // Tapping a different flower just moves the selection — gentle, not punishing.
       this.selected = cell;
+      this.reselects++;
       return { kind: 'reselect', from: a, cell };
     }
     const path = findPath(this.board, a, cell);
     if (!path) {
       this.selected = -1;
+      this.blockedTaps++;
       return { kind: 'mismatch', a, b: cell, reason: 'path' };
     }
     return this.applyMatch(a, cell, path, now);
@@ -163,8 +184,6 @@ export class Session {
     const cards: [number, number] = [this.board.cells[a], this.board.cells[b]];
     this.cleared.add(this.board.cells[a]);
     this.cleared.add(this.board.cells[b]);
-    this.board.cells[a] = EMPTY;
-    this.board.cells[b] = EMPTY;
     this.selected = -1;
     this.combo = now - this.lastMatchAt <= COMBO_WINDOW_MS ? Math.min(MAX_COMBO, this.combo + 1) : 1;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
@@ -185,89 +204,23 @@ export class Session {
     this.score += gained;
     this.pairsMade++;
 
-    let moved: [number, number][] = [];
+    const turns = Math.max(0, Math.min(2, path.length - 2));
+    this.turns[turns]++;
     const wind = windOf(this.spec);
-    if (wind) {
-      moved = applyGravity(this.board, wind);
-      // Snow and knots travel with their card. Move them all at once: a card may
-      // land where another one just left.
-      if (this.hidden.size || this.knots.size) {
-        const hid: number[] = [];
-        const tied: number[] = [];
-        for (const [from, to] of moved) {
-          if (this.hidden.delete(from)) hid.push(to);
-          if (this.knots.delete(from)) tied.push(to);
-        }
-        for (const i of hid) this.hidden.add(i);
-        for (const i of tied) this.knots.add(i);
-      }
-    }
-    const revealed = this.thaw();
-    const untied = this.untie();
+    const { moved, opened, revealed, untied } = applyPair(this, a, b, wind);
 
     const cleared = cardsLeft(this.board) === 0;
     let reshuffled = false;
     if (cleared) {
       this.finishedAt = now;
-    } else if (!findMove(this.board, this.locked)) {
-      // Stuck only because of snow or knots: release them (not the player's fault, no penalty).
-      this.release(revealed, untied);
-      if (!findMove(this.board)) {
-        this.board = reshuffle(this.board, this.rng);
-        this.autoShuffles++;
-        if (wind && wind !== 'down') this.windShuffles++;
-        reshuffled = true;
-      }
+    } else if (releaseIfStuck(this, revealed, untied)) {
+      // Snow or knots alone never strand you (released above, for free); a true dead end reshuffles.
+      this.board = reshuffle(this.board, this.rng);
+      this.autoShuffles++;
+      if (wind && wind !== 'down') this.windShuffles++;
+      reshuffled = true;
     }
-    return { kind: 'match', a, b, cards, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, untied, lucky, fever, feverStarted, yaku };
-  }
-
-  /**
-   * Free just enough to get going again: knots first (their faces are already
-   * known), then snow, then both. Pushes the freed cells onto the given lists.
-   */
-  private release(revealed: number[], untied: number[]): void {
-    const untieAll = () => {
-      untied.push(...this.knots);
-      this.knots.clear();
-    };
-    const meltAll = () => {
-      revealed.push(...this.hidden);
-      this.hidden.clear();
-    };
-    if (this.knots.size && findMove(this.board, this.hidden)) untieAll();
-    else if (this.hidden.size && findMove(this.board, this.knots)) meltAll();
-    else {
-      untieAll();
-      meltAll();
-    }
-  }
-
-  /** A cell is open once it touches an empty cell or sits on the board edge. */
-  private isOpen(i: number): boolean {
-    const { rows, cols, cells } = this.board;
-    const r = Math.floor(i / cols);
-    const c = i % cols;
-    return (
-      r === 0 || c === 0 || r === rows - 1 || c === cols - 1 ||
-      cells[i - 1] === EMPTY || cells[i + 1] === EMPTY || cells[i - cols] === EMPTY || cells[i + cols] === EMPTY
-    );
-  }
-
-  /** Untie knotted cards that now touch an empty cell (or the board edge). */
-  private untie(): number[] {
-    const out: number[] = [];
-    for (const i of this.knots) if (this.isOpen(i)) out.push(i);
-    for (const i of out) this.knots.delete(i);
-    return out;
-  }
-
-  /** Uncover snowy cards that now touch an empty cell (or the board edge). */
-  private thaw(): number[] {
-    const out: number[] = [];
-    for (const i of this.hidden) if (this.isOpen(i)) out.push(i);
-    for (const i of out) this.hidden.delete(i);
-    return out;
+    return { kind: 'match', a, b, cards, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, untied, opened, turns, lucky, fever, feverStarted, yaku };
   }
 
   /** Returns a legal pair to highlight (does not play it). */
@@ -287,7 +240,7 @@ export class Session {
     this.shufflesUsed++;
     const melted: number[] = [];
     this.lastUntied = [];
-    if ((this.hidden.size || this.knots.size) && !findMove(this.board, this.locked)) this.release(melted, this.lastUntied);
+    if (this.hidden.size || this.knots.size) releaseIfStuck(this, melted, this.lastUntied);
     return melted;
   }
   /** knots untied by the last shuffle() */
@@ -295,12 +248,23 @@ export class Session {
 
   stars(): Stars {
     const secs = this.elapsedMs(this.finishedAt || Date.now()) / 1000;
-    return {
+    const out: Stars = {
       clear: this.done,
       noAssist: this.done && this.hintsUsed + this.shufflesUsed + this.autoShuffles - this.windShuffles === 0,
       underPar: this.done && secs <= this.spec.par,
     };
+    if (this.spec.goal) out.goal = this.done && this.goalMet();
+    return out;
   }
+
+  /** The board's goal (if any) is met so far. */
+  goalMet(): boolean {
+    const g = this.spec.goal ? GOALS[this.spec.goal] : null;
+    return !!g && g.met(this, this.totalPairs);
+  }
+
+  /** Pairs on the board at the start. */
+  readonly totalPairs: number = 0;
 
   snapshot(): Board {
     return cloneBoard(this.board);

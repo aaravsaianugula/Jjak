@@ -2,7 +2,8 @@ import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
 import { type Point, STONE, cardsLeft, isCard } from '../../engine/board';
-import { type LevelSpec, RUSH, chapterOf, dailyTheme, journeyLevel, rushLevel, zenLevel } from '../../engine/levels';
+import { type LevelSpec, RUSH, chapterOf, dailyTheme, rushLevel, zenLevel } from '../../engine/levels';
+import { levelPlan } from '../../director';
 import { isBonus } from '../../data/deck';
 import { SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
@@ -619,7 +620,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     unlockAudio();
     target.classList.remove('is-deal');
     const cell = Number(target.dataset.cell);
-    const res = session.tap(cell, performance.now());
+    const now = performance.now();
+    const res = session.tap(cell, now);
+    emit('tap', { session, cell, result: res, now });
     switch (res.kind) {
       case 'select':
         select(target, true);
@@ -1379,7 +1382,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (fp && fp.after.rank > fp.before.rank) setTimeout(() => content.isConnected && rankUpMoment(fp), (rm ? 0 : rewardAt) + 2400);
 
     const nextSpec = (): LevelSpec | null =>
-      spec.mode === 'journey' ? journeyLevel(spec.number + 1) : spec.mode === 'zen' ? zenLevel(`zen-${Date.now()}`) : null;
+      spec.mode === 'journey' ? levelPlan(spec.number + 1).spec : spec.mode === 'zen' ? zenLevel(`zen-${Date.now()}`) : null;
 
     if (spec.mode === 'daily') {
       actions.append(
@@ -1401,7 +1404,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           onclick: async () => {
             sheet.close();
             await ads.betweenBoards(spec.mode === 'journey' ? spec.number : null);
-            nav.game(next);
+            if (spec.mode === 'journey') nav.journey(next.number);
+            else nav.game(next);
           },
           html: `${spec.mode === 'journey' ? `Level ${next.number}` : 'Next board'} ${ICONS.play}`,
         }),
@@ -1416,7 +1420,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           html: `${ICONS.restart}<span>Retry <small>for 3 blossoms</small></span>`,
           onclick: () => {
             sheet.close();
-            nav.game(journeyLevel(spec.number));
+            // The same board again (the Director pins a level's board until it changes tier).
+            nav.journey(spec.number);
           },
         }),
       );
@@ -1607,7 +1612,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       nav.game(rushLevel(`rush-${Date.now()}`, 0));
       return;
     }
+    if (!session.done) emit('leave', { session, reason: 'restart' });
     session = new Session(spec, performance.now());
+    emit('start', { session });
     clearHint();
     renderBoard();
     deal(0);
@@ -1677,6 +1684,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       return true;
     },
     destroy() {
+      // Leaving a board part-way through (Home, Back, the map) counts as a quit.
+      if (!rush && !session.done && session.pairsMade + session.blockedTaps + session.reselects > 0) emit('leave', { session, reason: 'quit' });
       clearInterval(tick);
       cancelAnimationFrame(scoreRaf);
       if (feverTimer) clearTimeout(feverTimer);

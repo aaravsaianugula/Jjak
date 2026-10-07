@@ -4,6 +4,7 @@ import { type JourneySave, defaultJourney, hydrateJourney } from './save-journey
 import { type GardenSave, defaultGarden, hydrateGarden } from './save-garden';
 import { type MarketSave, defaultMarket, hydrateMarket } from './save-market';
 import { type MetaSave, defaultMeta, hydrateMeta } from './save-meta';
+import { type AnalyticsSave, defaultAnalytics, hydrateAnalytics } from './save-analytics';
 
 export type Theme = 'auto' | 'paper' | 'ink';
 
@@ -72,6 +73,8 @@ export interface SaveData {
   garden: GardenSave;
   market: MarketSave;
   meta: MetaSave;
+  /** on-device play analytics for the Level Director (never leaves the device) */
+  analytics: AnalyticsSave;
 }
 
 const KEY = 'jjak.save.v1';
@@ -103,6 +106,7 @@ export const defaultSave = (): SaveData => ({
   garden: defaultGarden(),
   market: defaultMarket(),
   meta: defaultMeta(),
+  analytics: defaultAnalytics(),
 });
 
 /** Merge stored data over defaults so new fields appear after app updates. */
@@ -125,6 +129,7 @@ function hydrate(raw: unknown): SaveData {
     garden: hydrateGarden(r.garden),
     market: hydrateMarket(r.market),
     meta: hydrateMeta(r.meta),
+    analytics: hydrateAnalytics(r.analytics),
   };
 }
 

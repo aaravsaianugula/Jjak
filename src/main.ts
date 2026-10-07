@@ -18,6 +18,7 @@ import { applyCosmetics } from './services/market';
 import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
+import { prepareLevel } from './director';
 import { albumScreen } from './ui/screens/album';
 import { gameScreen } from './ui/screens/game';
 import { homeScreen } from './ui/screens/home';
@@ -33,6 +34,7 @@ import { welcomeScreen } from './ui/screens/welcome';
 
 nav.home = () => show(homeScreen());
 nav.game = (spec) => show(gameScreen(spec));
+nav.journey = (n) => void prepareLevel(n).then((spec) => nav.game(spec));
 nav.album = () => show(albumScreen());
 nav.settings = () => show(settingsScreen());
 nav.welcome = () => show(welcomeScreen());

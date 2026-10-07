@@ -4,6 +4,8 @@ import type { LevelSpec } from '../engine/levels';
 export const nav = {
   home: (): void => {},
   game: (_spec: LevelSpec): void => {},
+  /** play Journey level n: the Level Director picks (or generates) this player's board */
+  journey: (_n: number): void => {},
   album: (): void => {},
   settings: (): void => {},
   welcome: (): void => {},

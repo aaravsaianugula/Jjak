@@ -14,7 +14,7 @@ import {
   MAX_RANK, PATH_EXCLUSIVES, type RankTitle, type Reward, TITLES, WEEKLY, exclusiveName, isTitleRank, nextTitle, rankReward, titleFor,
 } from '../../data/meta';
 import { routeOf } from '../../data/route';
-import { CHAPTERS, LEVELS_PER_CHAPTER, dailyLevel, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
+import { CHAPTERS, LEVELS_PER_CHAPTER, dailyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
 import {
   type BoardReport, type Granted, claimChest, claimMission, claimRank, claimWeekly, missions, missionsDone, pending, rank,
   ranksToClaim, rerollMission, starChests, weekly,
@@ -558,7 +558,7 @@ export function pathScreen(): Screen {
       if (go === 'daily') nav.game(dailyLevel(localDateKey()));
       else if (go === 'rush') nav.game(rushLevel(`rush-${Date.now()}`, 0));
       else if (go === 'zen') nav.game(zenLevel(`zen-${Date.now()}`));
-      else nav.game(journeyLevel(save.level));
+      else nav.journey(save.level);
       return;
     }
     if (t.closest('[data-wclaim]')) {

@@ -3,7 +3,7 @@
  * to play without the game screen knowing about each of them.
  * The game screen emits; services subscribe once at startup.
  */
-import type { Session } from '../engine/session';
+import type { Session, TapResult } from '../engine/session';
 import type { ModeId } from '../engine/levels';
 import type { ClearSummary } from './progress';
 
@@ -18,6 +18,10 @@ export interface GameEvents {
   tool: { kind: 'hint' | 'shuffle'; mode: ModeId };
   /** a board started (after any intro) */
   start: { session: Session };
+  /** every tap on a board card, with what the session made of it (analytics) */
+  tap: { session: Session; cell: number; result: TapResult; now: number };
+  /** a board was abandoned before it was cleared */
+  leave: { session: Session; reason: 'quit' | 'restart' };
 }
 
 type Handler<K extends keyof GameEvents> = (e: GameEvents[K]) => void;
