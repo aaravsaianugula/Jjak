@@ -426,8 +426,9 @@ pack and petal pouches. In the IARC questionnaire, answer **Yes** to "digital pu
    4. **Install.** *Testers* tab → *Copy link* (the "join on the web" opt-in link) → open it
       on the phone signed in with a tester Gmail → *Accept invite* → *Download it on Google
       Play*. Check that ads (test ads until §2 is done) and, from an EU connection, the
-      consent form work. This build has no UMP debug-geography switch, so to see the GDPR
-      form from outside the EU, connect the phone through an EU VPN before the first launch.
+      consent form work. A Play build has no UMP debug geography, so to see the GDPR form from
+      outside the EU, connect the phone through an EU VPN before the first launch (a local QA build
+      can instead use `VITE_UMP_DEBUG_DEVICE=<hashed id> npx vite build --mode qa`; UMP logs the id).
    5. **Pre-launch report.** Google tests every testing-track upload on real devices
       automatically (about an hour). Play Console → app → **Test and release → Testing →
       Pre-launch report → Overview**: check *Stability* (crashes, ANRs: must be zero),
@@ -458,7 +459,7 @@ first internal-test build.
 - [x] web-verified · Levels 1–30 played start to finish in the browser (and 121–124, 157–159, 598–600): every board clears, intros show once, tiers adapt (a fast, clean player reaches tier 4 by level 10)
 - [x] web-verified · A retry or replay gives the same board (tier pinned per level)
 - [x] web-verified · Nothing mentions levels past 600 until level 600 is cleared; then "The road goes on" plays once, Home and the Map show Wanderer · Year 2
-- [ ] 📱 device · Endless levels (601+) generate in a Web Worker without a visible pause on a mid-range phone
+- [x] 📱 device (Pixel 10a · Android 17) · Endless levels (601+) generate in a Web Worker without a visible pause on a mid-range phone — worker 529–697 ms per board, never the main-thread fallback; tap → painted cards 259–561 ms; the board builds under the title card
 
 **Screens**
 - [x] web-verified · Map: scrolls to the current place; opening a place lists its 12 levels (gates 門, fences 垣, goal marks); any unlocked level replays
@@ -477,19 +478,19 @@ first internal-test build.
 - [ ] 📱 device · Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice
 
 **Ads**
-- [ ] 📱 device · EU test (phone on an EU VPN, §7; the build has no UMP debug-geography switch): consent form appears, and Settings shows "Ad privacy choices"
+- [x] 📱 device (Pixel 10a · Android 17) · EU test (QA build: `VITE_UMP_DEBUG_DEVICE=<hashed id from logcat> npx vite build --mode qa`, or an EU VPN on a normal build): consent form appears, and Settings shows "Ad privacy choices" — form shown at launch; "Do not consent" stored no purposes; the Settings row reopens the form
 - [ ] 📱 device · Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s
 - [ ] 📱 device · Rewarded: closing early grants nothing, and finishing grants the item; afterwards no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card
-- [ ] 📱 device · Banner on Home and Album only; the layout isn't covered (bottom padding adjusts)
+- [x] 📱 device (Pixel 10a · Android 17) · Banner on Home and Album only; the layout isn't covered (bottom padding adjusts) — 64 px padding on Home/Album, none on Market and boards; offline: no banner and no gap
 
 **Platform**
 - [ ] 📱 device · Daily reminder: offered after the first Daily; Android 13+ asks for notification permission; a notification arrives at the chosen hour and not on days already played
 - [ ] 📱 device · Music: starts after the first tap, changes with the season, fades during ads, stops in the background
-- [ ] 📱 device · Android back button: closes sheets → pauses a board in progress → returns home → minimizes on home
+- [x] 📱 device (Pixel 10a · Android 17) · Android back button: closes sheets → pauses a board in progress → returns home → minimizes on home (a board with no pairs made goes straight Home: nothing to lose)
 - [ ] 📱 device · Rotate / split-screen / large-screen: layout still fits (portrait locked on phones)
-- [ ] 📱 device · Airplane mode: game fully playable, ads simply absent
-- [ ] 📱 device · Kill and relaunch mid-level: progress (levels, album, petals, analytics) persists
-- [ ] 📱 device · Dark mode: Ink theme, with status bar icons readable
+- [x] 📱 device (Pixel 10a · Android 17) · Airplane mode: game fully playable, ads simply absent — cold start 1.0 s, a full board to its clear, only an "ads: start failed" warning
+- [x] 📱 device (Pixel 10a · Android 17) · Kill and relaunch mid-level: progress (levels, album, petals, analytics) persists — force-stopped 1 s after a clear: level, petals, album, clears, pairs and stars all kept
+- [x] 📱 device (Pixel 10a · Android 17) · Dark mode: Ink theme, with status bar icons readable — Auto follows the phone live and after a restart; splash on ink, no flash
 - [x] web-verified · Daily: completing once counts toward the streak; replays are marked "practice"; Warm tea keeps a streak through a missed day (unit tests)
 - [ ] 📱 device · Play Console pre-launch report: no crashes, accessibility warnings reviewed
 
