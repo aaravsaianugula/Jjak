@@ -130,8 +130,8 @@ which is why the Daily is identical worldwide.
 
 | Item | Source | Sink |
 |---|---|---|
-| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board, lanterns, Rush, lucky pairs, missions, rank rewards, chests, garden visitors. Simulated at **≈ 315 per hour** of steady play (`tests/economy.test.ts`) | Hint (20), Shuffle (15), the Market (≈ 12,200 of cosmetics and garden pieces) |
-| **Hints/Shuffles** | 3 / 2 at start, +1 each per chapter finished, rewarded ad (+1) | Using them |
+| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board, lanterns, Rush, lucky pairs, missions, rank rewards, chests, garden visitors. Simulated at **≈ 460 per hour** of steady play (`tests/economy.test.ts`) | Hint (20), Shuffle (15), the Market (≈ 12,200 of cosmetics and garden pieces) |
+| **Hints/Shuffles** | 5 / 5 at start; then only a rewarded ad (+1) or the petal price. Rewards that once gave a tool give its price in petals (20 a hint, 15 a shuffle) | Using them |
 | **Album cards** | First clear of each level, each Daily, optional rewarded "draw one more" | — |
 
 **Ads** (all IDs in `src/config.ts`):
