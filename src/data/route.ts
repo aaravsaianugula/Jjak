@@ -13,6 +13,14 @@
 export type Country = 'KR' | 'JP';
 /** 0 spring, 1 summer, 2 autumn, 3 winter */
 export type Season = 0 | 1 | 2 | 3;
+
+/** The real calendar's season for each month, January first (northern hemisphere, as Korea and Japan). */
+const MONTH_SEASON: readonly Season[] = [3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3];
+/** The season of a date in local time: Mar–May spring, Jun–Aug summer, Sep–Nov autumn, Dec–Feb winter. */
+export function calendarSeason(d: Date): Season {
+  return MONTH_SEASON[d.getMonth()];
+}
+
 /** The idea a chapter features. 'basics' = chapter 1, 'mix' = several at once. */
 export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'mix';
 

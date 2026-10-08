@@ -237,7 +237,8 @@ then play. Reduced motion shows the end state of each step instead of animating 
 the path draws, then 0 / 1 / 2 bends shown in turn; (2) the player makes a pair; (3) a blocked pair
 shakes and the 3-bend path is shown crossed out; (4) three quick pairs show the combo. Captions of
 two or three words. Skippable from the first frame, never shown to a returning player, and
-measured: the first real pair should land within 20 s.
+measured from the intro title's Begin tap (not app launch; `performance.measure('jjak:begin-to-first-pair')`):
+the first real pair should land within 20 s.
 
 **Mechanic intros** for stones, falling leaves, snow, lucky cards, knots, wind, gates, fences
 and goals use the demo player. **Replay intro** from How to Play and from the pause menu.

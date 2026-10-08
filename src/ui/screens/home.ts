@@ -35,6 +35,9 @@ let shownXp: number | null = null;
 /** Auto-open the gift once per app session. */
 let giftShownThisSession = false;
 
+/** The tagline under the wordmark, in English with its Korean and Japanese lines (Home and the intro title). */
+export const BRAND_TAG = `<p class="brand__tag"><span class="brand__en">Pair the flowers of the four seasons</span><span class="brand__native" lang="ko"><span class="serif">꽃을 맞추다</span> · <span class="ja" lang="ja">花を合わせる</span></span></p>`;
+
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function homeScreen(): Screen {
@@ -98,7 +101,7 @@ export function homeScreen(): Screen {
       <div class="scene__brand">
         <div class="seal" aria-hidden="true">짝</div>
         <h1 class="brand__word">Jjak</h1>
-        <p class="brand__tag"><span class="brand__en">Pair the flowers of the four seasons</span><span class="brand__native" lang="ko"><span class="serif">꽃을 맞추다</span> · <span class="ja" lang="ja">花を合わせる</span></span></p>
+        ${BRAND_TAG}
       </div>
     </div>
     <div class="panel journey">

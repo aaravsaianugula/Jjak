@@ -9,7 +9,7 @@ import { fencesMarkup, gateInner, gateLabel } from '../../art/mechanics';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, rushLevel, zenLevel } from '../../engine/levels';
 import { levelPlan } from '../../director';
 import { isBonus } from '../../data/deck';
-import { ROUTE_LEVELS, SEASON_NAMES, festivalTitle, placeLine, routeOf } from '../../data/route';
+import { ROUTE_LEVELS, SEASON_NAMES, calendarSeason, festivalTitle, placeLine, routeOf } from '../../data/route';
 import { roadGoesOn } from '../reveal';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
 import { breeze, luckyMoment, setKnot, stampMoment, tugKnot, untieKnot, windVane } from '../journey-fx';
@@ -71,7 +71,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   let total = cardsLeft(session.board);
   const gid = ++uid;
   // Journey plays its chapter's season; other modes follow the real calendar.
-  music.setSeason(spec.mode === 'journey' ? routeOf(spec.number).chapter.season : [3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3][new Date().getMonth()]);
+  music.setSeason(spec.mode === 'journey' ? routeOf(spec.number).chapter.season : calendarSeason(new Date()));
   /** Rush run state (null in other modes). */
   const rush =
     spec.mode === 'rush'

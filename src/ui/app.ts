@@ -67,7 +67,7 @@ export function installPlatformHooks(onPause: () => void, onResume: () => void):
   void CapApp.addListener('backButton', () => {
     if (closeTopSheet()) return;
     if (current?.onBack?.()) return;
-    if (current?.name === 'home' || current?.name === 'welcome') void CapApp.minimizeApp();
+    if (current?.name === 'home' || current?.name === 'intro' || current?.name === 'welcome') void CapApp.minimizeApp();
     else fallbackBack();
   });
 }

@@ -8,6 +8,9 @@ export const nav = {
   journey: (_n: number): void => {},
   album: (): void => {},
   settings: (): void => {},
+  /** first launch: the title screen with Begin */
+  intro: (): void => {},
+  /** the first-minute demo (after the intro's Begin) */
   welcome: (): void => {},
   map: (): void => {},
   seals: (): void => {},

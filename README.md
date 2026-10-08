@@ -23,7 +23,7 @@ and collect every card with its Korean and Japanese name.
 | **Modes** | Journey: **the Flower Road**, 600 levels across 50 real places in Korea and Japan (and a road that goes on for players who finish it). Rush (60 s score attack), Daily Jjak (same board worldwide, weekday themes, streak, share), Zen (untimed) |
 | **Level Director** | Every Journey board is built by a system, not by hand: an authored level grammar, bot personas that measure each board's difficulty, solver-proven validators, and an offline bank of 600 levels × 5 skill tiers. On the phone a player model picks the tier from how you play (time, first taps, misreads, hints, quits), with relief and stretch boards. Past 600, levels are generated live for each player in a Web Worker. All on device |
 | **Mechanics** | Stones, Falling leaves, First snow, Lucky cards, Knots (매듭), Wind, Gates (門) and Fences (울타리), introduced one at a time with an animated demo, then mixed. Level goals (Rhythm, Clean read, Full bloom, Straight brush) on some boards. Festival boards end every chapter |
-| **Onboarding** | Show, don't tell: an animated first minute (pair, bends, a blocked path, a combo) and a short demo on a mini board for every new idea, then a "your turn" |
+| **Onboarding** | A loader that takes over from the splash and follows the real boot steps, a title screen on first launch, then show, don't tell: an animated first minute (pair, bends, a blocked path, a combo) and a short demo on a mini board for every new idea, then a "your turn" |
 | **Progression** | Flower Path (100 free ranks with exclusives), 3 daily missions + weekly chest, star chests, passport stamps, 40+ Seals (incl. real Go-Stop / Koi-Koi card sets), Album of 48 cards + 2 lucky cards + gold-leaf editions |
 | **Market & Garden** | Petal shop: 5 deck styles, 5 card backs, path brushes, match effects, board papers, generative music styles, tools, Warm tea (streak freeze). A seasonal courtyard with 24 pieces, day/night and daily visitors |
 | **Meta** | Generative seasonal music, opt-in Daily reminders, Fever at ×5 combo, 7-day gift calendar, lantern gifts every 4 levels, lifetime stats. ≈ 50 hours of launch content (see `docs/EXPANSION_PLAN.md`) |
@@ -88,7 +88,7 @@ src/
   data/       the deck (KR/JP names, culture notes), the Flower Road route, Market catalog, ranks and missions
   art/        SVG card renderer + sprite
   services/   ads (AdMob + UMP), storage, audio, haptics, progress/economy, share
-  ui/         screens (welcome, home, game, map, market, garden, path, album, seals, settings), modal sheets, router
+  ui/         screens (intro, welcome, home, game, map, market, garden, path, album, seals, settings), modal sheets, router
   styles/     design tokens (Paper / Ink themes), subset fonts
 android/      Capacitor Android project (signing, AdMob app id, icons)
 resources/    icon & splash sources → `npm run assets`

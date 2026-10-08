@@ -8,8 +8,7 @@ import './styles/meta.css';
 import './styles/cards-extra.css';
 import './styles/mechanics.css';
 import './styles/demo.css';
-import { SplashScreen } from '@capacitor/splash-screen';
-import { Capacitor } from '@capacitor/core';
+import './styles/launch.css';
 import { installCardSprite } from './art/cards';
 import { ads } from './services/ads';
 import { store } from './services/store';
@@ -21,6 +20,8 @@ import { applyCosmetics } from './services/market';
 import { flush, loadSave, save } from './services/storage';
 import { applyTheme, installPlatformHooks, installWebBannerPreview, setBackFallback, show } from './ui/app';
 import { nav } from './ui/nav';
+import { takeOverLoader } from './ui/launch';
+import { firstScreen } from './ui/launch-plan';
 import { prepareLevel } from './director';
 import { prepareEndless } from './director/endless';
 import { ROUTE_LEVELS } from './data/route';
@@ -29,6 +30,7 @@ import { trackSessions } from './services/analytics';
 import { albumScreen } from './ui/screens/album';
 import { gameScreen } from './ui/screens/game';
 import { homeScreen } from './ui/screens/home';
+import { introScreen } from './ui/screens/intro';
 import { gardenScreen } from './ui/screens/garden';
 import { mapScreen } from './ui/screens/map';
 import { marketHooks, marketScreen } from './ui/screens/market';
@@ -59,6 +61,7 @@ nav.journey = (n) => {
 };
 nav.album = () => show(albumScreen());
 nav.settings = () => show(settingsScreen());
+nav.intro = () => show(introScreen());
 nav.welcome = () => show(welcomeScreen());
 nav.map = () => show(mapScreen());
 nav.seals = () => show(sealsScreen());
@@ -79,7 +82,11 @@ document.addEventListener('jjak:petals', () => {
 });
 
 async function boot() {
+  // The loader painted by index.html takes over from the native splash at once;
+  // its line advances as each real step below finishes.
+  const loader = takeOverLoader();
   await loadSave();
+  loader.done('save');
   trackSessions();
   // Past 600: make the current endless board in the background, so Continue is instant.
   if (save.level > ROUTE_LEVELS && save.journey.revealed) void prepareEndless(save.level);
@@ -87,6 +94,7 @@ async function boot() {
   applyTheme();
   installCardSprite();
   applyCosmetics();
+  loader.done('art');
   installWebBannerPreview();
   setBackFallback(() => nav.home());
   let heard = false;
@@ -122,21 +130,23 @@ async function boot() {
   } catch {
     /* fonts API unavailable */
   }
+  loader.done('fonts');
 
   void store.init();
   void planReminders();
   // DEV only: ?play=<url-encoded JSON LevelSpec> opens that board directly.
   const play = import.meta.env.DEV ? new URLSearchParams(location.search).get('play') : null;
   if (play) nav.game({ mode: 'journey', number: 99, seed: 'dev', rows: 8, cols: 6, stones: 0, months: 12, variants: true, par: 120, gravity: false, snow: 0, ...JSON.parse(play) });
-  else if (!save.onboarded) nav.welcome();
-  else {
-    nav.home();
-    void ads.start().then(() => {
-      // The banner may have been requested before the SDK was ready.
-      if (document.querySelector('.home, .screen[data-banner]')) void ads.showBanner();
-    });
+  else if (firstScreen(save) === 'intro') nav.intro();
+  else nav.home();
+  loader.done('screen');
+  await loader.finish();
+  // Never under the loader. A new player's ads start after the first minute (welcome.ts).
+  if (!play && save.onboarded) {
+    await ads.start();
+    // The banner may have been requested before the SDK was ready.
+    if (document.querySelector('.home, .screen[data-banner]')) void ads.showBanner();
   }
-  if (Capacitor.isNativePlatform()) void SplashScreen.hide();
 }
 
 void boot();

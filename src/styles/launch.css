@@ -1,0 +1,254 @@
+/* ───────────────────────────── Launch: loader and intro title ─────────────────────────────
+   The loader's first frame (flat ground, the seal where the native splash icon sits) is
+   inline in index.html so it paints before the bundle runs; here it moves once
+   src/ui/launch.ts adds .is-on. Motion is transform and opacity, plus the one brush stroke. */
+
+/* The stamp is pressed: a short push down, then it settles back with the shared settle curve. */
+#launch.is-on .launch__seal {
+  animation: launch-press 520ms both;
+}
+@keyframes launch-press {
+  0% {
+    transform: rotate(-5deg) scale(1);
+    animation-timing-function: var(--ease-in);
+  }
+  34% {
+    transform: rotate(-5deg) scale(0.94);
+    animation-timing-function: var(--ease-settle);
+  }
+  100% {
+    transform: rotate(-5deg) scale(1);
+  }
+}
+/* Its print shadow arrives as it lands on the paper. */
+.launch__seal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 12px 24px -12px rgba(110, 30, 15, 0.55);
+  opacity: 0;
+}
+#launch.is-on .launch__seal::before {
+  animation: launch-fade 420ms var(--ease-out) 180ms both;
+}
+
+/* One brush stroke drawn beneath the seal: a solid tapered ink shape revealed by a drawn mask. */
+.launch__stroke {
+  display: block;
+  overflow: visible;
+}
+.launch__draw {
+  stroke-dasharray: 1 2;
+  stroke-dashoffset: 1;
+}
+#launch.is-on .launch__stroke {
+  animation: launch-stroke-in 160ms var(--ease-out) 140ms both;
+}
+#launch.is-on .launch__draw {
+  animation: launch-draw 520ms var(--ease-in-out) 140ms both;
+}
+@keyframes launch-stroke-in {
+  to {
+    opacity: 0.86;
+  }
+}
+@keyframes launch-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.launch__word {
+  margin: 14px 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  line-height: 1;
+}
+.launch__en {
+  font-size: 30px;
+  letter-spacing: 0.01em;
+}
+.launch__ko {
+  font-size: 18px;
+  color: var(--muted);
+}
+#launch.is-on .launch__word {
+  animation: launch-rise 420ms var(--ease-out) 300ms both;
+}
+@keyframes launch-rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The progress line: a thin ink thread that advances only as real boot steps finish. */
+.launch__line {
+  position: relative;
+  width: 104px;
+  height: 2px;
+  margin-top: 22px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+.launch__line::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.14;
+}
+.launch__line i {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0.72;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 280ms var(--ease-out); /* LINE_SETTLE_MS in launch-plan.ts */
+}
+#launch.is-on .launch__line {
+  animation: launch-fade 300ms var(--ease-out) 120ms both;
+}
+@keyframes launch-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Out: the loader cross-fades while the first screen drifts in beneath it. */
+#launch.is-leaving {
+  animation: launch-out 360ms var(--ease-in-out) both;
+  pointer-events: none;
+}
+@keyframes launch-out {
+  to {
+    opacity: 0;
+  }
+}
+/* Screens built under the loader wait to make their entrance until it leaves. */
+:root[data-launching] .screen,
+:root[data-launching] .screen * {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Everything above lands on its end state at once (main.css); the exit is a short fade. */
+  #launch.is-leaving {
+    animation: rm-out 160ms ease-in both !important;
+  }
+}
+
+/* ───────────────────────────── Intro title (first launch) ───────────────────────────── */
+.opening {
+  justify-content: flex-end;
+  text-align: center;
+  padding-bottom: calc(var(--safe-bottom) + 28px);
+}
+.opening__scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 72%;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+.opening__title {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.opening__seal {
+  width: 76px;
+  height: 76px;
+  margin-bottom: 16px;
+  font-size: 41px;
+  transform: rotate(-5deg);
+  box-shadow: 0 10px 22px -10px rgba(110, 30, 15, 0.55);
+}
+.opening__word {
+  align-self: center;
+  font-size: 52px;
+}
+/* Home drops the tagline on short phones; here it is the point of the screen, so it stays. */
+.opening .brand__tag {
+  display: flex;
+  align-self: center;
+  align-items: center;
+  margin-top: 10px;
+  font-size: var(--fs-body);
+}
+.opening .brand__native {
+  display: block;
+  font-size: var(--fs-sm);
+}
+.opening__what {
+  position: relative;
+  max-width: 30ch;
+  margin: 18px auto 26px;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.opening__begin {
+  position: relative;
+}
+/* Entrance: the seal settles, then the words and Begin rise into place, one after another. */
+.opening__seal {
+  animation: opening-seal 560ms var(--ease-settle) 140ms both;
+}
+.opening__word,
+.opening .brand__tag,
+.opening__what,
+.opening__begin {
+  animation: opening-rise 520ms var(--ease-out) both;
+}
+.opening__word {
+  animation-delay: 240ms;
+}
+.opening .brand__tag {
+  animation-delay: 320ms;
+}
+.opening__what {
+  animation-delay: 420ms;
+}
+.opening__begin {
+  animation-delay: 520ms;
+}
+@keyframes opening-seal {
+  from {
+    opacity: 0;
+    transform: rotate(-5deg) scale(1.1);
+  }
+}
+@keyframes opening-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@media (max-height: 760px) {
+  .opening__seal {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 12px;
+    font-size: 34px;
+  }
+  .opening__word {
+    font-size: 44px;
+  }
+  .opening__what {
+    margin: 14px auto 20px;
+  }
+}

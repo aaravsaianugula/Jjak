@@ -6,6 +6,7 @@ import { DemoPlayer } from '../demo';
 import { BASIC_DEMOS } from '../demos';
 import { frag, h, wait } from '../dom';
 import { ICONS } from '../icons';
+import { FIRST_MINUTE } from '../launch-plan';
 import { openSheet } from '../modal';
 import { nav } from '../nav';
 
@@ -13,11 +14,12 @@ import { nav } from '../nav';
  * The first minute, shown instead of a page of rules. Four short beats on one
  * mini board, almost wordless:
  *   1. the brush pairs two cards and the path draws; then one bend, two bends
- *   2. your turn: the player makes a pair (target: within 20 s of launch)
+ *   2. your turn: the player makes a pair (target: within ~20 s of the intro's Begin tap)
  *   3. a blocked pair shakes; its three-bend path is crossed out; clear the way
  *   4. three quick pairs: 짝 · 짝짝 · 짝짝짝, the combo
  * Skippable from the first frame. The player's first pair is marked with
- * performance.mark('jjak:first-pair') so it can be measured.
+ * performance.mark('jjak:first-pair') and measured from the Begin tap as
+ * 'jjak:begin-to-first-pair' (FIRST_MINUTE in launch-plan.ts).
  */
 function firstMinute(opts: { replay: boolean; onDone: () => void }): { el: HTMLElement; destroy(): void } {
   const player = new DemoPlayer(BASIC_DEMOS.bends, { size: 'stage' });
@@ -60,7 +62,9 @@ function firstMinute(opts: { replay: boolean; onDone: () => void }): { el: HTMLE
     await player.yourTurn({
       hintAfter: 900,
       onPair: (n) => {
-        if (n === 1 && !opts.replay) performance.mark('jjak:first-pair');
+        if (n !== 1 || opts.replay) return;
+        performance.mark(FIRST_MINUTE.firstPairMark);
+        performance.measure(FIRST_MINUTE.measure, FIRST_MINUTE.beginMark, FIRST_MINUTE.firstPairMark);
       },
     });
     await wait(900);
@@ -75,7 +79,7 @@ function firstMinute(opts: { replay: boolean; onDone: () => void }): { el: HTMLE
   return { el, destroy: () => player.destroy() };
 }
 
-/** First launch: the first-minute intro, then straight into Level 1. */
+/** First launch, after the intro title's Begin: the first minute, then straight into Level 1. */
 export function welcomeScreen(): Screen {
   const start = () => {
     unlockAudio();
