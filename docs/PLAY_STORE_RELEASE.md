@@ -470,29 +470,29 @@ first internal-test build.
 - [x] web-verified · Reset progress: cosmetics fall back to defaults; Remove ads, Supporter and pouch receipts survive (unit test + browser check)
 - [x] web-verified · Rush: timer, +time floaters, next board on clear, end sheet with petals, XP and seals
 - [x] web-verified · Reduced motion: no deal cascade, static intro steps, the reveal shows its end state
-- [ ] 📱 device · Deck style and card back persist after a restart; every deck style keeps the 12 months distinguishable on an 8×7 board
+- [x] 📱 device (Pixel 10a · Android 17) · Deck style and card back persist after a restart; every deck style keeps the 12 months distinguishable on an 8×7 board — Ink wash + Blue waves equipped in the Market survive a force-stop; all six decks on the 8×7 level 624 (the near-monochrome Ink wash, Celadon and Moonlit read by motif and corner numeral)
 
 **Purchases (license tester)**
-- [ ] 📱 device · Remove ads: buy → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back
-- [ ] 📱 device · Petal pouch: buy → petals credited once; buy the same pouch again right away (proves it was consumed); kill the app mid-purchase → next launch credits it once
-- [ ] 📱 device · Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice
+- [ ] 📱 device · Remove ads: buy → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back — **Blocked on the owner:** the products don't exist in Play Console yet (the phone's billing calls return "Product not found"), and they need a license-tester account (§0a)
+- [ ] 📱 device · Petal pouch: buy → petals credited once; buy the same pouch again right away (proves it was consumed); kill the app mid-purchase → next launch credits it once — **Blocked on the owner:** same as above
+- [ ] 📱 device · Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice — **Blocked on the owner:** same as above
 
 **Ads**
 - [x] 📱 device (Pixel 10a · Android 17) · EU test (QA build: `VITE_UMP_DEBUG_DEVICE=<hashed id from logcat> npx vite build --mode qa`, or an EU VPN on a normal build): consent form appears, and Settings shows "Ad privacy choices" — form shown at launch; "Do not consent" stored no purposes; the Settings row reopens the form
-- [ ] 📱 device · Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s
-- [ ] 📱 device · Rewarded: closing early grants nothing, and finishing grants the item; afterwards no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card
+- [x] 📱 device (Pixel 10a · Android 17) · Levels 1–5 never show an interstitial; after that, at most one every 3 boards / 150 s — the first comes after level 5's clear ("never before level 5"); then 3 clears and ≥150 s apart in two 6-board runs
+- [x] 📱 device (Pixel 10a · Android 17) · Rewarded: closing early grants nothing, and finishing grants the item; afterwards no interstitial for 6 minutes; every interstitial is preceded by the "Short break" card — reward → +1 hint, used at once; no interstitial for 6 min though one was due; the card before every interstitial. Google's test rewarded ad grants its reward when skipped, so "closed early" is covered by tests/ad-show.test.ts, not the device. Fixed on the way: the next ad was lost after each interstitial (card with no ad), music came back under ads, and a rewarded ad closed early left the board paused
 - [x] 📱 device (Pixel 10a · Android 17) · Banner on Home and Album only; the layout isn't covered (bottom padding adjusts) — 64 px padding on Home/Album, none on Market and boards; offline: no banner and no gap
 
 **Platform**
 - [ ] 📱 device · Daily reminder: offered after the first Daily; Android 13+ asks for notification permission; a notification arrives at the chosen hour and not on days already played
-- [ ] 📱 device · Music: starts after the first tap, changes with the season, fades during ads, stops in the background
+- [x] 📱 device (Pixel 10a · Android 17) · Music: starts after the first tap, changes with the season, fades during ads, stops in the background — audio stream stopped until the first tap, started after; suspended in the background (fixed: it stayed running), back on return; season from the board's chapter; ducked until the ad closes
 - [x] 📱 device (Pixel 10a · Android 17) · Android back button: closes sheets → pauses a board in progress → returns home → minimizes on home (a board with no pairs made goes straight Home: nothing to lose)
-- [ ] 📱 device · Rotate / split-screen / large-screen: layout still fits (portrait locked on phones)
+- [x] 📱 device (Pixel 10a · Android 17) · Rotate / split-screen / large-screen: layout still fits (portrait locked on phones) — forced landscape keeps portrait on the phone; split and large windows measured in Edge at the same sizes (changing `wm size` locks the test phone): no overflow at 411×449, 800×1280, 1280×800 (Android 16+ ignores the portrait lock on large screens) or 912×1368. In a half-height split the cards shrink to ~23 px wide: it fits, but it's cramped
 - [x] 📱 device (Pixel 10a · Android 17) · Airplane mode: game fully playable, ads simply absent — cold start 1.0 s, a full board to its clear, only an "ads: start failed" warning
 - [x] 📱 device (Pixel 10a · Android 17) · Kill and relaunch mid-level: progress (levels, album, petals, analytics) persists — force-stopped 1 s after a clear: level, petals, album, clears, pairs and stars all kept
 - [x] 📱 device (Pixel 10a · Android 17) · Dark mode: Ink theme, with status bar icons readable — Auto follows the phone live and after a restart; splash on ink, no flash
 - [x] web-verified · Daily: completing once counts toward the streak; replays are marked "practice"; Warm tea keeps a streak through a missed day (unit tests)
-- [ ] 📱 device · Play Console pre-launch report: no crashes, accessibility warnings reviewed
+- [ ] 📱 device · Play Console pre-launch report: no crashes, accessibility warnings reviewed — **Blocked on the owner:** needs the upload keystore secrets (§3) so CI signs the AAB, then an internal-testing upload
 
 ## 9. Native edits already applied (for reference if you regenerate `android/`)
 
