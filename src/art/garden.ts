@@ -514,54 +514,120 @@ function scatter(r: () => number, clumps: Clump[], n: number, r0: number, r1: nu
 }
 
 /**
- * A canopy painted in washes: a dark lobed mass per clump, a deeper shade under
- * it on the lower right, a mid tone, a lit crown toward the upper left (the light
- * in every garden picture), and tapered leaf strokes breaking the silhouette.
+ * A ragged mass of leaves around (cx, cy): a few broad, uneven lobes whose edge
+ * is broken into leaf clusters, mostly pointed tips with shallow scoops between
+ * them and now and then a rounded one. It reads as foliage, not as the even
+ * rounded bumps of a cloud.
  */
-function foliage(r: () => number, clumps: Clump[], n: number, size: number, dark: string[], light: string[], op = 1): string {
-  let mass = '';
-  let shade = '';
-  let mid = '';
-  let crown = '';
-  const edge = dark.map(() => '');
-  const lit = light.map(() => '');
-  let tips = '';
-  const per = Math.min(8, Math.max(6, Math.round((n / clumps.length) * 0.6)));
-  for (const [x, y, rx, ry] of clumps) {
-    mass += blob(r, x, y + ry * 0.06, rx * 1.02, ry * 0.95, 9);
-    shade += blob(r, x + rx * 0.16, y + ry * 0.38, rx * 0.7, ry * 0.46, 6);
-    mid += blob(r, x - rx * 0.12, y - ry * 0.16, rx * 0.7, ry * 0.6, 7);
-    crown += blob(r, x - rx * 0.3, y - ry * 0.4, rx * 0.4, ry * 0.32, 5);
-    // leaves fan outward from the clump's heart and break its silhouette
-    for (let k = 0; k < per; k++) {
-      const a = r() * Math.PI * 2;
-      const d = 0.5 + r() * 0.55;
-      const len = size * (1.5 + r() * 1.1);
-      const ang = (a * 180) / Math.PI + (r() - 0.5) * 140;
-      edge[k % edge.length] += leaf(x + Math.cos(a) * rx * d * 0.8, y + Math.sin(a) * ry * d * 0.8, len, ang, size * 0.7);
-    }
-    // the lit side: toward the upper left
-    for (let k = 0; k < Math.ceil(per * 0.55); k++) {
-      const a = Math.PI * (0.9 + r() * 0.95);
-      const d = 0.25 + r() * 0.7;
-      const len = size * (1.3 + r() * 1);
-      const ang = (a * 180) / Math.PI + (r() - 0.5) * 150;
-      const px = x - rx * 0.12 + Math.cos(a) * rx * d * 0.78;
-      const py = y - ry * 0.14 + Math.sin(a) * ry * d * 0.78;
-      if (k % 4 === 3) tips += leaf(px, py, len * 0.8, ang, size * 0.5);
-      else lit[k % lit.length] += leaf(px, py, len, ang, size * 0.66);
-    }
+function ragged(r: () => number, cx: number, cy: number, rx: number, ry: number): string {
+  const TAU = Math.PI * 2;
+  const tips = Math.min(34, Math.max(9, Math.round((rx + ry) / 1.45)));
+  const lobes = 2 + Math.floor(r() * 3);
+  const ph = [r() * TAU, r() * TAU];
+  const pts: Pt[] = [];
+  for (let i = 0; i < tips; i++) {
+    const a = ((i + (r() - 0.5) * 0.7) / tips) * TAU;
+    const R = 0.84 + 0.15 * Math.sin(a * lobes + ph[0]) + 0.07 * Math.sin(a * 5 + ph[1]) + r() * 0.12;
+    pts.push([cx + Math.cos(a) * rx * R, cy + Math.sin(a) * ry * R]);
   }
-  const deep = mix(dark[0], '#1c2420', 0.4);
-  const out =
-    `<path d="${mass}" fill="${dark[0]}"/>` +
-    edge.map((d, i) => `<path d="${d}" fill="${dark[i]}"/>`).join('') +
-    `<path d="${shade}" fill="${deep}" opacity=".38"/>` +
-    `<path d="${mid}" fill="${dark[dark.length - 1]}" opacity=".55"/>` +
-    `<path d="${crown}" fill="${light[0]}" opacity=".22"/>` +
-    lit.map((d, i) => `<path d="${d}" fill="${light[i]}"/>`).join('') +
-    `<path d="${tips}" fill="${mix(light[light.length - 1], '#fffbe8', 0.3)}" opacity=".9"/>`;
-  return op < 1 ? `<g opacity="${op}">${out}</g>` : out;
+  const q = (v: number) => Math.round(v * 10) / 10;
+  let [x0, y0] = [q(pts[0][0]), q(pts[0][1])];
+  const v: number[] = [];
+  for (let i = 0; i < tips; i++) {
+    const [px, py] = pts[i];
+    const [nx, ny] = pts[(i + 1) % tips];
+    const mx = (px + nx) / 2;
+    const my = (py + ny) / 2;
+    const seg = Math.hypot(nx - px, ny - py);
+    const toC = Math.hypot(cx - mx, cy - my) || 1;
+    // a scoop toward the heart of the mass between two tips; about one in three bulges out a little instead
+    const pull = seg * (r() < 0.3 ? -0.2 : 0.16 + r() * 0.24);
+    const ex = q(nx);
+    const ey = q(ny);
+    v.push(q(mx + ((cx - mx) / toC) * pull) - x0, q(my + ((cy - my) / toC) * pull) - y0, ex - x0, ey - y0);
+    x0 = ex;
+    y0 = ey;
+  }
+  return `M${nums([q(pts[0][0]), q(pts[0][1])])}q${nums(v)}z`;
+}
+
+/** How a tree's crown is painted (see crown). */
+interface CrownPaint {
+  /** body tones of the foliage masses (the first is also the base of the deep shade) */
+  dark: string[];
+  /** lit tones, toward the upper left */
+  light: string[];
+  /** leaf-stroke size */
+  size: number;
+}
+
+/** A crown in two layers: paint the tree's limbs between them, so its structure shows in the gaps. */
+interface CrownLayers {
+  back: string;
+  front: string;
+}
+
+/**
+ * A tree crown in paper and ink. One ragged silhouette over every clump (and
+ * over the gaps between neighbours) is the shadowed back of the tree; the
+ * caller paints the limbs over it; then each clump's own mass sits a little up and
+ * to the left, leaving its shaded underside and the branches inside showing
+ * on the lower right. Lit masses and leaf sprays catch the light from the
+ * upper left, and sprays on the outer rim break the silhouette.
+ */
+function crown(r: () => number, clumps: Clump[], paint: CrownPaint): CrownLayers {
+  const { dark, light, size } = paint;
+  const deep = mix(dark[0], '#1c2420', 0.42);
+  const cx = clumps.reduce((t, c) => t + c[0], 0) / clumps.length;
+  const cy = clumps.reduce((t, c) => t + c[1], 0) / clumps.length;
+  let back = '';
+  clumps.forEach(([x, y, rx, ry], i) => {
+    back += ragged(r, x, y + ry * 0.06, rx * 1.1, ry * 1.06);
+    // neighbouring masses grow together, mostly: the odd gap stays open so the limbs show through
+    for (const [x2, y2, rx2, ry2] of clumps.slice(i + 1)) {
+      const near = Math.hypot(x2 - x, (y2 - y) * 1.3) < (rx + rx2) * 1.05;
+      if (near && r() < 0.7) back += ragged(r, (x + x2) / 2, (y + y2) / 2, Math.min(rx, rx2) * 0.62, Math.min(ry, ry2) * 0.6);
+    }
+  });
+  const body = dark.map(() => '');
+  let under = '';
+  let lit = '';
+  const rim = dark.map(() => '');
+  const flick = light.map(() => '');
+  // upper masses first, so the lower ones overlap them as they would from below
+  const order = [...clumps].sort((a, b) => a[1] - b[1]);
+  order.forEach(([x, y, rx, ry], i) => {
+    body[i % body.length] += ragged(r, x - rx * 0.1, y - ry * 0.14, rx * 0.84, ry * 0.78);
+    under += ragged(r, x + rx * 0.08, y + ry * 0.36, rx * 0.7, ry * 0.36);
+    lit += ragged(r, x - rx * 0.3, y - ry * 0.38, rx * 0.46, ry * 0.34);
+    // sprays of two or three leaves on the outer rim, pointing away from the heart of the crown
+    const out = Math.atan2(y - cy, x - cx);
+    const n = Math.max(3, Math.round((rx + ry) / 6));
+    for (let k = 0; k < n; k++) {
+      const a = out + (r() - 0.5) * Math.PI * 1.5;
+      const bx = x + Math.cos(a) * rx * 0.92;
+      const by = y + Math.sin(a) * ry * 0.92;
+      const deg = (a * 180) / Math.PI;
+      for (let j = 0; j < 2 + (k % 3 === 0 ? 1 : 0); j++) rim[(k + j) % rim.length] += leaf(bx, by, size * (1.5 + r() * 0.8), deg + (j - 0.5) * 30 + (r() - 0.5) * 16, size * 0.6);
+    }
+    // the lit side of each mass: flicks toward the upper left
+    for (let k = 0; k < Math.ceil(n * 0.5); k++) {
+      const a = Math.PI * (0.95 + r() * 0.75);
+      const bx = x - rx * 0.12 + Math.cos(a) * rx * 0.62;
+      const by = y - ry * 0.16 + Math.sin(a) * ry * 0.62;
+      const deg = (a * 180) / Math.PI;
+      for (let j = 0; j < 2; j++) flick[(k + j) % flick.length] += leaf(bx, by, size * (1.3 + r() * 0.6), deg + (j ? 20 : -20) + (r() - 0.5) * 14, size * 0.52);
+    }
+  });
+  return {
+    back: `<path d="${back}" fill="${deep}"/>`,
+    front:
+      rim.map((d, i) => `<path d="${d}" fill="${dark[i]}"/>`).join('') +
+      body.map((d, i) => `<path d="${d}" fill="${dark[i]}"/>`).join('') +
+      `<path d="${under}" fill="${deep}" opacity=".5"/>` +
+      `<path d="${lit}" fill="${light[0]}" opacity=".5"/>` +
+      flick.map((d, i) => `<path d="${d}" fill="${light[i]}"/>`).join(''),
+  };
 }
 
 /** Soft lobed patches in one colour (snow lying on a hedge, petals fallen in a drift). */
@@ -1072,6 +1138,8 @@ function swing(c: C): string {
   return o;
 }
 
+const PLUM_CLUMPS: Clump[] = [[104, 76, 14, 9], [126, 64, 10, 9], [168, 86, 16, 9], [150, 104, 12, 7], [118, 92, 12, 6], [176, 110, 8, 5]];
+
 function plum(c: C): string {
   const r = rng(131);
   const ink = c.s === 3 ? '#3f3638' : '#46393a';
@@ -1085,8 +1153,9 @@ function plum(c: C): string {
     [[[164, 97], [168, 82], [164, 70]], 1.4, 0.4],
   ];
   let o = shadow(140, 150, 22, 3, 0.14) + (c.s === 1 ? `<path d="${blob(r, 156, 154, 30, 4.4)}" fill="#3a3a26" opacity=".1"/>` : '');
-  o += `<path d="${branch(trunk, 8, 3.4, true)}" fill="${ink}"/>`;
-  o += limbs.map(([p, a, b]) => `<path d="${branch(p, a, b, true)}" fill="${ink}"/>`).join('');
+  const leaves = c.s === 1 ? crown(r, PLUM_CLUMPS, { dark: ['#5f8a4f', '#729a5b'], light: ['#8ab56c', '#a3c47f'], size: 1.8 }) : null;
+  o += `<path d="${branch(trunk, 8, 3.4, true)}" fill="${ink}"/>` + (leaves?.back ?? '');
+  o += `<path d="${limbs.map(([p, a, b]) => branch(p, a, b, true)).join('')}" fill="${ink}"/>`;
   // knots and bark highlights; lichen on the old trunk
   if (c.s < 3) o += `<path d="${blob(r, 137.6, 128, 1.4, 3)}${blob(r, 139, 142, 1.2, 2.4)}" fill="#9aa47a" opacity=".7"/>`;
   o += `<path d="M138 140l2 -6M141 128l-2 -5M136 112l2 -4" stroke="#7a6a68" stroke-width=".7" opacity=".6"/>`;
@@ -1120,9 +1189,8 @@ function plum(c: C): string {
     o += b + `<path d="${buds}" fill="#d98a9d"/>`;
     // fallen petals
     o += scatterDabs(r, [[140, 154, 26, 4]], 14, 0.8, 1.2, '#f3d6dc', 0.9);
-  } else if (c.s === 1) {
-    const cl: [number, number, number, number][] = [[104, 76, 14, 9], [126, 64, 10, 9], [168, 86, 16, 9], [150, 104, 12, 7], [118, 92, 12, 6], [176, 110, 8, 5]];
-    o += foliage(r, cl, 70, 1.8, ['#5f8a4f', '#729a5b'], ['#8ab56c', '#a3c47f']);
+  } else if (leaves) {
+    o += leaves.front;
     o += `<path d="${along(10).map(([x, y]) => ell(x, y + 2, 1.2, 1.2)).join('')}" fill="#b9c46a"${ol(0.25, 0.5)}/>`;
   } else if (c.s === 2) {
     const lc = ['#c9a85a', '#b98d4a', '#a8a050'];
@@ -1152,9 +1220,18 @@ function persimmon(c: C): string {
     [[[300, 88], [290, 100], [284, 108]], 1.6, 0.4],
   ];
   let o = shadow(334, 153, 24, 3.2, 0.15) + (c.s < 3 ? `<path d="${blob(r, 336, 158, 34, 5.4, 9)}" fill="#3a3a26" opacity=".1"/>` : '');
+  const cl: Clump[] = [
+    [292, 76, 18, 11], [316, 52, 18, 15], [342, 58, 20, 15], [334, 86, 22, 11], [306, 92, 14, 7], [352, 34, 12, 10], [300, 52, 10, 9], [362, 78, 10, 10],
+  ];
+  const tones: [string[], string[], number][] = [
+    [['#93b56c', '#a9c47f'], ['#c0d690', '#d3e2a6'], 2.7],
+    [['#3e6844', '#4f7a4f'], ['#6b9160', '#86a873'], 2.7],
+    [['#b8502e', '#cf7a38', '#c4552f'], ['#e0ad4f', '#e8c070', '#d99a48'], 2.3],
+  ];
+  const leaves = c.s < 3 ? crown(r, cl, { dark: tones[c.s][0], light: tones[c.s][1], size: tones[c.s][2] }) : null;
   o += `<path d="${branch(trunk, 10, 5)}" fill="${bark}"/>`;
   o += `<path d="M330 148q-2 -8 0 -16M333 128q2 -6 -1 -12" stroke="#7d6c62" stroke-width=".8" fill="none" opacity=".6"/>`;
-  o += limbs.map(([p, a, b]) => `<path d="${branch(p, a, b)}" fill="${bark}"/>`).join('');
+  o += (leaves?.back ?? '') + `<path d="${limbs.map(([p, a, b]) => branch(p, a, b)).join('')}" fill="${bark}"/>`;
   o += `<path d="${streaks(r, [[331, 136, 2, 12], [327, 108, 1.6, 8]], 6, 7, -92, 0.4, 10)}" fill="#8f7d70" opacity=".6"/>`;
   let tw = '';
   for (const [p] of limbs) {
@@ -1164,10 +1241,7 @@ function persimmon(c: C): string {
       tw += `M${x} ${y}q${n1(Math.cos(a) * 3)} ${n1(Math.sin(a) * 3 - 1)} ${n1(Math.cos(a) * 7)} ${n1(Math.sin(a) * 7)}`;
     }
   }
-  o += `<path d="${tw}" stroke="${bark}" stroke-width=".7" fill="none"/>`;
-  const cl: [number, number, number, number][] = [
-    [292, 76, 18, 11], [316, 52, 18, 15], [342, 58, 20, 15], [334, 86, 22, 11], [306, 92, 14, 7], [352, 34, 12, 10], [300, 52, 10, 9], [362, 78, 10, 10],
-  ];
+  o += `<path d="${tw}" stroke="${bark}" stroke-width=".7" fill="none"/>` + (leaves?.front ?? '');
   const fruitAt = (n: number) => {
     let f = '';
     let hi = '';
@@ -1182,10 +1256,9 @@ function persimmon(c: C): string {
     }
     return `<path d="${f}" fill="#e57f2a"${ol(0.35, 0.7)}/><path d="${f}" fill="${lin(c, 'fruitsh', [[0, '#000', 0], [0.55, '#000', 0], [1, '#7a2a10', 0.45]])}"/><path d="${hi}" fill="#fbd29a" opacity=".9"/><path d="${cx}" stroke="#4d5a30" stroke-width=".8" stroke-linecap="round"/>`;
   };
-  if (c.s === 0) o += foliage(r, cl, 110, 2.7, ['#93b56c', '#a9c47f'], ['#c0d690', '#d3e2a6'], 0.95);
-  else if (c.s === 1) o += foliage(r, cl, 140, 2.7, ['#3e6844', '#4f7a4f'], ['#6b9160', '#86a873']) + fruitAt(8).replace(/#e57f2a/, '#a9b866').replace(/#f8c37c/, '#d3dc96');
-  else if (c.s === 2) o += foliage(r, cl, 120, 2.3, ['#b8502e', '#cf7a38', '#c4552f'], ['#e0ad4f', '#e8c070', '#d99a48'], 0.92) + fruitAt(24);
-  else {
+  if (c.s === 1) o += fruitAt(8).replace(/#e57f2a/, '#a9b866').replace(/#f8c37c/, '#d3dc96');
+  else if (c.s === 2) o += fruitAt(24);
+  else if (c.s === 3) {
     o += `<path d="${snowAlong(r, trunk, 8)}${limbs.map(([p, a]) => snowAlong(r, p, a)).join('')}"${SNOW_STROKE}/>`;
     o += fruitAt(7);
   }
@@ -1530,10 +1603,7 @@ function maple(c: C): string {
     [[[44, 198], [28, 196], [16, 190]], 1.6, 0.4],
   ];
   let o = shadow(42, 216, 18, 2.6, 0.15) + (c.s < 3 ? `<path d="${blob(r, 74, 222, 50, 7, 10)}" fill="#3a3a26" opacity=".1"/>` : '');
-  o += `<path d="${branch(trunk, 7, 3.4)}" fill="${bark}"/>`;
-  o += limbs.map(([p, a, b]) => `<path d="${branch(p, a, b)}" fill="${bark}"/>`).join('');
-  o += `<path d="${streaks(r, [[42, 206, 1.4, 6], [48, 190, 1.2, 4]], 4, 6, -70, 0.35, 10)}" fill="#8a7468" opacity=".7"/>`;
-  const cl: [number, number, number, number][] = [
+  const cl: Clump[] = [
     [18, 164, 20, 10], [50, 152, 20, 12], [86, 158, 20, 11], [66, 136, 14, 10], [108, 172, 13, 8], [-2, 160, 10, 8], [36, 140, 12, 9], [28, 182, 12, 6],
   ];
   const leafCols = [
@@ -1541,9 +1611,13 @@ function maple(c: C): string {
     [['#4f7a45', '#628c50'], ['#7ea866', '#94b877']],
     [['#a8352a', '#c4452f'], ['#d4643c', '#e08a4a']],
   ];
-  if (c.s < 3) {
+  const leaves = c.s < 3 ? crown(r, cl, { dark: leafCols[c.s][0], light: leafCols[c.s][1], size: 2.1 }) : null;
+  o += `<path d="${branch(trunk, 7, 3.4)}" fill="${bark}"/>`;
+  o += `<path d="${streaks(r, [[42, 206, 1.4, 6], [48, 190, 1.2, 4]], 4, 6, -70, 0.35, 10)}" fill="#8a7468" opacity=".7"/>`;
+  o += (leaves?.back ?? '') + `<path d="${limbs.map(([p, a, b]) => branch(p, a, b)).join('')}" fill="${bark}"/>`;
+  if (leaves) {
     const [dk, lt] = leafCols[c.s];
-    o += foliage(r, cl, 150, 2.1, dk, lt);
+    o += leaves.front;
     const mp = mapleDef(c);
     let lv = '';
     for (let k = 0; k < 22; k++) {
@@ -1849,7 +1923,10 @@ function wisteria(c: C): string {
     return g.map((d, i) => `<path d="${d}" fill="${cols[i]}"/>`).join('');
   };
   if (s === 0) o += spray(['#8fb070', '#a9c487', '#c2d69e'], 36);
-  else if (s === 1) o += foliage(r, top, 70, 1.8, ['#4f7a4f', '#5f8a58'], ['#77a06a', '#8fb47a']);
+  else if (s === 1) {
+    const leaves = crown(r, top, { dark: ['#4f7a4f', '#5f8a58'], light: ['#77a06a', '#8fb47a'], size: 1.8 });
+    o += leaves.back + leaves.front;
+  }
   else if (s === 2) o += spray(['#d4b04e', '#c99a3e', '#e0c46a', '#b98a3a'], 40);
   // front beam
   o += `<path d="M${FB[0][0]} ${FB[0][1]}L${FB[1][0]} ${FB[1][1]}V${FB[1][1] + 3.6}L${FB[0][0]} ${FB[0][1] + 3.6}Z" fill="${wood}"${ol(0.45, 0.7)}/><path d="M${FB[0][0]} ${FB[0][1]}L${FB[1][0]} ${FB[1][1]}" stroke="${woodL}" stroke-width=".6"/>`;
@@ -1931,7 +2008,7 @@ function bonsai(c: C): string {
   let sn = '';
   const r = rng(231);
   for (const [px, py, rx, ry] of pads) {
-    dk += `M${n1(x + px - rx)} ${n1(y + py + ry * 0.4)}C${n1(x + px - rx)} ${n1(y + py - ry)} ${n1(x + px + rx)} ${n1(y + py - ry * 1.2)} ${n1(x + px + rx)} ${n1(y + py + ry * 0.4)}Z`;
+    dk += ragged(r, x + px, y + py - ry * 0.2, rx, ry * 0.85);
     for (let k = 0; k < 9; k++) {
       const t = (k + 0.5) / 9;
       const nx = x + px - rx * 0.85 + t * rx * 1.7;
