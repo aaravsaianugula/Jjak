@@ -16,7 +16,7 @@ import { buildBoard, maxStones } from '../src/engine/levels';
 import { Session } from '../src/engine/session';
 import { emit } from '../src/services/events';
 import { boardReport } from '../src/services/meta';
-import { recordClear } from '../src/services/progress';
+import { lanternGift, recordClear } from '../src/services/progress';
 import { ENDLESS_CAP, hydrateEndless, hydrateJourney } from '../src/services/save-journey';
 import { defaultSave, save } from '../src/services/storage';
 import { FAST, road } from './endless-helpers';
@@ -255,15 +255,18 @@ describe('pre-generation and rewards', () => {
     s.pairsMade = s.totalPairs;
     s.score = 3000;
     s.finishedAt = 30_000;
-    const hints = save.hints;
+    const tools = { hints: save.hints, shuffles: save.shuffles };
     const xp = save.meta.xp;
     emit('start', { session: s });
     const summary = recordClear(s);
     emit('clear', { session: s, summary });
     expect(summary.firstClear).toBe(true);
     expect(summary.petals).toBeGreaterThan(0);
-    expect(summary.lantern).toBeDefined(); // 612 is a lantern level (every 4th)
-    expect(save.hints).toBeGreaterThan(hints);
+    // 612 is a lantern level (every 4th) and a chapter end: the chapter gift rides on the lantern.
+    // It is petals now, not a hint and a shuffle (tools come only from an ad or the petal price).
+    expect(summary.lantern).toEqual({ petals: lanternGift(612) });
+    expect(lanternGift(612)).toBeGreaterThan(lanternGift(608));
+    expect({ hints: save.hints, shuffles: save.shuffles }).toEqual(tools);
     const place = routeOf(612).chapter;
     expect(place).toBe(ROUTE[0]);
     expect(summary.stamp).toMatchObject({ id: place.id, year: 1 });

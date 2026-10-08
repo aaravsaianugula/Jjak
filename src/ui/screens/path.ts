@@ -43,14 +43,12 @@ const TIER_LABEL = { 1: 'Light', 2: 'Steady', 3: 'Long' } as const;
 /** The rank seal: a vermilion square with the rank number, like a dojang. */
 const rankSeal = (r: number, cls = '') => `<span class="fp-seal ${cls}" aria-hidden="true"><b>${r}</b></span>`;
 
-function chips(r: Reward, small = false): string {
+function chips(r: Reward): string {
   const out: string[] = [];
   const c = (cls: string, icon: string, text: string, label: string) =>
     `<span class="chip chip--${cls}" title="${esc(label)}">${icon}<span>${text}</span></span>`;
   if (r.xp) out.push(c('xp', '', `+${fmt(r.xp)} XP`, `${r.xp} XP`));
   if (r.petals) out.push(c('petals', ICONS.petal, String(r.petals), `${r.petals} petals`));
-  if (r.hints) out.push(c('tool', pathArt('i-hint', 'chip__art'), small ? `${r.hints}` : `${r.hints} hint${r.hints > 1 ? 's' : ''}`, `${r.hints} hint${r.hints > 1 ? 's' : ''}`));
-  if (r.shuffles) out.push(c('tool', pathArt('i-shuffle', 'chip__art'), small ? `${r.shuffles}` : `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`, `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`));
   if (r.tea) out.push(c('tea', pathArt('i-tea', 'chip__art'), 'Warm tea', 'Warm tea: keeps your Daily streak through a missed day'));
   if (r.foil) out.push(c('foil', '<i class="chip__foil" aria-hidden="true">金</i>', 'Gold leaf', 'A gold-leaf edition of a card in your album'));
   for (const k of r.items ?? []) out.push(c('ex', '<i class="chip__ex" aria-hidden="true">珍</i>', esc(exclusiveName(k)), `${exclusiveName(k)} (Flower Path exclusive)`));
@@ -222,17 +220,15 @@ function announceClaims(list: RankClaimLite[]): void {
   const sum = list.reduce(
     (a, c) => ({
       petals: a.petals + c.granted.petals,
-      hints: a.hints + c.granted.hints,
-      shuffles: a.shuffles + c.granted.shuffles,
       tea: a.tea + c.granted.tea,
       foil: [...a.foil, ...c.granted.foil],
       items: [...a.items, ...c.granted.items],
     }),
-    { petals: 0, hints: 0, shuffles: 0, tea: 0, foil: [] as number[], items: [] as string[] },
+    { petals: 0, tea: 0, foil: [] as number[], items: [] as string[] },
   );
   const title = [...list].reverse().find((c) => c.title)?.title ?? null;
   if (title || sum.foil.length || sum.items.length) revealSheet(title, sum.foil, sum.items);
-  const parts = [sum.petals && `+${sum.petals} petals`, sum.hints && `+${sum.hints} hint${sum.hints > 1 ? 's' : ''}`, sum.shuffles && `+${sum.shuffles} shuffle${sum.shuffles > 1 ? 's' : ''}`, sum.tea && 'Warm tea'].filter(Boolean);
+  const parts = [sum.petals && `+${sum.petals} petals`, sum.tea && 'Warm tea'].filter(Boolean);
   toast(`Rank ${list[list.length - 1].rank} claimed${parts.length ? ` · ${parts.join(' · ')}` : ''}`);
 }
 
@@ -478,7 +474,7 @@ export function pathScreen(): Screen {
         </div>
         <div class="wchest__pips" role="progressbar" aria-label="Weekly chest" aria-valuemin="0" aria-valuemax="${w.target}" aria-valuenow="${w.count}">${pips}</div>
         <p class="wchest__note muted">${w.claimed ? `Opened. A new chest starts in ${days} day${days > 1 ? 's' : ''}.` : 'Fills a little with every mission you complete this week (Monday to Sunday).'}</p>
-        <div class="wchest__foot"><span class="chips">${chips(WEEKLY.reward, true)}</span>${w.ready ? '<button class="btn btn--accent wchest__claim" data-wclaim>Open</button>' : ''}</div>
+        <div class="wchest__foot"><span class="chips">${chips(WEEKLY.reward)}</span>${w.ready ? '<button class="btn btn--accent wchest__claim" data-wclaim>Open</button>' : ''}</div>
       </div>`),
     );
     return wrap;
@@ -501,7 +497,7 @@ export function pathScreen(): Screen {
           return `<button class="chest chest--${state}" data-chest="${ch.chapter}" data-step="${c.step}" aria-label="${esc(label)}"${state === 'ready' ? '' : ' aria-disabled="true"'}>
             <span class="chest__icon" aria-hidden="true">${pathArt(state === 'claimed' ? 'chest-empty' : 'chest', 'chest__art')}${state === 'claimed' ? `<i class="chest__done">${ICONS.check}</i>` : ''}</span>
             <span class="chest__step">${ICONS.blossom}${c.step}</span>
-            <span class="chips chips--sm">${chips(c.reward, true)}</span>
+            <span class="chips chips--sm">${chips(c.reward)}</span>
             ${state === 'ready' ? '<span class="chest__open">Open</span>' : ''}
           </button>`;
         })
@@ -666,7 +662,7 @@ export function pathScreen(): Screen {
 
 /** What came out of a chest. */
 function revealChest(name: string, g: Granted, weekly = false): void {
-  const reward: Reward = { xp: g.xp, petals: g.petals, hints: g.hints, shuffles: g.shuffles, tea: g.tea };
+  const reward: Reward = { xp: g.xp, petals: g.petals, tea: g.tea };
   const content = frag(`<div class="fp-reveal">
     <div class="fp-up__stage"><span class="fp-chest-big fp-rise-in${reducedMotion() ? ' is-still' : ''}" aria-hidden="true">${artInline(weekly ? 'bandaji-reveal' : 'chest-reveal', 'fp-chest-big__art')}</span>${petalBurstHtml(10)}</div>
     <div class="detail__kind">${esc(name)} · opened</div>

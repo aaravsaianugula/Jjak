@@ -186,8 +186,8 @@ function openGift(home: HTMLElement): void {
   if (!p) return;
   const days = GIFTS.map((g, i) => {
     const state = i < p.day ? 'done' : i === p.day ? 'now' : 'next';
-    // Each day shows what's inside: petals (more of them as the week goes on), a lantern hint, cards to shuffle, an album card.
-    const pic = g.card ? 'i-card' : g.hints && g.shuffles ? 'i-hintshuffle' : g.hints ? 'i-hint' : g.shuffles ? 'i-shuffle' : `i-petal${Math.min(3, Math.max(1, Math.round((g.petals ?? 10) / 5) - 1))}`;
+    // Each day shows what's inside: petals (a fuller handful for the bigger days), or an album card.
+    const pic = g.card ? 'i-card' : `i-petal${Math.min(3, Math.max(1, Math.round(g.petals / 5) - 1))}`;
     const icon = pathArt(pic, 'gday__art');
     return `<li class="gday gday--${state}" aria-label="Day ${i + 1}: ${esc(g.label)}${state === 'done' ? ', claimed' : state === 'now' ? ', today' : ''}">
       <span class="gday__n">${state === 'now' ? 'Today' : `Day ${i + 1}`}</span>

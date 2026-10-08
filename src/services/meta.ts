@@ -53,8 +53,6 @@ function addXp(n: number): void {
 
 export interface Granted {
   petals: number;
-  hints: number;
-  shuffles: number;
   tea: number;
   /** card ids newly gilded */
   foil: number[];
@@ -64,7 +62,7 @@ export interface Granted {
 
 /** Give a reward to the player. Tea over the cap and foil with nothing left to gild turn into petals. */
 export function grant(r: Reward): Granted {
-  const out: Granted = { petals: r.petals ?? 0, hints: r.hints ?? 0, shuffles: r.shuffles ?? 0, tea: 0, foil: [], items: [], xp: r.xp ?? 0 };
+  const out: Granted = { petals: r.petals ?? 0, tea: 0, foil: [], items: [], xp: r.xp ?? 0 };
   for (let i = 0; i < (r.tea ?? 0); i++) {
     if (save.streakFreezes < MAX_TEA) {
       save.streakFreezes++;
@@ -81,8 +79,6 @@ export function grant(r: Reward): Granted {
     out.items.push(key);
   }
   save.petals += out.petals;
-  save.hints += out.hints;
-  save.shuffles += out.shuffles;
   addXp(out.xp);
   persist();
   return out;

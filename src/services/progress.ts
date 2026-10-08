@@ -1,7 +1,7 @@
 import { ECONOMY, GIFTS } from '../config';
 import { ALL_CARD_IDS } from '../data/deck';
 import { ROUTE, ROUTE_LEVELS_PER_CHAPTER, routeOf } from '../data/route';
-import { localDateKey } from '../engine/levels';
+import { LEVELS_PER_CHAPTER, localDateKey } from '../engine/levels';
 import { LUCKY_PETALS, type Session, starCount, thirdStar } from '../engine/session';
 import { persist, save } from './storage';
 
@@ -13,8 +13,8 @@ export interface ClearSummary {
   drawn: number | null;
   /** daily only */
   daily?: { counted: boolean; streak: number; number: number; tea?: number };
-  /** lantern gift for every 4th Journey level */
-  lantern?: { petals: number; hints: number; shuffles: number };
+  /** lantern gift for every 4th Journey level (already added to the balance; not part of `petals`) */
+  lantern?: { petals: number };
   /** petals from lucky bonus pairs on this board (already added to the balance; not part of `petals`) */
   lucky?: number;
   /** passport stamp earned by first clearing a chapter's festival board (year ≥ 1 past level 600) */
@@ -56,6 +56,19 @@ export function drawCard(): number | null {
   return id;
 }
 
+/**
+ * Petals hung on Journey level `level`'s lantern (0 when it has none). Lanterns
+ * alternate a hint's and a shuffle's worth on top of their own petals, and the
+ * lantern at a chapter's end also carries the chapter gift (a hint and a
+ * shuffle's worth). Tools themselves come only from a rewarded ad or the Market.
+ */
+export function lanternGift(level: number): number {
+  if (level % ECONOMY.lanternEvery !== 0) return 0;
+  const hintTurn = (level / ECONOMY.lanternEvery) % 2 === 1;
+  const chapterGift = level % LEVELS_PER_CHAPTER === 0 ? ECONOMY.hintCost + ECONOMY.shuffleCost : 0;
+  return ECONOMY.lanternPetals + (hintTurn ? ECONOMY.hintCost : ECONOMY.shuffleCost) + chapterGift;
+}
+
 /** Lucky pairs pay petals on a Journey level's first clear (and on other modes' boards, which have no replays to farm). */
 export const luckyPays = (mode: string, firstClear: boolean) => mode !== 'journey' || firstClear;
 
@@ -80,18 +93,10 @@ export function recordClear(s: Session): ClearSummary {
     save.stars[n] = Math.max(prev, stars);
     if (n >= save.level) save.level = n + 1;
     if (out.firstClear) out.drawn = drawCard();
-    if (out.firstClear && n % ECONOMY.lanternEvery === 0) {
-      // Alternate the bonus tool so both stay topped up.
-      const hint = (n / ECONOMY.lanternEvery) % 2 === 1;
-      out.lantern = { petals: ECONOMY.lanternPetals, hints: hint ? 1 : 0, shuffles: hint ? 0 : 1 };
-      save.petals += out.lantern.petals;
-      save.hints += out.lantern.hints;
-      save.shuffles += out.lantern.shuffles;
-    }
-    // A small gift at the end of each chapter.
-    if (out.firstClear && n % 12 === 0) {
-      save.hints++;
-      save.shuffles++;
+    const lantern = out.firstClear ? lanternGift(n) : 0;
+    if (lantern) {
+      out.lantern = { petals: lantern };
+      save.petals += lantern;
     }
     // The place's passport stamp, the first time its festival board is cleared.
     // Past 600 every place-year earns its own stamp on the Wanderer pages.
@@ -268,9 +273,7 @@ export function claimGift(times = 1): number | null {
   const p = pendingGift();
   if (!p) return null;
   const g = p.gift;
-  save.petals += (g.petals ?? 0) * times;
-  save.hints += (g.hints ?? 0) * times;
-  save.shuffles += (g.shuffles ?? 0) * times;
+  save.petals += g.petals * times;
   let card: number | null = null;
   if (g.card) card = drawCard();
   save.gift.day = (save.gift.day + 1) % GIFTS.length;

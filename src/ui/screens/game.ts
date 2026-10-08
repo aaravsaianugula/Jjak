@@ -1473,7 +1473,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     }
     if (summary.lantern) {
       const l = summary.lantern;
-      stagger(frag(`<div class="lantern"><span class="lantern__icon" aria-hidden="true">${ICONS.lantern}</span><span><b>Lantern gift</b><br><span class="muted">+${l.petals} petals${l.hints ? ' · +1 hint' : ''}${l.shuffles ? ' · +1 shuffle' : ''}</span></span></div>`));
+      stagger(frag(`<div class="lantern"><span class="lantern__icon" aria-hidden="true">${ICONS.lantern}</span><span><b>Lantern gift</b><br><span class="muted">+${l.petals} petals</span></span></div>`));
     }
     if (summary.lucky) {
       stagger(frag(`<div class="lucky-reward"><span class="lucky-reward__mark ja" aria-hidden="true">福</span><span><b>Lucky pair</b><br><span class="muted">+${summary.lucky} petals</span></span></div>`));
