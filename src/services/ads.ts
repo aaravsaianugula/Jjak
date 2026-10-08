@@ -10,6 +10,7 @@
 import { Capacitor } from '@capacitor/core';
 import {
   AdMob,
+  AdmobConsentDebugGeography,
   AdmobConsentStatus,
   BannerAdPluginEvents,
   BannerAdPosition,
@@ -18,6 +19,13 @@ import {
 } from '@capacitor-community/admob';
 import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
 import { music } from './music';
+
+/**
+ * QA builds only: `VITE_UMP_DEBUG_DEVICE=<hashed device id>` (UMP logs it as
+ * addTestDeviceHashedId("…")) makes that phone appear to be in the EEA, so the
+ * consent form can be tested. Release builds never set it.
+ */
+const UMP_DEBUG_DEVICE: string = import.meta.env.VITE_UMP_DEBUG_DEVICE ?? '';
 import { persist, save } from './storage';
 
 const native = Capacitor.isNativePlatform();
@@ -56,7 +64,10 @@ class AdService {
 
   private async doStart() {
     const p = AD_PROFILE;
-    let info = await AdMob.requestConsentInfo({ tagForUnderAgeOfConsent: p.underConsent });
+    let info = await AdMob.requestConsentInfo({
+      tagForUnderAgeOfConsent: p.underConsent,
+      ...(UMP_DEBUG_DEVICE ? { debugGeography: AdmobConsentDebugGeography.EEA, testDeviceIdentifiers: [UMP_DEBUG_DEVICE] } : {}),
+    });
     if (info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) {
       info = await AdMob.showConsentForm();
     }

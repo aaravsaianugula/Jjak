@@ -2,7 +2,8 @@
 // Debug builds only: release builds don't expose the WebView to the inspector.
 //
 //   node scripts/device-play.mjs play [--seconds 60]        play boards with the hint button (pair it with
-//                                                         PLAY_SECONDS=60 scripts/device-qa.sh for frame pacing)
+//                    [--boards N]                         PLAY_SECONDS=60 scripts/device-qa.sh for frame pacing);
+//                                                         --boards stops on the Nth result sheet
 //   node scripts/device-play.mjs seed --level 601         TEST INSTALLS ONLY: overwrites the save (onboarded, stars
 //                                                         for every level below, plenty of hints), then force-stops
 //   node scripts/device-play.mjs endless [--boards 3]     from a seeded level past 600: cold start, tap Continue at
@@ -166,6 +167,7 @@ if (cmd === 'seed') {
   console.log(`Seeded level ${level}; the app is stopped.`);
 } else if (cmd === 'play') {
   const until = Date.now() + 1000 * Number(arg('seconds', 60));
+  const stopAfter = Number(arg('boards', Infinity));
   const { browser, page, cdp } = await connect();
   let boards = 0;
   while (Date.now() < until) {
@@ -173,6 +175,7 @@ if (cmd === 'seed') {
     await page.waitForSelector('.screen.game', { timeout: 20000 });
     const r = await playBoard(cdp, page, until);
     if (r === 'clear') boards++;
+    if (boards >= stopAfter) break;
     if (r === 'stuck') throw new Error('Stuck: no hint pair and no result screen');
     if (r === 'clear') {
       await sleep(1500);
