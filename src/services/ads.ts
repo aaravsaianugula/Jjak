@@ -37,13 +37,14 @@ const native = Capacitor.isNativePlatform();
 /**
  * Jjak's Play Console target audience is 13+, so it is not in the Families
  * programme: no age gate, no child-directed tagging. Ads are capped at
- * Parental Guidance so they stay in keeping with an "Everyone"-rated game
- * played by teens.
+ * General audiences (G), the strictest rating, so they stay calm and in keeping with
+ * an "Everyone"-rated game. Category blocking and display-only interstitials are set
+ * in the AdMob console (docs/PLAY_STORE_RELEASE.md §2).
  */
 const AD_PROFILE = {
   child: false,
   underConsent: false,
-  rating: MaxAdContentRating.ParentalGuidance,
+  rating: MaxAdContentRating.General,
 };
 
 class AdService {
@@ -261,7 +262,7 @@ function adBreakNotice(): Promise<void> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.className = 'ad-break';
-    el.innerHTML = '<div class="ad-break__card"><span class="seal seal--sm">짝</span><div><b>Short break</b><br><span>An ad keeps Jjak free. Back in a moment.</span></div></div>';
+    el.innerHTML = '<div class="ad-break__card"><span class="seal seal--sm">짝</span><div><b>Short break</b><br><span>An ad keeps Jjak free. Back in a moment.</span><br><small>Remove ads any time in Settings.</small></div></div>';
     document.body.append(el);
     setTimeout(() => {
       el.remove();

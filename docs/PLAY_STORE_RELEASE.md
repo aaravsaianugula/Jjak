@@ -132,6 +132,25 @@ Steps:
 7. While testing on your phone, register it as a **test device**: AdMob → *Settings → Test
    devices → Add test device* → Android, with the phone's advertising ID (phone *Settings →
    Google → All services → Ads*). Never tap your own live ads.
+8. **Keep the ads calm and in keeping with the game.** The app already caps every request at
+   **G** (general audiences, `src/services/ads.ts` `AD_PROFILE`), shows interstitials only
+   between boards, and never more than one per 3 boards / 150 s. The rest is console-only:
+   - *Apps → Jjak → Blocking controls → Content* → **Maximum ad content rating: G** (matches
+     the app; the stricter of the two wins).
+   - *Blocking controls → Sensitive categories* → block all of them (dating, gambling and
+     lotteries, alcohol, politics, religion, get-rich-quick, cosmetic procedures and the rest).
+   - *Blocking controls → General categories* → block any that feel loud for a calm puzzle
+     (for example *Shooter/action games*, *Social casino*), keeping *Games → Puzzle & word*,
+     *Arts & entertainment*, *Books & literature* and *Hobbies & leisure*, which fit Jjak.
+   - *Ad units → jjak-interstitial → Advanced settings → Ad type* → **Display** only (untick
+     Video), so a break is a still image, never a loud video. Rewarded stays video: the
+     player chooses it.
+   - *Blocking controls → Ad review center* → after launch, review the first week's ads and
+     block any that look off; this applies within hours, no new build.
+   - Link the Play listing (step 1) once it's live: AdMob then knows Jjak is a puzzle game,
+     and contextual demand leans toward related apps and games.
+   The plugin has no per-request content URL or keywords on Android, so these console
+   settings are where relevance is steered.
 
 > ⚠️ Until the IDs are replaced the app shows Google *test* ads and earns nothing. That's
 > intended for development.

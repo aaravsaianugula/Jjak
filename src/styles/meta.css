@@ -1263,6 +1263,22 @@ ol.road::before {
 .bundles {
   margin-top: 8px;
 }
+.noads {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.noads > span {
+  flex: 1;
+  min-width: 0;
+}
+.noads .btn {
+  flex: none;
+}
 .bundles__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

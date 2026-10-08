@@ -32,7 +32,7 @@ export const AD_POLICY = {
   /** shown before an interstitial so it never arrives unannounced */
   adBreakNoticeMs: 900,
   /** at most one gentle "remove ads" mention per day, after this many interstitials */
-  upsellAfterInterstitials: 3,
+  upsellAfterInterstitials: 1,
 };
 
 /**

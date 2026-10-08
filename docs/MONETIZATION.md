@@ -49,7 +49,7 @@ shaming, no fake countdown offers, and no ads that block progress.
 | Rush "Keep going +20 s" | Rewarded | Rush time runs out | Opt-in, once per run. This is the highest-intent placement. |
 | Daily gift ×2 | Rewarded | Gift sheet | Opt-in, once per day. |
 | Between boards | Interstitial | After a board, before the next one starts | Never before level 5, at most 1 per 3 boards and 150 s, never within **6 minutes of a rewarded ad**, always preceded by a **"Short break" notice**, never mid-puzzle. |
-| Home and Album | Adaptive banner | On menus only | Never over the board. |
+| Home and Album | Adaptive banner | On menus only | Never over the board. Home says beside it that ads can be removed. |
 | App-open | — | — | **Not used**: high annoyance, low value for a puzzle game. |
 
 All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without touching game code.
@@ -63,8 +63,13 @@ All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without 
   chooses them and some players like the rewards.
 * Ownership is re-checked with Play on every launch. "Restore purchase" is in Settings,
   and resetting progress never removes the purchase.
-* The only nudges: a Settings row, and a small text link on the result sheet **at most once
-  a day, and only after 3+ interstitials**. No pop-ups.
+* Where players learn they can remove ads (all quiet text, no pop-ups): a Settings row; a
+  Remove ads card in Market → Tools → Support Jjak; one line above the banner on Home
+  ("Ads keep Jjak free · Remove ads for $2.99"); a line on every "Short break" card; and a
+  small text link on the result sheet **at most once a day, from the first interstitial on**.
+  The Home line and the Market card appear only when Play has the product (no dead buttons).
+* Ads themselves are capped at **G** in code, and the AdMob console blocks sensitive
+  categories and keeps interstitials to still images (PLAY_STORE_RELEASE.md §2, step 8).
 * Implemented with `@capgo/native-purchases` (Capacitor 8, Google Play Billing). Purchases
   are auto-acknowledged.
 

@@ -708,6 +708,14 @@ export function bundlesSection(): HTMLElement | null {
     const owned = save.meta.supporter;
     el.innerHTML = `
       <h2 class="section-label" id="bundles-h">Support Jjak <span>Optional</span></h2>
+      ${
+        save.adFree
+          ? ''
+          : `<div class="panel noads">
+        <span><b>Remove ads</b><span class="muted"> · one-time purchase</span><br><span class="muted">No ads between boards and no banners. Reward ads you choose stay optional.</span></span>
+        <button class="btn btn--ghost" data-noads${native && store.available ? '' : ' disabled'}>${native ? esc(store.price) : 'On Android'}</button>
+      </div>`
+      }
       <div class="bundles__grid">
         ${IAP.pouches
           .map(
@@ -753,6 +761,15 @@ export function bundlesSection(): HTMLElement | null {
         toast(`+${fmt(p.petals)} petals. Thank you!`);
         document.dispatchEvent(new CustomEvent('jjak:petals'));
       } else if (res === 'pending') toast('Payment pending. Your petals arrive as soon as it completes.');
+      return;
+    }
+    const noads = t.closest<HTMLButtonElement>('[data-noads]');
+    if (noads && !noads.disabled) {
+      noads.disabled = true;
+      if (await store.buyRemoveAds()) {
+        toast('Thank you! Ads are gone. Rewards you choose stay optional.');
+        render();
+      } else noads.disabled = false;
       return;
     }
     const sup = t.closest<HTMLButtonElement>('[data-supporter]');
