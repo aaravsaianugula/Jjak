@@ -275,8 +275,19 @@ function lazyPaint(wrap: HTMLElement, blank: Paint, fill: Paint, now: boolean) {
     pumpLazy();
   }
 }
-const lazyArt = (wrap: HTMLElement, blank: string, fill: () => string, now: boolean) =>
-  lazyPaint(wrap, () => (wrap.innerHTML = blank), () => (wrap.innerHTML = fill()), now);
+/** lazyPaint for previews that are plain markup. */
+function lazyArt(wrap: HTMLElement, blank: string, fill: () => string, now: boolean) {
+  lazyPaint(
+    wrap,
+    () => {
+      wrap.innerHTML = blank;
+    },
+    () => {
+      wrap.innerHTML = fill();
+    },
+    now,
+  );
+}
 
 function itemArt(it: MarketItem, big = false): HTMLElement {
   const wrap = h('span', { class: `mk-art mk-art--${it.category}${big ? ' mk-art--big' : ''}`, 'aria-hidden': 'true' });
