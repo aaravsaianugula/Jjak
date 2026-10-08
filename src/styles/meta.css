@@ -1302,6 +1302,10 @@ ol.road::before {
 .noads-sheet__later {
   margin-top: -4px;
 }
+.noads-sheet__later .btn {
+  padding-inline: 8px;
+  white-space: nowrap;
+}
 /* The festival week: its seal pressed beside its date and names, over a hairline of ink. */
 .noads-fest {
   display: flex;
