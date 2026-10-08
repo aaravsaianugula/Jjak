@@ -185,10 +185,6 @@ defineArt('m-zen', '0 0 32 32', () => {
 
 // ── Small reward icons (chips, gift calendar) ──
 
-defineArt('i-hint', '0 0 24 24', () => lantern(12, 0.8, 0.34));
-defineArt('i-shuffle', '0 0 24 24', () =>
-  P(taperStroke([[3.6, 7.4], [8, 3.2], [13, 2], [19.6, 4.6]], 1.4, 0.3), '#c99a48') + cardUse('back', 9, 14.4, 10.4, -16) + cardUse('back', 15.2, 13.4, 10.4, 12),
-);
 defineArt('i-tea', '0 0 24 24', () =>
   S('M10 9C8.6 7 11 5.6 9.8 3.2M13.6 9C12.4 6.6 14.6 5.4 13.4 2.6', 'url(#mka-steam)', 1.1) +
   P('M3.6 11.6C3.8 16.6 7.4 20.6 12 20.6S20.2 16.6 20.4 11.6Z', 'url(#mka-celadon)', ` stroke="${LINE}" stroke-width=".7"`) +
@@ -207,7 +203,6 @@ const petal = (x: number, y: number, s: number, deg: number, fill = '#d98a98') =
 defineArt('i-petal1', '0 0 24 24', () => petal(12, 12, 0.9, 0));
 defineArt('i-petal2', '0 0 24 24', () => petal(9, 13, 0.72, -22, '#e3a5b0') + petal(15, 11.6, 0.76, 16));
 defineArt('i-petal3', '0 0 24 24', () => petal(7.6, 14, 0.64, -34, '#e3a5b0') + petal(16.4, 14, 0.64, 32, '#e3a5b0') + petal(12, 10.6, 0.72, 0));
-defineArt('i-hintshuffle', '0 0 24 24', () => cardUse('back', 16, 14, 9.6, 12) + lantern(7.6, 1.6, 0.3));
 
 /** The lantern gift on the result sheet: a lit lantern against dusk (also a CSS data URI). */
 defineArt('lantern-gift', '0 0 40 40', () =>

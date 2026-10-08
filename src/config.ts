@@ -70,20 +70,25 @@ export const ECONOMY = {
   zenPetals: 3,
   /** every Nth Journey level (first clear) hangs a lantern gift */
   lanternEvery: 4,
+  /** a lantern's own petals, before the hint's or shuffle's worth it alternates (src/services/progress.ts lanternGift) */
   lanternPetals: 15,
   /** Rush: petals per this many points, capped */
   rushPointsPerPetal: 800,
   rushPetalCap: 25,
 };
 
-/** 7-day gift calendar. Missing a day never resets it: it simply waits. */
-export const GIFTS: { petals?: number; hints?: number; shuffles?: number; card?: boolean; label: string }[] = [
+/**
+ * 7-day gift calendar. Missing a day never resets it: it simply waits.
+ * Hints and shuffles come only from a rewarded ad or the petal price, so the
+ * days that once held a tool hold that tool's price in petals instead.
+ */
+export const GIFTS: { petals: number; card?: boolean; label: string }[] = [
   { petals: 10, label: '10 petals' },
-  { hints: 1, label: 'A hint' },
+  { petals: ECONOMY.hintCost, label: `${ECONOMY.hintCost} petals` },
   { petals: 15, label: '15 petals' },
-  { shuffles: 1, label: 'A shuffle' },
+  { petals: ECONOMY.shuffleCost, label: `${ECONOMY.shuffleCost} petals` },
   { petals: 20, label: '20 petals' },
-  { hints: 1, shuffles: 1, label: 'Hint + shuffle' },
+  { petals: ECONOMY.hintCost + ECONOMY.shuffleCost, label: `${ECONOMY.hintCost + ECONOMY.shuffleCost} petals` },
   { card: true, petals: 10, label: 'Album card' },
 ];
 

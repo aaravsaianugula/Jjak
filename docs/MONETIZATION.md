@@ -22,7 +22,7 @@ Numbers from vendor blogs are directional. Validate them with Jjak's own data (s
 | Loop | Cadence | Hook |
 |---|---|---|
 | **Combo → Fever** | Seconds | Pairs within 4 s chain 짝짝짝…. At ×5 the board blooms (**만개 · 満開**) for 6 s of double points. |
-| **Journey** | Minutes | Up to three blossoms per level, a new mechanic each season, and a **lantern gift every 4 levels** (petals + a hint or shuffle). The Home card counts down to the next lantern. |
+| **Journey** | Minutes | Up to three blossoms per level, a new mechanic each season, and a **lantern gift every 4 levels** (petals; a chapter's last lantern holds more). The Home card counts down to the next lantern. |
 | **Near miss** | Per board | Missing a blossom puts "Retry for 3 blossoms" on the result sheet, along with what you missed. |
 | **Rush** | Minutes | A 60-second score attack. Pairs add 1 s (2 s at ×3+), clearing a board adds 8 s, and boards grow as the run goes on. You chase your personal best. |
 | **Daily Jjak** | Daily | The same board worldwide, a weekday theme, a streak, a 7-day strip, and a share card. |
@@ -30,8 +30,8 @@ Numbers from vendor blogs are directional. Validate them with Jjak's own data (s
 | **Daily reminder** | Daily | Opt-in only, offered inline after your first Daily (never a pop-up). It names that day's theme ("Leaf-fall Wednesday · Daily #8 is ready"), skips days you've already played, and uses inexact alarms (no special permission). |
 | **Card sets** | Per board | Clearing a real yaku set inside one board scores a named bonus, a discovery layer for players who learn the deck. |
 | **Album, Seals, papers** | Weeks | 48 cards, 44 seals including real yaku sets, and 12 board papers. |
-| **Flower Path 꽃길 · 花道** | Every board → ~50 h | Free 100-rank track fed by XP from all play. A title every 10 ranks, a reward on every rank (petals, tools, Warm tea, gold-leaf cards), and six exclusives that can't be bought (`back:moon` r25 … `music:moonlight` r100). Rank 2 comes in the first session, rank 5 in the first hour, rank 100 at about 50 hours. |
-| **Daily missions** | Daily | Three a day (light, steady, long) drawn from 40 templates across Journey, Daily, Rush and Zen, one free swap each. Completing them fills a **weekly chest** (15 → XP, tools and a gold-leaf card). Missing days costs nothing. |
+| **Flower Path 꽃길 · 花道** | Every board → ~50 h | Free 100-rank track fed by XP from all play. A title every 10 ranks, a reward on every rank (petals, Warm tea, gold-leaf cards), and six exclusives that can't be bought (`back:moon` r25 … `music:moonlight` r100). Rank 2 comes in the first session, rank 5 in the first hour, rank 100 at about 50 hours. |
+| **Daily missions** | Daily | Three a day (light, steady, long) drawn from 40 templates across Journey, Daily, Rush and Zen, one free swap each. Completing them fills a **weekly chest** (15 → XP, petals and a gold-leaf card). Missing days costs nothing. |
 | **Star chests** | Per chapter | Three chests per 12-level chapter at 12 / 24 / 36 blossoms: a reason to replay for missing blossoms. |
 | **Gold leaf 金箔** | Months | Rare foil editions of album cards from rank rewards, weekly and 36-blossom chests, and a small chance on perfect first clears later on. Never for sale. |
 | **Warm tea** | Daily | A streak freeze (hold up to 2). Missed days are covered automatically when the Daily is next solved. |
@@ -43,7 +43,7 @@ shaming, no fake countdown offers, and no ads that block progress.
 
 | Placement | Format | When | Rules |
 |---|---|---|---|
-| Out of hints or shuffles | Rewarded | Player taps Hint/Shuffle with none left | Opt-in. +1 on completion only. |
+| Out of hints or shuffles | Rewarded | Player taps Hint/Shuffle with none left | Opt-in. +1 on completion only. With buying for petals, this is the only way to get more tools. |
 | Double petals | Rewarded | Result sheet | Opt-in, once per board. |
 | Draw one more card | Rewarded | Result sheet | Opt-in, until the album is complete. |
 | Rush "Keep going +20 s" | Rewarded | Rush time runs out | Opt-in, once per run. This is the highest-intent placement. |
@@ -86,8 +86,13 @@ in one quiet "Support Jjak" section of the Market (`bundlesSection()` in
   pouches cost a little less per petal, simply because the prices step that way.
 * **No pay-to-skip:** petals buy cosmetics, garden pieces and tools. Journey levels,
   ranks, titles, the Flower Path exclusives and gold leaf can't be bought. For scale, a
-  steady player earns about 300 petals an hour, so the large pouch is roughly 13 hours of
-  play and the whole Market (~12,000) about 40.
+  steady player earns about 460 petals an hour, so the large pouch is roughly 9 hours of
+  play and the whole Market (~12,000) about 26.
+* **Tools come from ads or petals only:** players start with 5 hints and 5 shuffles. More
+  come only from the rewarded ad on the "Out of hints" sheet or the petal price (20 a hint,
+  15 a shuffle, or threes in the Market's Tools tab). Every other reward that once held a
+  tool (gift calendar, rank rewards, star and weekly chests, lanterns, the chapter gift)
+  gives that tool's price in petals instead (`tests/rewards.test.ts`).
 * **Paid seal is opt-in:** the Supporter seal joins the seal book only for owners, so
   completing the book never requires a purchase.
 * **Consumables are consumed** right after the petals are credited and saved. A

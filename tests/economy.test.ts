@@ -15,6 +15,7 @@ import {
   CHEST_STEPS, MAX_RANK, MAX_TEA, MISSION_REWARD, STAR_CHESTS, TEA_FALLBACK_PETALS, WEEKLY, XP,
   rankOf, rankReward, xpForRank,
 } from '../src/data/meta';
+import { lanternGift } from '../src/services/progress';
 
 /** Assumptions about the steady player (documented in EXPANSION_PLAN §1). */
 const PLAYER = {
@@ -99,7 +100,7 @@ function simulate(totalHours = 60): SimOut {
     tick(PLAYER.dailyMinutes, PLAYER.dailyPairs * XP.pair + XP.clear + PLAYER.dailyStars * XP.perStar + XP.daily);
     add('daily', ECONOMY.dailyPetals);
     const g = GIFTS[(day - 1) % GIFTS.length];
-    add('gift calendar', g.petals ?? 0);
+    add('gift calendar', g.petals);
     // Mission-driven boards: Rush and Zen
     for (let i = 0; i < PLAYER.rushRunsPerDay; i++) {
       tick(PLAYER.rushMinutes, PLAYER.rushPairs * XP.pair + Math.min(XP.rushCap, Math.floor(PLAYER.rushScore / XP.rushPointsPerXp)));
@@ -116,7 +117,7 @@ function simulate(totalHours = 60): SimOut {
       const stars = PLAYER.firstStars;
       tick(minutesFor(pairs), pairs * XP.pair + XP.clear + stars * XP.perStar + XP.firstClear);
       add('journey blossoms', stars * ECONOMY.petalsPerStar);
-      if (level % ECONOMY.lanternEvery === 0) add('lanterns', ECONOMY.lanternPetals);
+      add('lanterns', lanternGift(level));
       if (level >= PLAYER.luckyFrom && level % PLAYER.luckyEvery === 0) add('lucky cards (est.)', PLAYER.luckyPetals);
       let final = stars;
       if (level % PLAYER.replayEvery === 0) {
@@ -198,9 +199,15 @@ describe('Flower Path economy (steady player)', () => {
     );
   });
 
-  it('lands near 300 petals per hour', () => {
-    expect(perHour).toBeGreaterThan(270);
-    expect(perHour).toBeLessThan(330);
+  // Until 2026-10-07 this was "near 300 petals per hour" (292/h measured), with
+  // another ≈169/h of value handed out as free hints and shuffles. The owner
+  // made every free tool grant petals of the same value (ECONOMY.hintCost per
+  // hint, ECONOMY.shuffleCost per shuffle: gift calendar, rank rewards, star
+  // chests, the weekly chest, lanterns and the chapter gift), so the petal rate
+  // rises to ≈461/h while the total value a steady player earns is unchanged.
+  it('lands near 460 petals per hour (≈300 earned as petals + ≈160 that used to be free tools)', () => {
+    expect(perHour).toBeGreaterThan(430);
+    expect(perHour).toBeLessThan(490);
   });
 
   it('reaches rank 100 near 50 hours', () => {

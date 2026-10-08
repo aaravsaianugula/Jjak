@@ -15,12 +15,16 @@ breaking the calm, fair tone.
 | Album, garden, Market browsing (meta time) | | | 1–2 |
 | **Total** | | | **≈ 50** |
 
-Flower Path (rank track, 100 ranks) and the Market price list are tuned to the same
-clock. A steady player reaches rank 100 and can afford roughly the whole Market at
-around 50 hours.
+Flower Path (rank track, 100 ranks) and the Market price list were tuned to the same
+clock: a steady player reaches rank 100 at around 50 hours. Since hints and shuffles became
+petal-only (2026-10-07), the petals for the whole Market arrive at about 26 hours, less
+whatever the player spends on tools.
 
-**Economy target:** about **300 petals per hour** of active play, from all sources together
-(stars, lanterns, Daily, missions, rank rewards, lucky cards, chests). The Market's
+**Economy target:** about **460 petals per hour** of active play, from all sources together
+(stars, lanterns, Daily, missions, rank rewards, lucky cards, chests). Until 2026-10-07 it
+was about 300 an hour plus roughly 170 an hour of value as free hints and shuffles; tools
+now come only from a rewarded ad or the petal price, so every reward that held a tool pays
+its price in petals (20 a hint, 15 a shuffle) and the total value is unchanged. The Market's
 cosmetics + garden total is about **12,000 petals**. The cheapest items cost 60–150, so the
 first purchase happens in the first session.
 
@@ -28,19 +32,20 @@ first purchase happens in the first session.
 to print the table). A steady player, ~50 min a day: the Daily, two Rush runs and two Zen
 boards from missions, Journey for the rest (≈2.8 min a board, a replay for one level in
 three), two blossoms on a first clear, three missions a day with the hard one done 70% of
-days. Over 50.7 h they reach Journey level ~620 and earn **≈ 15,960 petals = 315 / h**:
+days. Over 50.6 h they reach Journey level ~550 and earn **≈ 23,330 petals = 461 / h**:
 
 | Source | Petals / h | | Source | Petals / h |
 |---|---|---|---|---|
-| Journey blossoms | 143 | | Rush | 16 |
-| Lanterns | 46 | | Missions | 16 |
-| Seals (old + new) | 24 | | Lucky cards (estimate: 10 on 1 board in 8 from level 61) | 14 |
-| Flower Path rank rewards | 19 | | Gift calendar | 9 |
-| Daily | 17 | | Zen | 7 |
-| Star chests | 4 | | Weekly chest (XP, tools, gold leaf; no petals) | 0 |
+| Journey blossoms | 127 | | Daily | 17 |
+| Lanterns (with the chapter gift) | 119 | | Rush | 16 |
+| Star chests | 53 | | Missions | 16 |
+| Flower Path rank rewards | 40 | | Lucky cards (estimate: 10 on 1 board in 8 from level 61) | 12 |
+| Seals (old + new) | 24 | | Weekly chest | 9 |
+| Gift calendar | 21 | | Zen | 7 |
 
-The base game alone already gives ~270 / h, so the Progression pillar pays mostly in XP,
-tools, Warm tea, gold leaf and exclusives and adds only ~45 petals / h. **XP:** ≈ 76,500 by
+Lanterns, star chests, rank rewards, the gift calendar and the weekly chest include the
+petals that replaced their old hints and shuffles (≈ 169 / h). The Progression pillar
+still pays mostly in XP, Warm tea, gold leaf and exclusives. **XP:** ≈ 76,500 by
 50 h; the curve (`CURVE` in `src/data/meta.ts`: 80 XP to rank 2, then 180 + 12.1·(r−1))
 puts **rank 2 at 5 min, rank 5 at 38 min, rank 10 at 1.5 h, rank 25 at 5.2 h, rank 50 at
 15 h, rank 70 at 27 h, rank 85 at 37 h and rank 100 at 49.9 h.** About 22 gold-leaf cards

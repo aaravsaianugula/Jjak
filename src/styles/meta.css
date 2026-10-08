@@ -106,18 +106,6 @@
   color: var(--gold-text);
   background: color-mix(in srgb, var(--gold) 13%, var(--surface));
 }
-.chip--tool svg {
-  color: var(--indigo);
-}
-:root[data-theme='ink'] .chip--tool svg,
-:root[data-theme='dark'] .chip--tool svg {
-  color: var(--ink-soft);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='paper']):not([data-theme='light']) .chip--tool svg {
-    color: var(--ink-soft);
-  }
-}
 .chip--tea svg {
   color: var(--good-text);
 }
