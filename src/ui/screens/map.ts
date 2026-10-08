@@ -16,14 +16,16 @@ import { shownSpec, shownYears } from '../../director';
 import { GOALS } from '../../engine/goals';
 import { MECHANICS } from '../../engine/mechanics';
 
+/** How far the fold's two panels overlap at their join (px). */
+const FOLD_SEAM_PX = 4;
 /** A small brushed ring: the mark of a level with a goal (its third blossom). */
 const GOAL_MARK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8C5.8 2.8 2.8 6 2.8 10s3 7.2 7.2 7.2 7.2-3 7.2-7.2c0-3.2-1.8-5.6-4.6-6.7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 import { levelsToLantern, syncStamps } from '../../services/progress';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
-import { esc, frag } from '../dom';
+import { esc, frag, h } from '../dom';
 import { ICONS } from '../icons';
-import { flip, measure, reducedMotion } from '../motion';
+import { FLIP_EASE, FLIP_MS, flip, measure, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 /** What each chapter features, for the open chapter's note. */
@@ -211,8 +213,11 @@ export function mapScreen(): Screen {
   }
 
   function relayout(was: number | null) {
+    endFold?.();
     // FLIP: the stops below the change glide to their new places (transforms
     // only) while the opened chapter's levels fade in under them.
+    const foldCard = was == null ? null : list.querySelector<HTMLElement>(`.stop[data-ch="${was}"] .stop__card`);
+    const foldFrom = foldCard?.getBoundingClientRect().height ?? 0;
     const from = Math.min(...[was, open].filter((k): k is number => k != null));
     const sc = el.querySelector<HTMLElement>('.road__list')!;
     const view = sc.getBoundingClientRect();
@@ -241,6 +246,44 @@ export function mapScreen(): Screen {
       }
     }
     flip(before);
+    if (foldCard) settleFold(foldCard, foldFrom);
+  }
+
+  /**
+   * A closing card's own height settles with the stops below instead of
+   * snapping: its paint moves to two panels behind its content, the top and a
+   * rounded tail that slides up under it in step with the FLIP (transforms only).
+   */
+  let endFold: (() => void) | null = null;
+  function settleFold(card: HTMLElement, fromH: number): void {
+    const li = card.parentElement;
+    if (!li || reducedMotion()) return;
+    li.classList.add('is-folding');
+    const toH = card.offsetHeight;
+    const dy = fromH - toH;
+    if (dy < 1) {
+      li.classList.remove('is-folding');
+      return;
+    }
+    const r = parseFloat(getComputedStyle(card).borderBottomLeftRadius);
+    const top = card.offsetTop;
+    const tail = h('i', { class: 'stop__fold stop__fold--tail', 'aria-hidden': 'true' });
+    const upper = h('i', { class: 'stop__fold stop__fold--top', 'aria-hidden': 'true' });
+    // Each panel overlaps the other by FOLD_SEAM_PX and clips it away, so
+    // neither one's edge (or the current stop's inset ring) shows at the join.
+    Object.assign(tail.style, { top: `${top + toH - r - FOLD_SEAM_PX}px`, height: `${dy + r + FOLD_SEAM_PX}px`, clipPath: `inset(${FOLD_SEAM_PX}px -48px -48px -48px)` });
+    Object.assign(upper.style, { top: `${top}px`, height: `${toH - r + FOLD_SEAM_PX}px`, clipPath: `inset(-48px -48px ${FOLD_SEAM_PX}px -48px)` });
+    li.append(tail, upper);
+    const anim = tail.animate([{ transform: 'none' }, { transform: `translateY(${-dy}px)` }], { duration: FLIP_MS, easing: FLIP_EASE, fill: 'forwards' });
+    const done = () => {
+      anim.cancel();
+      tail.remove();
+      upper.remove();
+      li.classList.remove('is-folding');
+      if (endFold === done) endFold = null;
+    };
+    endFold = done;
+    anim.onfinish = done;
   }
 
   render();

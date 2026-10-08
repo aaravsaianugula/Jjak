@@ -34,10 +34,10 @@ import { music } from '../../services/music';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { brushStroke, burstFx, type Pt } from '../brush-fx';
-import { esc, frag, h, toast } from '../dom';
+import { esc, fmt, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { type SheetHandle, openSheet } from '../modal';
-import { petalBump } from '../motion';
+import { petalBump, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 // ── Extension points ────────────────────────────────────────────────
@@ -64,8 +64,6 @@ export function bundlesSection(): HTMLElement | null {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt = (n: number) => n.toLocaleString('en-US');
 const petal = (n: number) => `<span class="mk-price__icon" aria-hidden="true">${ICONS.petal}</span><span class="num">${fmt(n)}</span>`;
 const lockIcon =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';

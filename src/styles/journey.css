@@ -204,15 +204,46 @@
 
 .stop__card {
   margin: 6px 0;
+  overflow: hidden;
+}
+.stop__card,
+.stop__fold {
   border-radius: var(--radius-md);
   background:
     linear-gradient(100deg, color-mix(in srgb, var(--acc) 9%, transparent), transparent 55%),
     var(--surface);
   box-shadow: var(--shadow);
-  overflow: hidden;
 }
-.stop.is-here .stop__card {
+.stop.is-here .stop__card,
+.stop.is-here .stop__fold {
   box-shadow: var(--shadow-lift), inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* Folding a chapter shut (map.ts settleFold): the card's paint moves to two
+   panels behind its content, the top and a rounded tail that slides up under
+   it, so its lower edge glides with the stops below instead of snapping. */
+.stop.is-folding {
+  position: relative;
+}
+.stop.is-folding .stop__card {
+  position: relative;
+  z-index: 1;
+  background: none;
+  box-shadow: none;
+}
+.stop__fold {
+  position: absolute;
+  grid-column: 2;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.stop__fold--top {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.stop__fold--tail {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 .stop__head {
   display: flex;

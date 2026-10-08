@@ -63,6 +63,12 @@ export function untrigger(node: Element | null | undefined, cls: string): void {
 
 const easeOut = (k: number) => 1 - (1 - k) ** 3;
 
+/** Smoothstep: 0 before `a`, 1 after `b`, an S-curve between. */
+export const smooth = (a: number, b: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
 /**
  * A petal balance changed: count the pill's number from `from` to `to` and give
  * the pill a small bump (`.petals.is-bump` in main.css). The number lives in
@@ -104,10 +110,13 @@ export function petalBump(
  * FLIP: animate `nodes` from where they were (`before`, from `measure`) to
  * where layout puts them now, with transforms only.
  */
+/** The FLIP glide: its length and curve, for anything that must move in step with it. */
+export const FLIP_MS = 320;
+export const FLIP_EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
 export function measure(nodes: HTMLElement[]): Map<HTMLElement, number> {
   return new Map(nodes.map((n) => [n, n.getBoundingClientRect().top]));
 }
-export function flip(before: Map<HTMLElement, number>, ms = 320): void {
+export function flip(before: Map<HTMLElement, number>, ms = FLIP_MS): void {
   if (reducedMotion()) return;
   const moved: HTMLElement[] = [];
   for (const [n, top] of before) {
@@ -121,7 +130,7 @@ export function flip(before: Map<HTMLElement, number>, ms = 320): void {
   if (!moved.length) return;
   void document.body.offsetWidth;
   for (const n of moved) {
-    n.style.transition = `transform ${ms}ms cubic-bezier(0.2, 0.8, 0.2, 1)`;
+    n.style.transition = `transform ${ms}ms ${FLIP_EASE}`;
     n.style.transform = '';
   }
   setTimeout(() => {

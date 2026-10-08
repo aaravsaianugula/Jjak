@@ -13,9 +13,9 @@ import { sfx } from '../services/audio';
 import { haptic } from '../services/haptics';
 import { persist, save } from '../services/storage';
 import { frag, h } from './dom';
+import { reducedMotion } from './motion';
 import { ICONS } from './icons';
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Where the last stamp sits in the scene (viewBox units): at the road's near end. */
 const STAMP_AT = { x: 66, y: 474, size: 80 };
