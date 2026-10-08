@@ -15,8 +15,11 @@ import {
   BannerAdPluginEvents,
   BannerAdPosition,
   BannerAdSize,
+  InterstitialAdPluginEvents,
   MaxAdContentRating,
+  RewardAdPluginEvents,
 } from '@capacitor-community/admob';
+import { playFullScreenAd } from './ad-show';
 import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
 import { music } from './music';
 
@@ -174,19 +177,23 @@ class AdService {
     await adBreakNotice();
     music.duck(true);
     try {
+      let shown: boolean;
       if (native) {
         this.interstitialLoaded = false;
-        await AdMob.showInterstitial();
+        // Ends when the ad closes; the next one is preloaded only then (see ad-show.ts).
+        ({ shown } = await playFullScreenAd(() => AdMob.showInterstitial(), {
+          onDismissed: (fn) => AdMob.addListener(InterstitialAdPluginEvents.Dismissed, fn),
+          onFailedToShow: (fn) => AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, fn),
+        }));
       } else {
-        await webStub('Interstitial ad', 'Between boards only, never mid-puzzle.', 1200);
+        shown = await webStub('Interstitial ad', 'Between boards only, never mid-puzzle.', 1200);
       }
+      if (!shown) return false; // nothing to show (no fill): the board goes on
       save.ads.clearsSinceInterstitial = 0;
       save.ads.lastInterstitialAt = Date.now();
       save.ads.interstitialsShown++;
       persist();
       return true;
-    } catch {
-      return false; // no fill: skip silently
     } finally {
       music.duck(false);
       void this.preloadInterstitial();
@@ -206,15 +213,14 @@ class AdService {
     else if (this.ready) {
       if (!this.rewardedLoaded) await this.preloadRewarded();
       if (this.rewardedLoaded) {
-        try {
-          this.rewardedLoaded = false;
-          const item = await AdMob.showRewardVideoAd();
-          ok = !!item && item.amount >= 0;
-        } catch {
-          ok = false;
-        } finally {
-          void this.preloadRewarded();
-        }
+        this.rewardedLoaded = false;
+        // Ends when the ad closes, rewarded or not (closed early, the plugin's show call never settles).
+        ({ rewarded: ok } = await playFullScreenAd(() => AdMob.showRewardVideoAd(), {
+          onDismissed: (fn) => AdMob.addListener(RewardAdPluginEvents.Dismissed, fn),
+          onFailedToShow: (fn) => AdMob.addListener(RewardAdPluginEvents.FailedToShow, fn),
+          onRewarded: (fn) => AdMob.addListener(RewardAdPluginEvents.Rewarded, fn),
+        }));
+        void this.preloadRewarded();
       }
     }
     music.duck(false);
