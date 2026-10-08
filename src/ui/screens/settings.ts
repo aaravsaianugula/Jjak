@@ -2,6 +2,8 @@ import { APP_VERSION, LINKS } from '../../config';
 import { applyCosmetics, paperName } from '../../services/market';
 import { ads } from '../../services/ads';
 import { store } from '../../services/store';
+import { Capacitor } from '@capacitor/core';
+import { openRemoveAds } from '../remove-ads';
 import { music } from '../../services/music';
 import { REMINDER_TIMES, disableReminder, enableReminder } from '../../services/reminders';
 import { resetSave, save, persist, type Theme } from '../../services/storage';
@@ -53,7 +55,7 @@ export function settingsScreen(): Screen {
       <div class="list list--icons" role="group" aria-labelledby="set-support">
         ${save.adFree
           ? `<div class="row row--feature">${row(ICONS.heart, 'Ads removed', 'Thank you for supporting Jjak. Optional reward ads stay available.')}<span class="row__end" style="color:var(--good-text)" aria-hidden="true">${ICONS.check}</span></div>`
-          : `<button class="row row--feature" data-act="buy">${row(ICONS.heart, 'Remove ads', 'No ads between boards and no banners. Rewards you choose stay optional.')}<span class="price${store.available ? '' : ' price--off'}">${store.available ? esc(store.price) : 'Android'}</span></button>`}
+          : `<button class="row row--feature" data-act="buy">${row(ICONS.heart, 'Remove ads', 'No ads between boards and no banners. Rewards you choose stay optional.')}${store.available ? `<span class="price">${esc(store.price)}</span>` : Capacitor.isNativePlatform() ? chevron : '<span class="price price--off">Android</span>'}</button>`}
         <button class="row" data-act="restore">${row(ICONS.restart, 'Restore purchase', 'Already bought it on another device?')}${chevron}</button>
       </div>
       <h2 class="section-label" id="set-help">Help &amp; privacy</h2>
@@ -115,11 +117,8 @@ export function settingsScreen(): Screen {
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'how') showHowToPlay();
     if (act === 'buy') {
-      if (!store.available) return toast('Remove ads is available in the Android app from Google Play.');
-      if (await store.buyRemoveAds()) {
-        toast('Ads removed. Thank you!');
-        nav.settings();
-      }
+      if (!Capacitor.isNativePlatform()) return toast('Remove ads is available in the Android app from Google Play.');
+      if (await openRemoveAds()) nav.settings();
     }
     if (act === 'restore') {
       const owned = await store.restore();

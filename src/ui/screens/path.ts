@@ -24,6 +24,7 @@ import {
 import { formatCountdown, msToNextDaily } from '../../services/progress';
 import { save } from '../../services/storage';
 import { store } from '../../services/store';
+import { openRemoveAds } from '../remove-ads';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { type Screen } from '../app';
@@ -713,7 +714,7 @@ export function bundlesSection(): HTMLElement | null {
           ? ''
           : `<div class="panel noads">
         <span><b>Remove ads</b><span class="muted"> · one-time purchase</span><br><span class="muted">No ads between boards and no banners. Reward ads you choose stay optional.</span></span>
-        <button class="btn btn--ghost" data-noads${native && store.available ? '' : ' disabled'}>${native ? esc(store.price) : 'On Android'}</button>
+        <button class="btn btn--ghost" data-noads${native ? '' : ' disabled'}>${native ? (store.available ? esc(store.price) : 'See more') : 'On Android'}</button>
       </div>`
       }
       <div class="bundles__grid">
@@ -765,11 +766,7 @@ export function bundlesSection(): HTMLElement | null {
     }
     const noads = t.closest<HTMLButtonElement>('[data-noads]');
     if (noads && !noads.disabled) {
-      noads.disabled = true;
-      if (await store.buyRemoveAds()) {
-        toast('Thank you! Ads are gone. Rewards you choose stay optional.');
-        render();
-      } else noads.disabled = false;
+      if (await openRemoveAds()) render();
       return;
     }
     const sup = t.closest<HTMLButtonElement>('[data-supporter]');
@@ -787,8 +784,10 @@ export function bundlesSection(): HTMLElement | null {
   render();
   if (native) {
     void store.ready.then(() => {
-      if (!store.extrasAvailable) el.remove();
-      else render();
+      if (store.extrasAvailable) return render();
+      // Pouches and the Supporter pack aren't on Play (yet): keep only the Remove ads card.
+      if (save.adFree) return el.remove();
+      el.querySelectorAll('.bundles__grid, .supporter, .bundles__fine').forEach((n) => n.remove());
     });
   }
   return el;

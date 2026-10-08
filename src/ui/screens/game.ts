@@ -25,6 +25,8 @@ import { music } from '../../services/music';
 import { REMINDER_TIMES, disableReminder, enableReminder, planReminders } from '../../services/reminders';
 import { type ClearSummary, completedMonths, luckyPays, drawCard, formatCountdown, localToday, msToNextDaily, recordClear, recordRush, type RushRecorded, shareTextFor } from '../../services/progress';
 import { store } from '../../services/store';
+import { Capacitor } from '@capacitor/core';
+import { openRemoveAds } from '../remove-ads';
 import { AD_POLICY } from '../../config';
 import { shareText } from '../../services/share';
 import { persist, save } from '../../services/storage';
@@ -1574,12 +1576,12 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     actions.append(row);
     // At most once a day, and only after a few interstitials: a quiet way out of ads.
     const today = localToday();
-    if (!save.adFree && store.available && save.ads.interstitialsShown >= AD_POLICY.upsellAfterInterstitials && save.ads.lastUpsell !== today) {
+    if (!save.adFree && Capacitor.isNativePlatform() && save.ads.interstitialsShown >= AD_POLICY.upsellAfterInterstitials && save.ads.lastUpsell !== today) {
       save.ads.lastUpsell = today;
       persist();
-      const link = h('button', { class: 'upsell' }, `Prefer no ads between boards? Remove them for ${store.price}`);
+      const link = h('button', { class: 'upsell' }, `Prefer no ads between boards? ${store.available ? `Remove them for ${store.price}` : 'Remove them'}`);
       link.addEventListener('click', async () => {
-        if (await store.buyRemoveAds()) {
+        if (await openRemoveAds()) {
           link.textContent = 'Thank you! Ads between boards are gone.';
           link.setAttribute('disabled', '');
         }

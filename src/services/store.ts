@@ -50,6 +50,12 @@ class Store {
     }
   }
 
+  /** Try Play billing again (it was offline or still starting at launch). True if Remove ads can be bought now. */
+  async retry(): Promise<boolean> {
+    if (native && !this.available) await this.initCore();
+    return this.available;
+  }
+
   private async syncOwnership(): Promise<void> {
     const { purchases } = await NativePurchases.getPurchases({ productType: PURCHASE_TYPE.INAPP });
     const done = (p: { purchaseState?: string }) => p.purchaseState === undefined || p.purchaseState === '1';

@@ -4,6 +4,8 @@ import { cardSvg } from '../../art/cards';
 import { pathArt } from '../../art/path-art';
 import { ads } from '../../services/ads';
 import { store } from '../../services/store';
+import { Capacitor } from '@capacitor/core';
+import { openRemoveAds } from '../remove-ads';
 import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
@@ -163,13 +165,16 @@ export function homeScreen(): Screen {
     if (go === 'garden') nav.garden();
     if (go === 'settings') nav.settings();
     if (go === 'path') nav.path();
-    if (go === 'noads') void removeAds(el);
+    if (go === 'noads') void openRemoveAds().then((off) => off && el.querySelector('.home__noads')?.remove());
   });
-  // Where the banner is, say plainly that it can go (once Play has the price).
-  void store.ready.then(() => {
-    if (!el.isConnected || save.adFree || !store.available) return;
-    el.append(h('button', { class: 'upsell home__noads', 'data-go': 'noads' }, `Ads keep Jjak free · Remove ads for ${store.price}`));
-  });
+  // Where the banner is, say plainly that it can go; the price joins once Play has it.
+  if (Capacitor.isNativePlatform() && !save.adFree) {
+    const line = h('button', { class: 'upsell home__noads', 'data-go': 'noads' }, 'Ads keep Jjak free · Remove ads');
+    el.append(line);
+    void store.ready.then(() => {
+      if (store.available) line.textContent = `Ads keep Jjak free · Remove ads for ${store.price}`;
+    });
+  }
   // Level 600 is behind the player but the road's reveal hasn't played yet (say the
   // app closed on the result sheet): play it before anything else.
   if (save.level > ROUTE_LEVELS && !save.journey.revealed) {
@@ -191,17 +196,6 @@ export function homeScreen(): Screen {
 }
 
 /** Daily gift calendar: seven days, never resets, optional ×2 with a rewarded ad. */
-/** Home's Remove ads line: buy, then drop the banner and the line. */
-async function removeAds(home: HTMLElement): Promise<void> {
-  const link = home.querySelector<HTMLButtonElement>('.home__noads');
-  if (!link || link.disabled) return;
-  link.disabled = true;
-  if (await store.buyRemoveAds()) {
-    link.remove();
-    toast('Thank you! Ads are gone. Rewards you choose stay optional.');
-  } else link.disabled = false;
-}
-
 function openGift(home: HTMLElement): void {
   const p = pendingGift();
   if (!p) return;

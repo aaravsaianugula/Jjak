@@ -1279,6 +1279,15 @@ ol.road::before {
 .noads .btn {
   flex: none;
 }
+/* The Remove ads offer (src/ui/remove-ads.ts) */
+.noads-sheet .supporter__list {
+  margin: 4px 0 12px;
+}
+.noads-sheet__note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
 .bundles__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
