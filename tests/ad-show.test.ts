@@ -6,13 +6,18 @@
  * ad and plays music under this one; waiting on the show call alone can hang forever.
  */
 import { describe, expect, it } from 'vitest';
-import { type AdEvents, playFullScreenAd } from '../src/services/ad-show';
+import { type AdEvents, FullScreenGate, playFullScreenAd } from '../src/services/ad-show';
 
-/** A fake plugin: listeners by event, and handles that report removal. */
-function fakeAd() {
+/**
+ * A fake plugin: a listener only hears events once its registration has gone through
+ * (a bridge round trip later, as on the device), and handles report removal.
+ */
+function fakeAd(failOn: string | null = null) {
   const listeners = new Map<string, Set<() => void>>();
   let removed = 0;
   const on = (name: string) => async (fn: () => void) => {
+    await Promise.resolve();
+    if (name === failOn) throw new Error(`addListener(${name}) failed`);
     const set = listeners.get(name) ?? new Set<() => void>();
     set.add(fn);
     listeners.set(name, set);
@@ -24,7 +29,7 @@ function fakeAd() {
     };
   };
   const emit = (name: string) => listeners.get(name)?.forEach((fn) => fn());
-  const events: AdEvents = { onDismissed: on('dismissed'), onFailedToShow: on('failed'), onRewarded: on('reward') };
+  const events: AdEvents = { onDismissed: on('dismissed'), onFailedToShow: on('failed'), onRewarded: on('reward'), onReturn: on('return') };
   const live = () => [...listeners.values()].reduce((n, s) => n + s.size, 0);
   return { events, emit, live, removed: () => removed };
 }
@@ -84,12 +89,52 @@ describe('playFullScreenAd', () => {
     expect(ad.live()).toBe(0);
   });
 
-  it('listens before showing, so a close that comes at once is not missed', async () => {
+  it('shows only once every listener is registered, so a close that comes at once is heard', async () => {
     const ad = fakeAd();
     const run = playFullScreenAd(async () => {
       ad.emit('dismissed');
     }, ad.events);
     expect(await run).toEqual({ shown: true, rewarded: false });
-    expect(ad.removed()).toBe(3);
+    expect(ad.removed()).toBe(4);
+  });
+
+  it('coming back to the app ends an ad whose close event never came', async () => {
+    const ad = fakeAd();
+    const run = playFullScreenAd(() => Promise.resolve(), ad.events);
+    await tick();
+    ad.emit('reward');
+    ad.emit('return');
+    expect(await run).toEqual({ shown: true, rewarded: true });
+    expect(ad.live()).toBe(0);
+  });
+
+  it('a listener that fails to register: nothing is shown and the others are removed', async () => {
+    const ad = fakeAd('reward');
+    let showed = false;
+    await expect(
+      playFullScreenAd(async () => {
+        showed = true;
+      }, ad.events),
+    ).rejects.toThrow('addListener(reward) failed');
+    expect(showed).toBe(false);
+    expect(ad.live()).toBe(0);
+  });
+});
+
+describe('FullScreenGate', () => {
+  it('refuses a second full-screen ad while one is up, then opens again', async () => {
+    const gate = new FullScreenGate();
+    let finish: () => void = () => {};
+    const first = gate.run(() => new Promise<boolean>((r) => (finish = () => r(true))), false);
+    expect(await gate.run(async () => true, false)).toBe(false);
+    finish();
+    expect(await first).toBe(true);
+    expect(await gate.run(async () => true, false)).toBe(true);
+  });
+
+  it('opens again when the ad throws', async () => {
+    const gate = new FullScreenGate();
+    await expect(gate.run(() => Promise.reject(new Error('boom')), false)).rejects.toThrow('boom');
+    expect(await gate.run(async () => true, false)).toBe(true);
   });
 });

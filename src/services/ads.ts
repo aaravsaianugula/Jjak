@@ -19,7 +19,7 @@ import {
   MaxAdContentRating,
   RewardAdPluginEvents,
 } from '@capacitor-community/admob';
-import { playFullScreenAd } from './ad-show';
+import { FullScreenGate, playFullScreenAd } from './ad-show';
 import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
 import { music } from './music';
 
@@ -47,12 +47,33 @@ const AD_PROFILE = {
   rating: MaxAdContentRating.General,
 };
 
+/** Back in the app with no close event from the ad: after this grace, the ad counts as closed. */
+const RETURN_GRACE_MS = 1500;
+
+/** Fires (after the grace) when the app is in front again after something covered it. */
+function onReturn(fn: () => void): Promise<{ remove: () => Promise<void> }> {
+  let away = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const watch = () => {
+    if (document.hidden) away = true;
+    else if (away) timer = setTimeout(fn, RETURN_GRACE_MS);
+  };
+  document.addEventListener('visibilitychange', watch);
+  return Promise.resolve({
+    remove: async () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', watch);
+    },
+  });
+}
+
 class AdService {
   private ready = false;
   private starting: Promise<void> | null = null;
   private bannerVisible = false;
   private interstitialLoaded = false;
   private rewardedLoaded = false;
+  private readonly fullScreen = new FullScreenGate();
   privacyOptionsRequired = false;
   /** Set by the UI to show a placeholder strip on the web demo. */
   onWebBanner: ((visible: boolean) => void) | null = null;
@@ -174,7 +195,14 @@ class AdService {
     save.ads.clearsSinceInterstitial++;
     persist();
     if (!this.interstitialDue(journeyLevelCleared)) return false;
-    if (native && (!this.ready || !this.interstitialLoaded)) return false;
+    if (native && (!this.ready || !this.interstitialLoaded)) {
+      void this.preloadInterstitial(); // a load that failed (offline launch, no fill) gets another try
+      return false;
+    }
+    return this.fullScreen.run(() => this.showInterstitial(), false);
+  }
+
+  private async showInterstitial(): Promise<boolean> {
     await adBreakNotice();
     music.duck(true);
     try {
@@ -185,6 +213,7 @@ class AdService {
         ({ shown } = await playFullScreenAd(() => AdMob.showInterstitial(), {
           onDismissed: (fn) => AdMob.addListener(InterstitialAdPluginEvents.Dismissed, fn),
           onFailedToShow: (fn) => AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, fn),
+          onReturn,
         }));
       } else {
         shown = await webStub('Interstitial ad', 'Between boards only, never mid-puzzle.', 1200);
@@ -195,6 +224,10 @@ class AdService {
       save.ads.interstitialsShown++;
       persist();
       return true;
+    } catch (err) {
+      // The plugin wouldn't take a listener: skip this ad rather than strand the player between boards.
+      console.warn('ads: interstitial skipped', err);
+      return false;
     } finally {
       music.duck(false);
       void this.preloadInterstitial();
@@ -206,25 +239,37 @@ class AdService {
     return !native || (this.ready && this.rewardedLoaded);
   }
 
-  /** Show a rewarded ad. Resolves true only if the reward was earned. */
-  async rewarded(): Promise<boolean> {
+  /** Show a rewarded ad. Resolves true only if the reward was earned; a second tap while one is up is refused. */
+  rewarded(): Promise<boolean> {
+    return this.fullScreen.run(() => this.playRewarded(), false);
+  }
+
+  private async playRewarded(): Promise<boolean> {
     let ok = false;
     music.duck(true);
-    if (!native) ok = await webStub('Rewarded ad', 'On Android a short video plays here.', 1400);
-    else if (this.ready) {
-      if (!this.rewardedLoaded) await this.preloadRewarded();
-      if (this.rewardedLoaded) {
-        this.rewardedLoaded = false;
-        // Ends when the ad closes, rewarded or not (closed early, the plugin's show call never settles).
-        ({ rewarded: ok } = await playFullScreenAd(() => AdMob.showRewardVideoAd(), {
-          onDismissed: (fn) => AdMob.addListener(RewardAdPluginEvents.Dismissed, fn),
-          onFailedToShow: (fn) => AdMob.addListener(RewardAdPluginEvents.FailedToShow, fn),
-          onRewarded: (fn) => AdMob.addListener(RewardAdPluginEvents.Rewarded, fn),
-        }));
-        void this.preloadRewarded();
+    try {
+      if (!native) ok = await webStub('Rewarded ad', 'On Android a short video plays here.', 1400);
+      else if (this.ready) {
+        if (!this.rewardedLoaded) await this.preloadRewarded();
+        if (this.rewardedLoaded) {
+          this.rewardedLoaded = false;
+          // Ends when the ad closes, rewarded or not (closed early, the plugin's show call never settles).
+          ({ rewarded: ok } = await playFullScreenAd(() => AdMob.showRewardVideoAd(), {
+            onDismissed: (fn) => AdMob.addListener(RewardAdPluginEvents.Dismissed, fn),
+            onFailedToShow: (fn) => AdMob.addListener(RewardAdPluginEvents.FailedToShow, fn),
+            onRewarded: (fn) => AdMob.addListener(RewardAdPluginEvents.Rewarded, fn),
+            onReturn,
+          }));
+        }
       }
+    } catch (err) {
+      // The plugin wouldn't take a listener: no reward, and the board carries on.
+      console.warn('ads: rewarded ad skipped', err);
+      ok = false;
+    } finally {
+      music.duck(false);
+      void this.preloadRewarded();
     }
-    music.duck(false);
     if (ok) {
       save.ads.lastRewardedAt = Date.now();
       save.ads.rewardedWatched++;

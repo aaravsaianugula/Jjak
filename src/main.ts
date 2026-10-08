@@ -14,7 +14,7 @@ import { installCardSprite } from './art/cards';
 import { ads } from './services/ads';
 import { store } from './services/store';
 import { haptic } from './services/haptics';
-import { suspendAudio } from './services/audio';
+import { resumeAudio, suspendAudio } from './services/audio';
 import { music } from './services/music';
 import { planReminders } from './services/reminders';
 import { applyCosmetics } from './services/market';
@@ -97,6 +97,7 @@ async function boot() {
       suspendAudio();
     },
     () => {
+      resumeAudio();
       if (heard) music.refresh();
     },
   );

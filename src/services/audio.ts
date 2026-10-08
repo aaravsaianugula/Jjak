@@ -18,16 +18,22 @@ export function audioContext(): AudioContext | null {
     master.gain.value = 0.55;
     master.connect(ctx.destination);
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  // Never restart the stream while the app is hidden (a late timer's sound); resumeAudio() does it on return.
+  if (ctx.state === 'suspended' && !document.hidden) void ctx.resume();
   return ctx;
 }
 
 /**
  * App hidden: stop the audio stream itself, not just its volume, so the phone's audio
- * hardware can sleep. The next sound (or music on return) resumes it via audioContext().
+ * hardware can sleep. resumeAudio() restarts it when the app is in front again.
  */
 export function suspendAudio(): void {
   if (ctx?.state === 'running') void ctx.suspend();
+}
+
+/** App in front again: restart the stream (if a gesture ever started it), music or not. */
+export function resumeAudio(): void {
+  if (ctx?.state === 'suspended') void ctx.resume();
 }
 
 function ac(): AudioContext | null {
