@@ -237,14 +237,34 @@ export function claimMission(slot: number): { xp: number; petals: number } | nul
   return r;
 }
 
-/** Advance every open mission that tracks `metric`. */
-function bump(metric: MissionMetric, amount = 1): void {
-  if (amount <= 0) return;
+interface MissionTicker {
+  /** advance every open mission that tracks `metric` */
+  bump: (metric: MissionMetric, amount?: number) => void;
+  /** does an open mission track `metric`? (skip work no mission will count) */
+  tracks: (metric: MissionMetric) => boolean;
+}
+
+/**
+ * Today's open missions, looked up once per game event (a pair, a clear, a Rush
+ * run) rather than once per metric. The caller persists once when it's done.
+ */
+function missionTicker(): MissionTicker {
   ensureToday();
-  const best = BEST_METRICS.includes(metric);
-  for (const s of save.meta.missions.list) {
+  const open = save.meta.missions.list.flatMap((s) => {
     const def = missionDef(s.id);
-    if (!def || def.metric !== metric || s.done) continue;
+    return def && !s.done ? [{ s, def }] : [];
+  });
+  const tracks = (metric: MissionMetric) => open.some(({ s, def }) => def.metric === metric && !s.done);
+  const bump = (metric: MissionMetric, amount = 1) => {
+    if (amount > 0) advance(open, metric, amount);
+  };
+  return { bump, tracks };
+}
+
+function advance(open: { s: MissionState; def: MissionDef }[], metric: MissionMetric, amount: number): void {
+  const best = BEST_METRICS.includes(metric);
+  for (const { s, def } of open) {
+    if (def.metric !== metric || s.done) continue;
     s.n = best ? Math.max(s.n, amount) : s.n + amount;
     if (s.n >= def.target) {
       s.n = def.target;
@@ -257,7 +277,6 @@ function bump(metric: MissionMetric, amount = 1): void {
       notify(`Mission complete · ${missionText(def)}`);
     }
   }
-  persist();
 }
 
 export function weekly(): { count: number; target: number; claimed: boolean; ready: boolean; reward: Reward } {
@@ -479,6 +498,7 @@ on('start', ({ session }) => {
 on('pair', (e) => {
   const b = track(e.session);
   addXp(XP.pair);
+  const { bump, tracks } = missionTicker();
   bump('pairs');
   if (e.mode === 'rush') bump('rushPairs');
   if (e.combo === 4) bump('combo4');
@@ -487,12 +507,16 @@ on('pair', (e) => {
     b.fever = e.session.feverCount;
   }
   if (e.yaku.length) bump('yaku', e.yaku.length);
-  const kinds = e.cards.filter((id) => !isBonus(id)).map((id) => cardDef(id).kind);
-  bump('brights', kinds.filter((k) => k === 'bright').length);
-  bump('animals', kinds.filter((k) => k === 'animal').length);
-  bump('ribbons', kinds.filter((k) => k === 'ribbon').length);
-  const month = monthFor(save.meta.missions.date ?? today()).index;
-  bump('monthCards', e.cards.filter((id) => !isBonus(id) && id >> 2 === month).length);
+  if (tracks('brights') || tracks('animals') || tracks('ribbons')) {
+    const kinds = e.cards.filter((id) => !isBonus(id)).map((id) => cardDef(id).kind);
+    bump('brights', kinds.filter((k) => k === 'bright').length);
+    bump('animals', kinds.filter((k) => k === 'animal').length);
+    bump('ribbons', kinds.filter((k) => k === 'ribbon').length);
+  }
+  if (tracks('monthCards')) {
+    const month = monthFor(save.meta.missions.date ?? today()).index;
+    bump('monthCards', e.cards.filter((id) => !isBonus(id) && id >> 2 === month).length);
+  }
   if (e.cards.some(isBonus)) {
     bump('lucky');
     const fresh = BONUS_IDS.filter((id) => !save.meta.bonus.includes(id));
@@ -513,6 +537,7 @@ on('clear', ({ session, summary }) => {
   const spec = session.spec as SpecX;
   const st = session.stars();
   const mode = spec.mode;
+  const { bump } = missionTicker();
   if (mode === 'zen') {
     addXp(XP.zenClear);
     bump('zen');
@@ -560,6 +585,7 @@ on('clear', ({ session, summary }) => {
 on('rush', (e) => {
   // A "Keep going" continuation tops the run up to its new score; it isn't a new run.
   addXp(rushXp(e.score) - (e.extends != null ? rushXp(e.extends) : 0));
+  const { bump } = missionTicker();
   if (e.extends == null) bump('rushRuns');
   bump('rushBest', e.score);
   persist();

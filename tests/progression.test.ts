@@ -2,7 +2,7 @@
  * Flower Path: rank curve, rewards, missions, chests, gold leaf, purchases,
  * and Warm tea (streak freeze) consumption.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BONUS_IDS } from '../src/data/deck';
 import {
   MAX_RANK, MISSIONS, PATH_EXCLUSIVES, TITLES, rankInfo, rankOf, rankReward, xpForRank, xpToNext,
@@ -142,6 +142,70 @@ describe('missions', () => {
     expect(rerollMission(1)).toBe(false);
   });
 });
+
+describe('pair handler', () => {
+  // A fixed day (October: its cards are 36 plain, 37 plain, 38 ribbon, 39 animal) so the month mission is stable.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 7, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  type Pair = { cards: [number, number]; combo: number; yaku?: string[]; fever?: number; finish?: boolean };
+  /** Two brights, an animal + ribbon at ×4, October plains with a set at Full bloom, the lucky pair at ×4, October ribbon + animal. */
+  const PAIRS: Pair[] = [
+    { cards: [3, 11], combo: 1 },
+    { cards: [7, 2], combo: 4 },
+    { cards: [36, 37], combo: 5, yaku: ['akadan'], fever: 1 },
+    { cards: [BONUS_IDS[0], BONUS_IDS[1]], combo: 4, fever: 2 },
+    { cards: [38, 39], combo: 1, finish: true },
+  ];
+
+  /** Play PAIRS with these three missions open; returns each mission's progress. */
+  function play(ids: string[], mode: 'journey' | 'rush'): { n: number; done: boolean }[] {
+    save.meta.missions = { date: localDateKey(), list: ids.map((id) => ({ id, n: 0, done: false, claimed: false, rerolled: false })) };
+    const s = new Session(mode === 'rush' ? rushLevel('pin', 0) : journeyLevel(9), 0);
+    emit('start', { session: s });
+    for (const p of PAIRS) {
+      if (p.fever) s.feverCount = p.fever;
+      if (p.finish) s.finishedAt = 30_000;
+      emit('pair', { mode, cards: p.cards, combo: p.combo, fever: !!p.fever, yaku: p.yaku ?? [], session: s });
+    }
+    return save.meta.missions.list.map(({ n, done }) => ({ n, done }));
+  }
+
+  it('advances every pair-driven mission by exactly what the pairs held (pinned)', () => {
+    expect(play(['brights6', 'animals8', 'ribbons8'], 'journey')).toEqual([{ n: 2, done: false }, { n: 2, done: false }, { n: 2, done: false }]);
+    expect(play(['month8', 'combo4x3', 'yaku1'], 'journey')).toEqual([{ n: 4, done: false }, { n: 2, done: false }, { n: 1, done: true }]);
+    expect(play(['lucky1', 'fever3', 'pairs40'], 'journey')).toEqual([{ n: 1, done: true }, { n: 2, done: false }, { n: 5, done: false }]);
+    expect(play(['rushPairs60', 'boards3', 'pairs100'], 'rush')).toEqual([{ n: 5, done: false }, { n: 1, done: false }, { n: 5, done: false }]);
+    expect(play(['rushPairs60', 'boards3', 'pairs100'], 'journey')).toEqual([{ n: 0, done: false }, { n: 0, done: false }, { n: 5, done: false }]);
+  });
+
+  it('gives a point of XP per pair, counts finished missions toward the week, and collects the lucky cards once', () => {
+    play(['brights6', 'animals8', 'ribbons8'], 'journey');
+    expect(save.meta.xp).toBe(PAIRS.length);
+    play(['month8', 'combo4x3', 'yaku1'], 'journey');
+    play(['lucky1', 'fever3', 'pairs40'], 'journey');
+    expect(save.meta.week.count).toBe(2);
+    expect(save.meta.stats.missions).toBe(2);
+    expect(save.meta.bonus).toEqual([...BONUS_IDS]);
+    expect(save.meta.xp).toBe(3 * PAIRS.length);
+  });
+
+  it('a new day mid-board draws fresh missions before the next pair counts', () => {
+    play(['pairs40', 'zen2', 'pairs200'], 'journey');
+    const s = new Session(journeyLevel(9), 0);
+    emit('start', { session: s });
+    vi.setSystemTime(new Date(2026, 9, 8, 0, 0, 5));
+    emit('pair', { mode: 'journey', cards: [0, 1], combo: 1, fever: false, yaku: [], session: s });
+    expect(save.meta.missions.date).toBe('2026-10-08');
+    const pairs = save.meta.missions.list.filter((m) => missionsMetric(m.id) === 'pairs');
+    for (const m of pairs) expect(m.n).toBe(1);
+  });
+});
+
+const missionsMetric = (id: string) => MISSIONS.find((m) => m.id === id)?.metric;
 
 describe('XP from play', () => {
   it('gives XP for pairs, clears, blossoms and first clears, and reports it for the result sheet', () => {
