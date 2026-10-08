@@ -469,7 +469,7 @@ first internal-test build.
 
 **Onboarding and teaching**
 - [x] web-verified · Every launch: the loader takes over from the native splash (same ground, seal centred), the seal is pressed, a brush stroke draws, the line follows the real boot steps; held 0.7 s, then it cross-fades into the first screen (Edge: boot done ≈0.4 s after load, loader gone ≈1.1 s after its motion starts, fresh and returning alike)
-- [ ] 📱 device · The splash-to-loader handoff is invisible in both themes (seal size and position match the system splash icon)
+- [x] 📱 device (Pixel 10a · Android 17) · The splash-to-loader handoff is invisible in both themes (seal size and position match the system splash icon) — the splash now uses a seal-only icon (`drawable/splash_icon.xml`, no paper disk on ink); the seal measures 291 px wide at the same centre before and after the handoff, light and dark
 - [x] web-verified · First launch: the intro title (seasonal landscape, seal, Jjak, tagline, Begin), then the animated first minute (pair, bends, blocked path, combo) with Skip from the first frame; a fresh player's first real pair lands ~7.1 s after Begin (measured from the Begin tap, not launch: `jjak:begin-to-first-pair`); ends in Level 1 with the first pair glowing
 - [x] web-verified · Returning players never see the first minute; Settings → How to play → Replay intro plays it again
 - [x] web-verified · Each idea gets a one-time animated intro (demo, then "your turn") the first time it appears: Level 6 variants · Stones L14 · Falling leaves L26 · First snow L38 · Lucky cards L50 · Knots L74 · Wind L98 · Gates L122 · Fences L158 · each goal kind on its first goal board

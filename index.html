@@ -29,7 +29,8 @@
       /* First frame of the loader (src/ui/launch.ts drives it, src/styles/launch.css moves it).
          Flat paper or ink exactly as the native splash, the seal centred where the splash icon sits. */
       #launch {
-        --launch-seal: 116px;
+        /* Measured on a Pixel 10a: the system splash draws the seal (drawable/splash_icon) at the same size. */
+        --launch-seal: 106px;
         position: fixed;
         inset: 0;
         z-index: 10000;
