@@ -1823,10 +1823,18 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   requestAnimationFrame(() => {
     // Goal boards hold the title card a little longer, so the goal can be read.
     const introMs = spec.mode === 'journey' && spec.number === 1 ? 900 : goal ? 1900 : 1150;
-    renderBoard();
-    // The cards start dealing just as the title card begins to lift.
-    deal(Math.max(0, introMs - 220));
-    ro.observe(stage);
+    const t0 = performance.now();
+    // The board (a few hundred ms of card layout on a phone) is built after this frame,
+    // under the title card: the screen and the title answer the tap at once, and their
+    // transform/opacity animations keep running on the compositor while it builds.
+    requestAnimationFrame(() =>
+      setTimeout(() => {
+        renderBoard();
+        // The cards start dealing just as the title card begins to lift.
+        deal(Math.max(0, introMs - 220 - (performance.now() - t0)));
+        ro.observe(stage);
+      }, 0),
+    );
     updateHud();
     updateGoal();
     paused = true;

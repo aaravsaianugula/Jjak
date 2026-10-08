@@ -240,6 +240,8 @@ async function generate(n: number, relief: number): Promise<LevelSpec> {
     spec = honestSpec({ ...plan.spec, tier: tierFor(plan.base, target) });
   }
   const ms = Math.round(clock() - t0);
+  // Device QA reads these from the inspector (scripts/device-play.mjs endless).
+  if (typeof performance !== 'undefined') performance.measure(`endless ${n} ${src}`, { start: t0, duration: ms });
   es.seq++;
   es.levels[n] = { spec, target, offset: target - plan.base, relief, src, at: es.seq };
   pruneEndless(es, Math.max(save.level, n));
