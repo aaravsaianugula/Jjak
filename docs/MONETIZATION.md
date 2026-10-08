@@ -63,7 +63,7 @@ All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without 
   chooses them and some players like the rewards.
 * Ownership is re-checked with Play on every launch. "Restore purchase" is in Settings,
   and resetting progress never removes the purchase.
-* Where players learn they can remove ads (all quiet text, no pop-ups): a Settings row; a
+* Where players learn they can remove ads (quiet text, plus the asks in §4a): a Settings row; a
   Remove ads card in Market → Tools → Support Jjak; one line above the banner on Home
   ("Ads keep Jjak free · Remove ads for $2.99"); a line on every "Short break" card; and a
   small text link on the result sheet **at most once a day, from the first interstitial on**.
@@ -72,6 +72,54 @@ All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without 
   categories and keeps interstitials to still images (PLAY_STORE_RELEASE.md §2, step 8).
 * Implemented with `@capgo/native-purchases` (Capacitor 8, Google Play Billing). Purchases
   are auto-acknowledged.
+
+## 4a. When the game asks (first start, then one festival week a month)
+
+The game itself opens the Remove ads sheet only on these occasions (`src/services/ad-offer.ts`,
+triggered from Home by `askRemoveAdsIfDue` in `src/ui/remove-ads.ts`):
+
+* **First start:** the first time a player reaches Home (for a new player that's after the
+  intro, the first minute and the first board). Existing players who update are asked once
+  the same way, since they were never asked before.
+* **Then at most once a month, during that month's festival week** (the festival's date and
+  the six days after it, by the phone's own calendar day). The first ask counts for its month,
+  so a first start inside a festival week is one ask, not two.
+* **Never** once ads are off (Remove ads, the festival product or the Supporter pack), and
+  never after **"Don't ask again"**, a quiet button beside "Not now" that appears only on
+  these asks. It's a preference: Reset progress keeps it (and keeps the ask history, so a
+  reset isn't a new first start). Remove ads stays in Settings, Market and on Home.
+* Only on Home, Android only, after the launch loader has gone, after the daily gift (and any
+  card it reveals) has closed, never over the road's reveal, the board, or mid-puzzle. If the
+  player leaves Home before it's time, the next visit to Home asks instead; if they opened
+  Remove ads themselves this session, a later launch asks instead.
+
+**Festival calendar.** Twelve fixed-date Korean and Japanese festivals, one per month. Lunar
+festivals (Seollal, Chuseok, Dano) are left out on purpose: their dates move every year.
+
+| Month | Festival | Native name | Week |
+|---|---|---|---|
+| Jan | New Year | 正月 · 신정 | Jan 1–7 |
+| Feb | Setsubun | 節分 | Feb 3–9 |
+| Mar | Hinamatsuri | 雛祭り | Mar 3–9 |
+| Apr | Hanami | 花見 | Apr 1–7 |
+| May | Children's Day | 어린이날 · こどもの日 | May 5–11 |
+| Jun | Summer solstice | 하지 · 夏至 | Jun 21–27 |
+| Jul | Tanabata | 七夕 | Jul 7–13 |
+| Aug | Obon | お盆 | Aug 13–19 |
+| Sep | Autumn equinox | 추분 · 秋分 | Sep 22–28 |
+| Oct | Hangeul Day | 한글날 | Oct 9–15 |
+| Nov | Shichi-Go-San | 七五三 | Nov 15–21 |
+| Dec | Dongji | 동지 · 冬至 | Dec 22–28 |
+
+**The festival price.** A second one-time, non-consumable product, `jjak_remove_ads_festival`
+(suggested **US$2.49** against the regular US$2.99; Play sets local prices). It does exactly
+what Remove ads does and is restored the same way. While a festival week is on, the Remove
+ads sheet (asked or opened by the player) shows the festival's seal, date and names and, only
+when Play reported both prices in the same currency and the festival one is lower, says
+plainly: "Remove ads for $2.49 this week (usually $2.99)", and its Buy button buys the
+festival product. If the festival product isn't set up (or isn't cheaper), the sheet still
+shows the festival but sells Remove ads at the regular price and claims no discount. No
+countdowns, no "last chance", no percentages.
 
 ## 4b. Petal pouches and the Supporter pack
 

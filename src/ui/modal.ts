@@ -8,6 +8,8 @@ export interface SheetHandle {
 }
 
 const stack: (SheetHandle & { dismissible: boolean })[] = [];
+/** Waiting for every sheet to close (sheetsClosed). */
+const idleWaiters: (() => void)[] = [];
 
 /**
  * Bottom sheet (or centred dialog). Tapping the scrim closes it when dismissible.
@@ -31,6 +33,7 @@ export function openSheet(
       const i = stack.indexOf(handle);
       if (i < 0) return;
       stack.splice(i, 1);
+      if (!stack.length) idleWaiters.splice(0).forEach((wake) => wake());
       scrim.classList.add('is-closing');
       setTimeout(() => scrim.remove(), 280);
       if (opener?.isConnected) opener.focus({ preventScroll: true });
@@ -116,6 +119,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 export const sheetOpen = () => stack.length > 0;
+
+/** Resolves once no sheet is open (at once if none is). */
+export function sheetsClosed(): Promise<void> {
+  if (!stack.length) return Promise.resolve();
+  return new Promise((resolve) => idleWaiters.push(resolve));
+}
 
 /** Simple choice dialog. Resolves with the chosen key, or null if dismissed. */
 export function choose(

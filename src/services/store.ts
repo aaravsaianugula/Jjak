@@ -7,6 +7,7 @@
 import { Capacitor } from '@capacitor/core';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import { IAP } from '../config';
+import { type PlayPrice } from './ad-offer';
 import { ads } from './ads';
 import { grantPouch, grantSupporter } from './meta';
 import { flush, persist, save } from './storage';
@@ -17,6 +18,10 @@ class Store {
   /** Billing works on this device and the product exists in Play Console. */
   available = false;
   price = IAP.fallbackPrice;
+  /** Remove ads as Play prices it, once Play has answered with a price. */
+  regular: PlayPrice | null = null;
+  /** Remove ads at the festival price, when that product is set up in Play. */
+  festival: PlayPrice | null = null;
   /** Petal pouches and the Supporter pack are set up in Play Console. */
   extrasAvailable = false;
   private billing = false;
@@ -26,9 +31,20 @@ class Store {
   /** Resolves once init() has finished (prices known, or billing unavailable). */
   readonly ready = new Promise<void>((r) => (this.readyResolve = r));
 
+  /** The festival product is live in Play. */
+  get festivalAvailable(): boolean {
+    return this.festival !== null;
+  }
+
+  /** Play's localized festival price, when the product is live. */
+  get festivalPrice(): string | null {
+    return this.festival?.label ?? null;
+  }
+
   async init(): Promise<void> {
     try {
       await this.initCore();
+      await this.initFestival();
       await this.initExtras();
     } finally {
       this.readyResolve();
@@ -44,15 +60,30 @@ class Store {
       const { product } = await NativePurchases.getProduct({ productIdentifier: IAP.removeAds, productType: PURCHASE_TYPE.INAPP });
       this.available = true;
       this.price = product.priceString || IAP.fallbackPrice;
+      this.regular = playPrice(product);
       await this.syncOwnership();
     } catch {
       this.available = false; // product not set up yet, or no Play services
     }
   }
 
+  /** Load the festival product (separately, so Remove ads works even if it isn't set up). */
+  private async initFestival(): Promise<void> {
+    if (!native || !this.billing) return;
+    try {
+      const { product } = await NativePurchases.getProduct({ productIdentifier: IAP.removeAdsFestival, productType: PURCHASE_TYPE.INAPP });
+      this.festival = playPrice(product);
+    } catch {
+      this.festival = null; // not set up in Play Console: festival weeks show the regular price
+    }
+  }
+
   /** Try Play billing again (it was offline or still starting at launch). True if Remove ads can be bought now. */
   async retry(): Promise<boolean> {
-    if (native && !this.available) await this.initCore();
+    if (native && !this.available) {
+      await this.initCore();
+      if (!this.festival) await this.initFestival();
+    }
     return this.available;
   }
 
@@ -62,7 +93,8 @@ class Store {
     // The Supporter pack also removes ads.
     const supporter = purchases.some((p) => p.productIdentifier === IAP.supporter && done(p));
     if (supporter) grantSupporter();
-    const owned = purchases.some((p) => (p.productIdentifier === IAP.removeAds || p.productIdentifier === IAP.supporter) && done(p));
+    const removesAds: string[] = [IAP.removeAds, IAP.removeAdsFestival, IAP.supporter];
+    const owned = purchases.some((p) => removesAds.includes(p.productIdentifier) && done(p));
     // Pouches bought but not yet consumed (app closed mid-purchase, or a pending payment that completed).
     for (const p of purchases) {
       const pouch = IAP.pouches.find((x) => x.id === p.productIdentifier);
@@ -75,11 +107,15 @@ class Store {
     }
   }
 
-  /** Returns true if the player now owns "Remove ads". */
-  async buyRemoveAds(): Promise<boolean> {
-    if (!native || !this.available) return false;
+  /**
+   * Returns true if the player now owns "Remove ads". `festival` buys it at the festival
+   * price (falls back to the regular product when the festival one isn't in Play).
+   */
+  async buyRemoveAds(opts: { festival?: boolean } = {}): Promise<boolean> {
+    const productIdentifier = opts.festival && this.festival ? IAP.removeAdsFestival : IAP.removeAds;
+    if (!native || (productIdentifier === IAP.removeAds && !this.available)) return false;
     try {
-      const t = await NativePurchases.purchaseProduct({ productIdentifier: IAP.removeAds, productType: PURCHASE_TYPE.INAPP });
+      const t = await NativePurchases.purchaseProduct({ productIdentifier, productType: PURCHASE_TYPE.INAPP });
       if (t.purchaseState !== undefined && t.purchaseState !== '1') return false; // pending (e.g. cash payment)
       save.adFree = true;
       persist();
@@ -180,6 +216,11 @@ class Store {
     }
     return save.adFree;
   }
+}
+
+/** Play's price for a product, or null when Play gave no localized price. */
+function playPrice(product: { priceString: string; price: number; currencyCode: string }): PlayPrice | null {
+  return product.priceString ? { label: product.priceString, amount: product.price, currency: product.currencyCode } : null;
 }
 
 export const store = new Store();

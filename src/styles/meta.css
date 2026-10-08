@@ -1288,6 +1288,93 @@ ol.road::before {
   font-size: 13px;
   color: var(--text);
 }
+.noads-sheet .noads-sheet__lead {
+  margin: 6px 0 10px;
+}
+/* A festival price, said plainly. */
+.noads-sheet .noads-sheet__deal {
+  margin: 0 0 6px;
+  font-size: var(--fs-body);
+}
+.noads-sheet__deal b {
+  color: var(--accent-text);
+}
+.noads-sheet__later {
+  margin-top: -4px;
+}
+/* The festival week: its seal pressed beside its date and names, over a hairline of ink. */
+.noads-fest {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.noads-fest__seal {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  font-size: 21px;
+  font-weight: 600;
+  transform: rotate(-6deg);
+  animation: noads-seal 460ms var(--ease-out) both;
+}
+/* .seal sets the Hangul serif; a kanji mark takes the Japanese face. */
+.noads-fest__seal.ja {
+  font-family: var(--font-ja);
+}
+.noads-fest__seal.serif {
+  font-weight: 700;
+}
+.noads-fest__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.noads-fest__date {
+  font-size: var(--fs-cap);
+  font-weight: 700;
+  letter-spacing: var(--track-cap);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.noads-fest__name {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+}
+.noads-fest__native {
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+}
+/* Pressed onto the paper: it arrives a touch large and settles at its tilt. */
+@keyframes noads-seal {
+  from {
+    opacity: 0;
+    transform: scale(1.25) rotate(-12deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(-6deg);
+  }
+}
+/* Short phones: the asked sheet keeps its buttons in view without scrolling. */
+@media (max-height: 680px) {
+  .noads-sheet .sheet__actions {
+    margin-top: 12px;
+    gap: 6px;
+  }
+  .noads-sheet .supporter__list {
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .noads-fest__seal {
+    animation: none;
+  }
+}
 .bundles__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

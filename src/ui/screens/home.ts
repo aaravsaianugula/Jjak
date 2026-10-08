@@ -5,7 +5,7 @@ import { pathArt } from '../../art/path-art';
 import { ads } from '../../services/ads';
 import { store } from '../../services/store';
 import { Capacitor } from '@capacitor/core';
-import { openRemoveAds } from '../remove-ads';
+import { askRemoveAdsIfDue, openRemoveAds } from '../remove-ads';
 import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
@@ -179,9 +179,13 @@ export function homeScreen(): Screen {
   // app closed on the result sheet): play it before anything else.
   if (save.level > ROUTE_LEVELS && !save.journey.revealed) {
     setTimeout(() => el.isConnected && void roadGoesOn().then(() => nav.home()), 400);
-  } else if (pendingGift() && !giftShownThisSession) {
-    giftShownThisSession = true;
-    setTimeout(() => openGift(el), 650);
+  } else {
+    if (pendingGift() && !giftShownThisSession) {
+      giftShownThisSession = true;
+      setTimeout(() => openGift(el), 650);
+    }
+    // First start, or this month's festival week: the game asks once (after the gift).
+    void askRemoveAdsIfDue(el).then((off) => off && el.querySelector('.home__noads')?.remove());
   }
 
   // Count the petals earned (or spent) since the last visit.

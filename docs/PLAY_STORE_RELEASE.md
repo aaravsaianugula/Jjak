@@ -45,7 +45,9 @@ of Play Console.
     → accept **Play App Signing** (Google-generated key) → upload `app-release.aab` →
     *Next* → *Save and publish*.
 11. **In-app products** (§2b): Play Console → app → **Monetize with Play → Products →
-    One-time products** → *Create one-time product* ×5, ids from §2b, then *Activate*. (Play
+    One-time products** → *Create one-time product* ×6, ids from §2b (including
+    `jjak_remove_ads_festival`, the festival price of Remove ads: suggested US$2.49, local
+    prices from Play's templates), then *Activate*. (Play
     only offers this once a build with billing is uploaded: that's step 10.)
 12. **License testers** (§2b): Play Console → *Settings* (account level) → **License
     testing** → add your Gmail → response *RESPOND_NORMALLY* → *Save changes*.
@@ -157,9 +159,9 @@ Steps:
 
 ## 2b. In-app products: Remove ads, petal pouches, Supporter pack
 
-All five are **one-time products** (Play Console → app → **Monetize with Play → Products →
+All six are **one-time products** (Play Console → app → **Monetize with Play → Products →
 One-time products**; older consoles call it *In-app products*). The ids must match `IAP` in
-`src/config.ts:44–61`, and the billing service (`src/services/store.ts`) asks Play for all
+`src/config.ts`, and the billing service (`src/services/store.ts`) asks Play for all
 of them as one-time (`PURCHASE_TYPE.INAPP`) products. The app always shows Play's own
 localized `priceString`; the prices below are the fallbacks in `src/config.ts` and are
 suggestions (set the US price and let Play convert it).
@@ -172,6 +174,7 @@ your account needs a **payments profile** (Play Console → *Settings* at accoun
 | Product ID | Name | Type in the app | Suggested price | What it gives |
 |---|---|---|---|---|
 | `jjak_remove_ads` | Remove ads | Non-consumable | US$2.99 | No interstitials or banners. Rewarded ads stay. |
+| `jjak_remove_ads_festival` | Remove ads (festival price) | Non-consumable | US$2.49 | The same as Remove ads, offered only during a festival week (MONETIZATION.md §4a). Keep it **below** Remove ads in every country, or the app shows no discount. |
 | `jjak_petals_small` | Small pouch | **Consumable** | US$0.99 | 600 petals |
 | `jjak_petals_medium` | Pouch of petals | **Consumable** | US$2.49 | 1,600 petals |
 | `jjak_petals_large` | Large pouch | **Consumable** | US$4.99 | 4,000 petals |
@@ -188,8 +191,8 @@ your account needs a **payments profile** (Play Console → *Settings* at accoun
    finds the unconsumed purchase, credits it (each purchase token is remembered, so
    never twice) and consumes it. Pending payments (e.g. cash) are credited on a later
    launch once Play marks them purchased.
-3. Remove ads and the Supporter pack are **restored** on every launch and by
-   *Settings → Restore purchase* (both remove ads; the Supporter gifts are granted once).
+3. Remove ads (either price) and the Supporter pack are **restored** on every launch and by
+   *Settings → Restore purchase* (all remove ads; the Supporter gifts are granted once).
    Refunded non-consumables drop out of Play's list and ads come back on next launch.
 4. Products only appear in builds installed from a Play track (internal testing is
    fine). **License testers** buy without being charged: Play Console → *Settings*
@@ -200,7 +203,8 @@ your account needs a **payments profile** (Play Console → *Settings* at accoun
    declines*, and *Slow test card, approves after a few minutes* (exercises the
    pending-payment path). Test a pouch twice in a row to confirm consumption.
 5. If the pouch / Supporter products aren't set up, their section hides itself; Remove
-   ads keeps working on its own.
+   ads keeps working on its own. If `jjak_remove_ads_festival` isn't set up, festival weeks
+   still show the festival but sell Remove ads at the regular price, with no discount claim.
 6. Data safety: add **Purchase history** (collected, not shared, purpose: app
    functionality). It's read from Google Play on the device to restore purchases; the
    app keeps only pouch purchase tokens locally to avoid double credit. No payment
@@ -208,7 +212,7 @@ your account needs a **payments profile** (Play Console → *Settings* at accoun
 
 **Honesty rules for these products** (Play's policies and our own tone): every product
 says exactly what it contains, there are no timers, no "% off" or fake "best value"
-labels, no random rewards for money, and petals only buy cosmetics, garden items and
+labels (the festival price only says "this week (usually …)", using Play's two real prices), no random rewards for money, and petals only buy cosmetics, garden items and
 tools: never levels or progress gates.
 
 ## 3. Signing
@@ -495,6 +499,7 @@ first internal-test build.
 
 **Purchases (license tester)**
 - [ ] 📱 device · Remove ads: buy → banners and interstitials stop, rewarded stays; reinstall → "Restore purchase" brings it back — **Blocked on the owner:** the products don't exist in Play Console yet (the phone's billing calls return "Product not found"), and they need a license-tester account (§0a)
+- [ ] 📱 device · Remove ads asks (MONETIZATION.md §4a): the first Home after the first board opens the sheet with "Don't ask again"; in a festival week, with both Remove ads products live, it shows the festival and "this week (usually …)" and buys `jjak_remove_ads_festival`; "Don't ask again" stops every ask — needs the products and a license tester (§0a)
 - [ ] 📱 device · Petal pouch: buy → petals credited once; buy the same pouch again right away (proves it was consumed); kill the app mid-purchase → next launch credits it once — **Blocked on the owner:** same as above
 - [ ] 📱 device · Supporter pack: buy → ads off, +1,500 petals, Clouds back owned, Supporter seal; reinstall → restore brings ads-off and the back, petals are not granted twice — **Blocked on the owner:** same as above
 

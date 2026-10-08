@@ -45,6 +45,12 @@ export const IAP = {
   removeAds: 'jjak_remove_ads',
   fallbackPrice: '$2.99',
   /**
+   * Remove ads at the festival price (one-time, **non-consumable**; suggested US$2.49).
+   * Offered only during a festival week (src/services/ad-offer.ts) and owned exactly like
+   * Remove ads. Its price is only called a discount when Play's prices show one.
+   */
+  removeAdsFestival: 'jjak_remove_ads_festival',
+  /**
    * Petal pouches: **consumable** in-app products (consumed after the petals are
    * credited, so they can be bought again). Prices come from Play (`priceString`);
    * the fallbacks are only shown while Play hasn't answered. See docs/MONETIZATION.md §4b.

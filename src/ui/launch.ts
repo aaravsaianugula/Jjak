@@ -22,6 +22,10 @@ export interface Loader {
   finish(): Promise<void>;
 }
 
+let markGone: () => void = () => {};
+/** Resolves once the loader has cross-faded away and the first screen is fully in view. */
+export const loaderGone = new Promise<void>((resolve) => (markGone = resolve));
+
 const nextFrame = () => new Promise<number>((r) => requestAnimationFrame(r));
 
 /**
@@ -63,6 +67,7 @@ export function takeOverLoader(): Loader {
       el.classList.add('is-leaving');
       await wait(reducedMotion() ? LEAVE_REDUCED_MS : LEAVE_MS);
       el.remove();
+      markGone();
     },
   };
 }
