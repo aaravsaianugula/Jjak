@@ -1801,6 +1801,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   }
 
   const ro = new ResizeObserver(() => layout());
+  /** Set when the screen is left, so work deferred past the first frame doesn't run on a leaving screen. */
+  let gone = false;
   // DEV only: let screenshot scripts read the session and find pairs.
   if (import.meta.env.DEV) {
     (window as unknown as Record<string, unknown>).__game = {
@@ -1829,6 +1831,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     // transform/opacity animations keep running on the compositor while it builds.
     requestAnimationFrame(() =>
       setTimeout(() => {
+        if (gone) return; // left within a frame or two (Back before the first pair)
         renderBoard();
         // The cards start dealing just as the title card begins to lift.
         deal(Math.max(0, introMs - 220 - (performance.now() - t0)));
@@ -1840,6 +1843,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     paused = true;
     pausedAt = performance.now();
     void intro(introMs).then(() => {
+      if (gone) return;
       session.startedAt = performance.now();
       paused = false;
       emit('start', { session });
@@ -1856,6 +1860,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       return true;
     },
     destroy() {
+      gone = true;
       // Leaving a board part-way through (Home, Back, the map) counts as a quit.
       if (!rush && !session.done && session.pairsMade + session.blockedTaps + session.reselects > 0) emit('leave', { session, reason: 'quit' });
       clearInterval(tick);

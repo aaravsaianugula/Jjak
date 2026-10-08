@@ -3,7 +3,8 @@
 //
 //   node scripts/device-play.mjs play [--seconds 60]        play boards with the hint button (pair it with
 //                    [--boards N]                         PLAY_SECONDS=60 scripts/device-qa.sh for frame pacing);
-//                                                         --boards stops on the Nth result sheet
+//                                                         --boards stops on the Nth result sheet. Needs a seeded
+//                                                         save (plenty of hints): run seed first
 //   node scripts/device-play.mjs seed --level 601         TEST INSTALLS ONLY: overwrites the save (onboarded, stars
 //                                                         for every level below, plenty of hints), then force-stops
 //   node scripts/device-play.mjs endless [--boards 3]     from a seeded level past 600: cold start, tap Continue at
@@ -30,10 +31,21 @@ const sdkAdb = sdk && join(sdk, 'platform-tools', process.platform === 'win32' ?
 const ADB = sdkAdb && existsSync(sdkAdb) ? sdkAdb : 'adb';
 const adb = (...a) => execFileSync(ADB, a, { encoding: 'utf8' }).replace(/\r/g, '').trim();
 
-/** Forward the app's inspector socket and attach to its page. */
+/** The app's process id, or '' while it isn't running (pidof exits 1 then). */
+function pidOf() {
+  try {
+    return adb('shell', 'pidof', PKG).split(/\s+/)[0];
+  } catch (e) {
+    if (e.status === 1) return '';
+    throw e;
+  }
+}
+
+/** Forward the app's inspector socket and attach to its page, opening the app first if it isn't running. */
 async function connect() {
+  if (!pidOf()) adb('shell', 'am', 'start', '-n', `${PKG}/.MainActivity`);
   for (let t = 0; t < 60; t++) {
-    const pid = adb('shell', 'pidof', PKG).split(/\s+/)[0];
+    const pid = pidOf();
     if (pid && adb('shell', 'cat', '/proc/net/unix').includes(`webview_devtools_remote_${pid}`)) {
       adb('forward', `tcp:${PORT}`, `localabstract:webview_devtools_remote_${pid}`);
       const browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
@@ -169,6 +181,9 @@ if (cmd === 'seed') {
   const until = Date.now() + 1000 * Number(arg('seconds', 60));
   const stopAfter = Number(arg('boards', Infinity));
   const { browser, page, cdp } = await connect();
+  // Playing runs on hints; a real save runs out after a few and the "Out of hints" sheet would stop it.
+  const hints = await page.evaluate(async () => JSON.parse((await window.Capacitor.Plugins.Preferences.get({ key: 'jjak.save.v1' })).value ?? '{}').hints ?? 0);
+  if (hints < 100) throw new Error(`The save has ${hints} hints: run "seed --level N" first (test installs only)`);
   let boards = 0;
   while (Date.now() < until) {
     if (!(await page.locator('.screen.game').count())) await next(cdp, page);
@@ -196,6 +211,7 @@ if (cmd === 'seed') {
       await P.set({ key: 'jjak.save.v1', value: JSON.stringify(s) });
     });
     await browser.close();
+    adb('shell', 'am', 'force-stop', PKG); // as in seed: a reload would persist the in-memory save over the edit
   }
   const cold = coldStart();
   const { browser, page, cdp } = await connect();

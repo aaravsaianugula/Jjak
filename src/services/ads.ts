@@ -21,11 +21,12 @@ import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
 import { music } from './music';
 
 /**
- * QA builds only: `VITE_UMP_DEBUG_DEVICE=<hashed device id>` (UMP logs it as
- * addTestDeviceHashedId("…")) makes that phone appear to be in the EEA, so the
- * consent form can be tested. Release builds never set it.
+ * QA builds only: `VITE_UMP_DEBUG_DEVICE=<hashed device id> npx vite build --mode qa`
+ * (UMP logs the id as addTestDeviceHashedId("…")) makes that phone appear to be in
+ * the EEA, so the consent form can be tested. Any other build mode ignores it, so a
+ * stray .env value can't reach a release bundle.
  */
-const UMP_DEBUG_DEVICE: string = import.meta.env.VITE_UMP_DEBUG_DEVICE ?? '';
+const UMP_DEBUG_DEVICE: string = import.meta.env.MODE === 'qa' ? (import.meta.env.VITE_UMP_DEBUG_DEVICE ?? '') : '';
 import { persist, save } from './storage';
 
 const native = Capacitor.isNativePlatform();

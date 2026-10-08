@@ -28,9 +28,6 @@ shot() { adb exec-out screencap -p > "$OUT/$1.png"; echo "  saved $OUT/$1.png"; 
 night_before=$(adb shell cmd uimode night | tr -d '\r' | awk '{print $NF}')
 restore() { adb shell cmd uimode night "${night_before:-auto}" >/dev/null 2>&1 || true; }
 trap restore EXIT
-# The app's processes (its own and the WebView renderers) after each launch, so the error log skips other apps.
-: > "$OUT/pids.txt"
-note_pids() { adb shell ps -A -o PID,NAME | tr -d '\r' | awk '/com\.jjak\.puzzle|com\.google\.android\.webview:sandboxed/ {print $1}' >> "$OUT/pids.txt"; }
 
 echo "1. Install"
 adb install -r -d "$APK" >/dev/null
@@ -42,7 +39,6 @@ for i in 1 2 3; do
   sleep 3
 done
 shot start-default
-note_pids
 
 echo "3. Light and dark: Auto should follow the phone, while the app is open and after a restart"
 adb logcat -c
@@ -53,7 +49,6 @@ for mode in no yes; do
   adb shell am force-stop "$PKG"
   adb shell am start -W -n "$ACT" >/dev/null
   sleep 4
-  note_pids
   shot "restart-night-$mode"
 done
 restore
@@ -70,9 +65,12 @@ adb shell dumpsys gfxinfo "$PKG" > "$OUT/gfxinfo.txt"
 grep -E 'Total frames rendered|Janky frames|50th percentile|90th percentile|95th percentile|99th percentile' "$OUT/gfxinfo.txt" | sed 's/^/  /'
 
 echo "5. Errors from the app since step 3"
-note_pids
-pid_re=$(sort -u "$OUT/pids.txt" | paste -sd'|' -)
-adb logcat -d -v brief | tr -d '\r' | grep -E "\(\s*(${pid_re:-0})\):" | grep -iE "chromium.*(error|uncaught)|Capacitor.*(error|exception)|AndroidRuntime|FATAL" > "$OUT/errors.txt" || true
+# Every process started for the app since step 3 (its own and its WebView renderers, even ones that died
+# early): ActivityManager names the host app in each "Start proc" line, so other apps' lines are left out.
+adb logcat -d -b main,system,crash -v brief | tr -d '\r' > "$OUT/logcat.txt"
+pid_re=$(grep -a "Start proc" "$OUT/logcat.txt" | grep -a "{$PKG/" | sed -E 's/.*Start proc ([0-9]+):.*/\1/' | sort -u | paste -sd'|' -)
+grep -aE "\(\s*(${pid_re:-0})\):" "$OUT/logcat.txt" \
+  | grep -iE "chromium.*(error|uncaught)|Capacitor.*(error|exception)|AndroidRuntime|FATAL" > "$OUT/errors.txt" || true
 if [ -s "$OUT/errors.txt" ]; then echo "  $(wc -l < "$OUT/errors.txt") lines in $OUT/errors.txt"; else echo "  none"; fi
 
 echo "Done: $OUT"
