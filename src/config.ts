@@ -61,8 +61,8 @@ export const IAP = {
 };
 
 export const ECONOMY = {
-  startHints: 3,
-  startShuffles: 2,
+  startHints: 5,
+  startShuffles: 5,
   hintCost: 20,
   shuffleCost: 15,
   petalsPerStar: 5,

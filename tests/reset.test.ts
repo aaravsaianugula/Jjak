@@ -9,6 +9,17 @@ import { DEFAULTS, activeBrush, activeFx, applyCosmetics, equip, equipped, grant
 import { grantPouch, grantSupporter } from '../src/services/meta';
 import { defaultSave, resetSave, save } from '../src/services/storage';
 
+describe('starting tools', () => {
+  it('a new player (or a reset) starts with 5 hints and 5 shuffles; more come from an ad or petals', async () => {
+    expect(defaultSave().hints).toBe(5);
+    expect(defaultSave().shuffles).toBe(5);
+    Object.assign(save, defaultSave(), { hints: 0, shuffles: 1 });
+    await resetSave();
+    expect(save.hints).toBe(5);
+    expect(save.shuffles).toBe(5);
+  });
+});
+
 describe('reset progress', () => {
   it('drops cosmetics to the defaults and keeps purchase receipts', async () => {
     Object.assign(save, defaultSave());
