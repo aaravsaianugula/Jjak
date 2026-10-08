@@ -22,6 +22,14 @@ export function audioContext(): AudioContext | null {
   return ctx;
 }
 
+/**
+ * App hidden: stop the audio stream itself, not just its volume, so the phone's audio
+ * hardware can sleep. The next sound (or music on return) resumes it via audioContext().
+ */
+export function suspendAudio(): void {
+  if (ctx?.state === 'running') void ctx.suspend();
+}
+
 function ac(): AudioContext | null {
   if (!save.settings.sound) return null;
   return audioContext();
