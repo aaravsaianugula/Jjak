@@ -4,7 +4,7 @@ import { persist, save } from '../../services/storage';
 import { type Screen } from '../app';
 import { DemoPlayer } from '../demo';
 import { BASIC_DEMOS } from '../demos';
-import { frag, h } from '../dom';
+import { frag, h, wait } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
 import { nav } from '../nav';
@@ -63,7 +63,7 @@ function firstMinute(opts: { replay: boolean; onDone: () => void }): { el: HTMLE
         if (n === 1 && !opts.replay) performance.mark('jjak:first-pair');
       },
     });
-    await new Promise((r) => setTimeout(r, 900));
+    await wait(900);
     stage(2);
     if (!(await player.swap(BASIC_DEMOS.blocked)) || !(await player.play(1))) return;
     stage(3);

@@ -2546,12 +2546,35 @@ export function gardenVisitorSvg(id: string, season = seasonOf(), items: readonl
 
 /** One item on its own (viewBox 0 0 120 120) on a painted disc, for Market tiles and the piece sheet. */
 export function gardenItemSvg(id: string, season = seasonOf()): string {
+  return itemSvg(id, season, `gi${++seq}-`);
+}
+
+/** Id scope of a cached vignette; every copy swaps it for a fresh one. */
+const TEMPLATE_SCOPE = 'gi§-';
+const itemTemplates = new Map<string, string>();
+
+/**
+ * gardenItemSvg built once per item and season: later calls only rescope the
+ * ids (so copies can share a page). The Market builds these in idle time,
+ * which keeps its Garden tab from drawing two dozen vignettes on the tap.
+ */
+export function gardenItemSvgCached(id: string, season = seasonOf()): string {
+  const key = `${season}:${id}`;
+  let tpl = itemTemplates.get(key);
+  if (tpl === undefined) {
+    tpl = itemSvg(id, season, TEMPLATE_SCOPE);
+    itemTemplates.set(key, tpl);
+  }
+  return tpl.replaceAll(TEMPLATE_SCOPE, `gi${++seq}-`);
+}
+
+function itemSvg(id: string, season: number, scope: string): string {
   const spot = GARDEN_SPOTS[id];
   if (!spot) return `<svg class="garden-item-art" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="#e9dfcc"/></svg>`;
   const s = ((season % 4) + 4) % 4;
   const set = new Set([id, ...(byId.get(id)?.needs ? [byId.get(id)!.needs!] : [])]);
   const night = id === 'fireflies';
-  const c = context(`gi${++seq}-`, night ? 1 : s, night, (x) => set.has(x));
+  const c = context(scope, night ? 1 : s, night, (x) => set.has(x));
   c.vig = true;
   const [fx, fy, w, hz, kind] = VIGNETTE[id];
   c.view = [fx - w / 2, fx + w / 2];

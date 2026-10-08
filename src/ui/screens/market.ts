@@ -7,7 +7,7 @@
  */
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { art, deckle } from '../../art/market-art';
-import { GARDEN_ITEMS, gardenItemSvg } from '../../art/garden';
+import { GARDEN_ITEMS, gardenItemSvgCached } from '../../art/garden';
 import { cardBackPreviewSvg, cardPreviewSvg } from '../../art/styles';
 import { ECONOMY } from '../../config';
 import { MONTHS, cardDef, monthDef } from '../../data/deck';
@@ -34,10 +34,10 @@ import { music } from '../../services/music';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { brushStroke, burstFx, type Pt } from '../brush-fx';
-import { esc, frag, h, toast } from '../dom';
+import { esc, fmt, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { type SheetHandle, openSheet } from '../modal';
-import { petalBump } from '../motion';
+import { petalBump, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 // ── Extension points ────────────────────────────────────────────────
@@ -64,8 +64,6 @@ export function bundlesSection(): HTMLElement | null {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt = (n: number) => n.toLocaleString('en-US');
 const petal = (n: number) => `<span class="mk-price__icon" aria-hidden="true">${ICONS.petal}</span><span class="num">${fmt(n)}</span>`;
 const lockIcon =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';
@@ -90,10 +88,15 @@ const monthHave = (m: number) => [0, 1, 2, 3].filter((v) => save.album.includes(
 
 const toolArt = (it: MarketItem, big: boolean): string => art(`tool-${it.id}`, 'mk-ill mk-ill--tool', '', big);
 
-/** Board papers: a deckle-edged sheet held by a brass weight, with close-up detail over the real board texture. */
-const paperArt = (it: MarketItem): string => {
+/**
+ * Board papers: a deckle-edged sheet held by a brass weight, with close-up
+ * detail over the real board texture. Unpainted, it's the bare sheet (the
+ * grid's placeholder until the tile is on screen).
+ */
+const paperArt = (it: MarketItem, painted: boolean): string => {
   const seed = it.id.split('').reduce((n, c) => n * 31 + c.charCodeAt(0), 7) >>> 0;
   const clip = `style="clip-path:${deckle(seed)}"`;
+  if (!painted) return `<span class="mk-swatch"><span class="mk-swatch__sheet" ${clip}></span></span>`;
   let face: string;
   if (it.source?.kind === 'album') {
     const m = it.source.month;
@@ -119,19 +122,19 @@ const BRUSH_INK: Record<string, string> = {
 /**
  * Two little cards with a stroke or burst between them. Brushes are shown on a
  * small mounted scroll beside an inkstone; effects on a patch of board.
+ * Unpainted, it's the empty scroll or board (the grid's placeholder).
  */
-function miniStage(it: MarketItem, big: boolean): HTMLElement {
+function miniStage(it: MarketItem, big: boolean, painted: boolean): { mount: HTMLElement; stage: HTMLElement } {
   const stage = h('span', { class: `mk-demo${big ? ' mk-demo--big' : ''}`, 'aria-hidden': 'true' });
-  stage.innerHTML = `<span class="mk-demo__card">${cardSvg(PAIR[0])}</span><span class="mk-demo__card">${cardSvg(PAIR[1])}</span>`;
+  if (painted) stage.innerHTML = `<span class="mk-demo__card">${cardSvg(PAIR[0])}</span><span class="mk-demo__card">${cardSvg(PAIR[1])}</span>`;
   if (it.category === 'brush') {
     const scroll = h('span', { class: 'mk-scroll', style: `--mka-ink:${BRUSH_INK[it.id] ?? BRUSH_INK.ink}` });
     const paper = h('span', { class: 'mk-scroll__paper' }, stage);
     scroll.append(paper);
     scroll.insertAdjacentHTML('beforeend', `<i class="mk-scroll__rod"></i><i class="mk-scroll__rod mk-scroll__rod--r"></i>${art('inkstone', 'mk-scroll__stone')}`);
-    return scroll;
+    return { mount: scroll, stage };
   }
-  const board = h('span', { class: 'mk-board' }, stage);
-  return board;
+  return { mount: h('span', { class: 'mk-board' }, stage), stage };
 }
 
 /** Card width and path corners for a demo stage of width W (cards at 22% / 78%). */
@@ -219,21 +222,23 @@ function playDemo(stage: HTMLElement, it: MarketItem, brush: string, fx: string)
 }
 
 /*
- * Card previews in the grid are painted lazily: a tile gets blank cards first
- * and its art once it's on screen, a few tiles per frame. Opening a tab never
- * waits on the card art, and tiles below the fold cost nothing until reached.
+ * Previews in the grid are painted lazily: a tile gets a placeholder first
+ * (blank cards, a bare sheet, an empty scroll) and its art once it's on screen,
+ * one tile per frame. Opening a tab never waits on the art, and tiles below
+ * the fold cost nothing until reached.
  */
-const lazyFills = new WeakMap<Element, () => string>();
+type Paint = () => void;
+const lazyFills = new WeakMap<Element, Paint>();
 const lazyQueue: Element[] = [];
 let lazyRaf = 0;
 const lazyIo =
   typeof IntersectionObserver === 'undefined'
     ? null
     : new IntersectionObserver(
-        (entries) => {
+        (entries, io) => {
           for (const e of entries) {
             if (!e.isIntersecting) continue;
-            lazyIo!.unobserve(e.target);
+            io.unobserve(e.target);
             lazyQueue.push(e.target);
           }
           pumpLazy();
@@ -246,25 +251,42 @@ function pumpLazy() {
     lazyRaf = 0;
     // One tile per frame: most of a preview's cost is the browser styling and
     // painting its art after this returns, so that's the unit that fits a frame.
-    while (lazyQueue.length) {
-      const el = lazyQueue.shift()!;
+    for (let el = lazyQueue.shift(); el; el = lazyQueue.shift()) {
       const fill = lazyFills.get(el);
       if (!fill || !el.isConnected) continue;
-      el.innerHTML = fill();
+      fill();
       el.classList.add('is-painted');
       break;
     }
     pumpLazy();
   });
 }
-function lazyArt(wrap: HTMLElement, blank: string, fill: () => string, now: boolean) {
-  if (now || !lazyIo) {
-    wrap.innerHTML = fill();
+/** Show `blank` now and run `fill` once `wrap` is on screen; `now` (the detail sheet) fills at once. */
+function lazyPaint(wrap: HTMLElement, blank: Paint, fill: Paint, now: boolean) {
+  if (now) {
+    fill();
     return;
   }
-  wrap.innerHTML = blank;
+  blank();
   lazyFills.set(wrap, fill);
-  lazyIo.observe(wrap);
+  if (lazyIo) lazyIo.observe(wrap);
+  else {
+    lazyQueue.push(wrap);
+    pumpLazy();
+  }
+}
+/** lazyPaint for previews that are plain markup. */
+function lazyArt(wrap: HTMLElement, blank: string, fill: () => string, now: boolean) {
+  lazyPaint(
+    wrap,
+    () => {
+      wrap.innerHTML = blank;
+    },
+    () => {
+      wrap.innerHTML = fill();
+    },
+    now,
+  );
 }
 
 function itemArt(it: MarketItem, big = false): HTMLElement {
@@ -284,17 +306,27 @@ function itemArt(it: MarketItem, big = false): HTMLElement {
       break;
     }
     case 'garden':
-      wrap.innerHTML = `<span class="mk-garden">${gardenItemSvg(it.id)}</span>`;
+      lazyArt(wrap, '<span class="mk-garden"></span>', () => `<span class="mk-garden">${gardenItemSvgCached(it.id)}</span>`, big);
       break;
     case 'paper':
-      wrap.innerHTML = paperArt(it);
+      lazyArt(wrap, paperArt(it, false), () => paperArt(it, true), big);
       break;
     case 'music':
       wrap.innerHTML = musicArt(it);
       break;
     case 'brush':
     case 'fx':
-      wrap.append(miniStage(it, big));
+      lazyPaint(
+        wrap,
+        () => wrap.replaceChildren(miniStage(it, big, false).mount),
+        () => {
+          const { mount, stage } = miniStage(it, big, true);
+          wrap.replaceChildren(mount);
+          // Grid tiles show a still frame; the detail sheet runs its own demo.
+          if (!big) paintStill(stage, it);
+        },
+        big,
+      );
       break;
   }
   return wrap;
@@ -423,16 +455,6 @@ export function marketScreen(tab?: string): Screen {
     return tile;
   }
 
-  function paintStills(root: HTMLElement) {
-    requestAnimationFrame(() => {
-      root.querySelectorAll<HTMLElement>('.mk-tile').forEach((t) => {
-        const stage = t.querySelector<HTMLElement>('.mk-demo');
-        const it = itemsIn(t.dataset.key!.split(':')[0] as MarketItem['category']).find((x) => x.key === t.dataset.key);
-        if (stage && it) paintStill(stage, it);
-      });
-    });
-  }
-
   function showTab(id: string, keepScroll = false) {
     const t = MARKET_TABS.find((x) => x.id === id) ?? MARKET_TABS[0];
     const changed = t.id !== current;
@@ -445,7 +467,7 @@ export function marketScreen(tab?: string): Screen {
     const btn = rail.querySelector<HTMLElement>(`[data-tab="${t.id}"]`);
     btn?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: changed && !reducedMotion() ? 'smooth' : 'auto' });
     body.setAttribute('aria-label', t.name);
-    const scrollTop = keepScroll ? body.scrollTop : 0;
+    const scrollTop = body.scrollTop;
     const items = itemsIn(t.category).filter(isListed);
     const owned = items.filter((it) => !it.consumable && isOwned(it.key)).length;
     const frag0 = document.createDocumentFragment();
@@ -488,10 +510,12 @@ export function marketScreen(tab?: string): Screen {
       frag0.append(earnPanel(false));
     }
     frag0.append(frag(`<p class="mk-fine">Prices are always in petals. Nothing here is random, and nothing runs out.</p>`));
+    // A new section starts at the top; reset before the swap, while layout is
+    // clean, so the tap doesn't force a layout of the new section.
+    if (!keepScroll) body.scrollTop = 0;
     body.replaceChildren(frag0);
     changedKeys = [];
-    body.scrollTop = scrollTop;
-    paintStills(body);
+    if (keepScroll) body.scrollTop = scrollTop;
     // Dots stay for this visit; next time they're gone.
     markSeen(...items.filter((it) => isNew(it)).map((it) => it.key));
   }
@@ -834,8 +858,9 @@ export function marketScreen(tab?: string): Screen {
 
   showTab(startTab);
   // While the player looks around, prepare the deck previews in idle time (one
-  // card per idle slot), so the Decks tab opens warm.
-  // Then the drawn art of the other tabs, one sprite symbol per idle slot.
+  // card per idle slot), so the Decks tab opens warm. Then the drawn art of the
+  // other tabs, one sprite symbol or garden vignette per idle slot, so a tile's
+  // art is ready by the time it's painted.
   const warmArt = [
     ...itemsIn('tool').map((it) => `tool-${it.id}`),
     'inkstone',
@@ -843,19 +868,19 @@ export function marketScreen(tab?: string): Screen {
     ...['plain', ...itemsIn('paper').filter((it) => !it.source && !it.isDefault).map((it) => it.id)].map((id) => `paper-${id}`),
     ...[...MUSIC_IDS].map((id) => `music-${id}`),
   ];
-  const warm = itemsIn('deck').flatMap((it) => DECK_CARDS.map((id) => [id, it.id] as const));
+  const warm: (() => void)[] = [
+    ...itemsIn('deck').flatMap((it) => DECK_CARDS.map((id) => () => cardPreviewSvg(id, it.id))),
+    ...warmArt.map((sym) => () => art(sym)),
+    ...itemsIn('garden').filter(isListed).map((it) => () => gardenItemSvgCached(it.id)),
+  ];
   let warmId = 0;
   const idle = (fn: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 2000 }) : window.setTimeout(fn, 120));
   const unidle = (n: number) => (typeof cancelIdleCallback === 'function' ? cancelIdleCallback(n) : clearTimeout(n));
   const warmNext = () => {
     if (!el.isConnected) return;
-    const next = warm.shift();
-    if (next) cardPreviewSvg(next[0], next[1]);
-    else {
-      const sym = warmArt.shift();
-      if (!sym) return;
-      art(sym);
-    }
+    const job = warm.shift();
+    if (!job) return;
+    job();
     warmId = idle(warmNext);
   };
   warmId = idle(warmNext);

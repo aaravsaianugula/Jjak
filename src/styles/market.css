@@ -563,7 +563,17 @@
 .mk-card:empty {
   background: color-mix(in srgb, var(--surface) 70%, var(--line));
 }
-.is-painted .mk-card svg {
+/* The garden's placeholder: the bare paper disc its vignette is painted on. */
+.mk-garden:empty {
+  border-radius: 50%;
+  transform: scale(0.86);
+  background: color-mix(in srgb, var(--surface) 70%, var(--line));
+}
+.is-painted .mk-card svg,
+.is-painted .mk-garden svg,
+.is-painted .mk-demo,
+.is-painted .mk-swatch__sheet > *,
+.is-painted .mk-swatch__weight {
   animation: mk-paint-in 260ms ease-out both;
 }
 @keyframes mk-paint-in {
@@ -572,7 +582,11 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .is-painted .mk-card svg {
+  .is-painted .mk-card svg,
+  .is-painted .mk-garden svg,
+  .is-painted .mk-demo,
+  .is-painted .mk-swatch__sheet > *,
+  .is-painted .mk-swatch__weight {
     animation: none;
   }
 }

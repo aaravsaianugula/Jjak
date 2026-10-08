@@ -27,16 +27,13 @@ import { store } from '../../services/store';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { type Screen } from '../app';
-import { esc, frag, h, toast } from '../dom';
+import { esc, fmt, frag, h, toast, wait } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
 import { nav } from '../nav';
-import { petalBump, retrigger } from '../motion';
+import { petalBump, reducedMotion, retrigger } from '../motion';
 
 type Tab = 'path' | 'missions' | 'chests';
-
-const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt = (n: number) => n.toLocaleString('en-US');
 
 const TIER_LABEL = { 1: 'Light', 2: 'Steady', 3: 'Long' } as const;
 
@@ -82,6 +79,10 @@ export function pathStrip(): string {
   </button>`;
 }
 
+/** A bar's fill at `pct`: a full-width fill slid left, so it moves with a transform. */
+const barAt = (pct: number) => `translateX(${((Math.max(pct, 0.04) - 1) * 100).toFixed(1)}%)`;
+const BAR_EASE = 'cubic-bezier(0.3, 0.7, 0.2, 1)';
+
 /**
  * Fill the Home strip's bar from `fromXp` to the XP now (rolling over on a
  * rank-up), sliding the fill with a transform. Nothing to do when no XP came in.
@@ -94,14 +95,13 @@ export function fillStrip(strip: HTMLElement | null, fromXp: number, delay = 0):
   const before = rankInfo(fromXp);
   const after = rank();
   const up = after.rank > before.rank;
-  const at = (pct: number) => `translateX(${((Math.max(pct, 0.04) - 1) * 100).toFixed(1)}%)`;
   bar.style.width = '100%';
   bar.style.minWidth = '0';
-  bar.style.transform = at(before.pct);
+  bar.style.transform = barAt(before.pct);
   if (up && seal) seal.querySelector('b')!.textContent = String(before.rank);
   const go = (pct: number, ms: number) => {
-    bar.style.transition = `transform ${ms}ms cubic-bezier(0.3, 0.7, 0.2, 1)`;
-    bar.style.transform = at(pct);
+    bar.style.transition = `transform ${ms}ms ${BAR_EASE}`;
+    bar.style.transform = barAt(pct);
   };
   setTimeout(() => {
     if (!bar.isConnected) return;
@@ -109,7 +109,7 @@ export function fillStrip(strip: HTMLElement | null, fromXp: number, delay = 0):
     go(1, 600);
     setTimeout(() => {
       bar.style.transition = 'none';
-      bar.style.transform = at(0);
+      bar.style.transform = barAt(0);
       if (seal) {
         seal.querySelector('b')!.textContent = String(after.rank);
         retrigger(seal, 'is-up');
@@ -154,16 +154,19 @@ export function pathResult(rep: BoardReport, at = 0): HTMLElement {
   const bar = el.querySelector<HTMLElement>('.fp-bar i')!;
   const seal = el.querySelector<HTMLElement>('.fp-seal')!;
   const sub = el.querySelector<HTMLElement>('[data-sub]')!;
+  bar.style.width = '100%';
+  bar.style.minWidth = '0';
+  bar.style.transform = barAt(rep.before.pct);
   const go = (pct: number, ms: number) => {
-    bar.style.transition = `width ${ms}ms cubic-bezier(0.3, 0.7, 0.2, 1)`;
-    bar.style.width = `${Math.round(pct * 100)}%`;
+    bar.style.transition = `transform ${ms}ms ${BAR_EASE}`;
+    bar.style.transform = barAt(pct);
   };
   setTimeout(() => {
     if (!up) return go(rep.after.pct, 900);
     go(1, 650);
     setTimeout(() => {
       bar.style.transition = 'none';
-      bar.style.width = '0%';
+      bar.style.transform = barAt(0);
       seal.querySelector('b')!.textContent = String(rep.after.rank);
       seal.classList.add('is-up');
       sub.textContent = `${titleFor(rep.after.rank).en} · rank ${rep.after.rank}`;
@@ -181,7 +184,7 @@ export function rankUpMoment(rep: BoardReport): void {
   const newTitle = TITLES.some((x) => x.rank > rep.before.rank && x.rank <= r && x.rank > 1);
   const reward = rankReward(Math.max(1, save.meta.claimed) + 1);
   const content = frag(`<div class="fp-up">
-    <div class="fp-up__stage">${rankSeal(r, 'fp-seal--xl fp-stamp-in')}${petalBurstHtml(10)}</div>
+    <div class="fp-up__stage fp-up__stage--rank">${rankSeal(r, 'fp-seal--xl fp-seal-settle')}${petalBurstHtml(6, RANK_UP_REACH)}</div>
     <div class="detail__kind">Rank up · <span lang="ko">승급</span> · <span class="ja" lang="ja">昇級</span></div>
     <h2>Rank ${r}${newTitle ? ` · ${esc(t.en)}` : ''}</h2>
     ${newTitle ? `<p class="fp-up__native"><span lang="ko" class="serif">${t.ko}</span> · <span class="ja" lang="ja">${t.ja}</span></p><p class="muted">${esc(t.line)}</p>` : '<p class="muted">A new step on the Flower Path.</p>'}
@@ -190,7 +193,8 @@ export function rankUpMoment(rep: BoardReport): void {
   const actions = h('div', { class: 'sheet__actions' });
   content.append(actions);
   const sheet = openSheet(content, { center: true, label: `Rank ${r}` });
-  if (!reducedMotion()) setTimeout(() => sfx.stamp(), 120);
+  // The stamp sounds as the seal meets the paper.
+  if (!reducedMotion()) setTimeout(() => sfx.stamp(), RANK_UP_LAND_MS);
   haptic.success();
   if (ranksToClaim()) {
     actions.append(
@@ -262,12 +266,17 @@ function revealSheet(title: RankTitle | null, foil: number[], items: string[]): 
   actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => sheet.close() }, 'Lovely'));
 }
 
-const petalBurstHtml = (n: number) =>
+/** The rank-up seal reaches the paper this long into its settle (meta.css fp-seal-settle). */
+const RANK_UP_LAND_MS = 300;
+/** The rank-up petals only drift a little way from the seal. */
+const RANK_UP_REACH = 0.7;
+
+const petalBurstHtml = (n: number, reach = 1) =>
   reducedMotion()
     ? ''
     : `<span class="fp-burst" aria-hidden="true">${Array.from({ length: n }, (_, i) => {
         const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
-        const d = 46 + Math.random() * 34;
+        const d = (46 + Math.random() * 34) * reach;
         return `<i style="--dx:${Math.round(Math.cos(a) * d)}px;--dy:${Math.round(Math.sin(a) * d - 18)}px;--r:${Math.round(Math.random() * 300 - 150)}deg;--d:${120 + Math.round(Math.random() * 160)}ms"></i>`;
       }).join('')}</span>`;
 
@@ -556,7 +565,7 @@ export function pathScreen(): Screen {
       do {
         const c = await claimOne(all ? null : claimBtn);
         if (c) got.push(c);
-        if (all && ranksToClaim()) await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 260));
+        if (all && ranksToClaim()) await wait(reducedMotion() ? 0 : 260);
       } while (all && ranksToClaim());
       refreshPetals();
       renderHero();

@@ -839,21 +839,61 @@
   margin: 0;
   padding: 0;
 }
+/* The current beat's dot stretches into a pill (7px to 22px) with transforms
+   only: the dot is the pill's left cap, ::after its right cap sliding out, and
+   ::before the band between them; the dots after it slide along. The row keeps
+   room for the pill at its end. */
+.first__dots {
+  padding-right: 15px;
+}
 .first__dots li {
+  --dot: var(--line);
+  position: relative;
   width: 7px;
   height: 7px;
-  border-radius: 4px;
-  background: var(--line);
-  transition:
-    width 260ms var(--ease-out),
-    background 260ms;
+  border-radius: 50%;
+  background: var(--dot);
+  transition: transform 300ms var(--ease-settle);
+}
+.first__dots li::before,
+.first__dots li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  height: 7px;
+  background: var(--dot);
+  transition: transform 300ms var(--ease-settle);
+}
+.first__dots li::before {
+  left: 3.5px;
+  width: 15px;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.first__dots li::after {
+  left: 0;
+  width: 7px;
+  border-radius: 50%;
 }
 .first__dots li.is-done {
-  background: var(--ink-soft);
+  --dot: var(--ink-soft);
 }
 .first__dots li.is-on {
-  width: 22px;
-  background: var(--accent);
+  --dot: var(--accent);
+}
+.first__dots li.is-on::before {
+  transform: scaleX(1);
+}
+.first__dots li.is-on::after,
+.first__dots li.is-on ~ li {
+  transform: translateX(15px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .first__dots li,
+  .first__dots li::before,
+  .first__dots li::after {
+    transition: none;
+  }
 }
 .first__go {
   max-width: 360px;

@@ -26,6 +26,9 @@ export function frag(html: string): HTMLElement {
   return t.content.firstElementChild as HTMLElement;
 }
 
+/** A count for display: digits grouped the same way everywhere (1,840). */
+export const fmt = (n: number): string => n.toLocaleString('en-US');
+
 export const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 

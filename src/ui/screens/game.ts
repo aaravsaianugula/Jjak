@@ -29,13 +29,13 @@ import { AD_POLICY } from '../../config';
 import { shareText } from '../../services/share';
 import { persist, save } from '../../services/storage';
 import { type Screen } from '../app';
-import { esc, frag, h, toast, wait } from '../dom';
+import { esc, fmt, frag, h, toast, wait } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
 import { showHowToPlay } from './settings';
 import { boardReport, rushReport } from '../../services/meta';
 import { pathResult, rankUpMoment } from './path';
-import { petalBump, reducedMotion, restartAnimations, retrigger, untrigger } from '../motion';
+import { petalBump, reducedMotion, restartAnimations, retrigger, smooth, untrigger } from '../motion';
 import { nav } from '../nav';
 import { MARKET_PAPER_IDS } from '../../data/market';
 import { activeBrush, activeFx } from '../../services/market';
@@ -51,14 +51,9 @@ const COMBO_WORDS = ['', '', 'Pair', 'Nice', 'Lovely', 'Brilliant'];
 const INK_DRAW = 210;
 const INK_LIFE = 900;
 
-const fmt = (n: number) => n.toLocaleString('en-US');
 /** Only touch the text when it changes (a same-value write still costs a layout and paint). */
 const setText = (node: Element, text: string) => {
   if (node.textContent !== text) node.textContent = text;
-};
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
 };
 
 function titleFor(spec: LevelSpec): string {

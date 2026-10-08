@@ -10,6 +10,7 @@
  * bursts are skipped (or drawn still for static previews).
  */
 import { h } from './dom';
+import { smooth } from './motion';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 export interface Pt {
@@ -22,10 +23,6 @@ const DRAW = 210;
 const LIFE = 900;
 
 const f = (v: number) => v.toFixed(1);
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
 const mk = (tag: string, attrs: Record<string, string | number>, cls?: string) => {
   const e = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
