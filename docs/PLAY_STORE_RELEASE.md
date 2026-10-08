@@ -12,8 +12,8 @@ Each step links to the section with the details. Play Console renames its menus 
 then: if a label below doesn't match, type the **bold** name into the search box at the top
 of Play Console.
 
-1. **Put `main` on GitHub** (§5). GitHub only has two `claude/…` branches today and the
-   default branch is `claude/quirky-lamport-37q8ip`. Push `main`, then GitHub → repo →
+1. **Make `main` the default branch** (§5). `main` is on GitHub (pushed 2026-10-07) but the
+   default is still `claude/quirky-lamport-37q8ip`: GitHub → repo →
    *Settings → General → Default branch* → switch to `main` → *Update*.
 2. **Create the upload key** on your PC and back it up (§3): `keytool` command, two backup
    copies, password in your password manager.
@@ -345,7 +345,7 @@ so publish it at exactly that address with GitHub Pages on the public repo
 | Ads | **Yes, contains ads** |
 | Advertising ID | **Yes**, the app uses it (the Google Mobile Ads SDK adds the `AD_ID` permission to the build). Purposes: **Advertising or marketing**, **Analytics**, **Fraud prevention, security, and compliance**. |
 | App access | All functionality available without special access |
-| Target audience | **13–15, 16–17, 18+** (13+ only). The app isn't in the Families programme, so it has no age gate. Ads are capped at Parental Guidance content in `src/services/ads.ts`. |
+| Target audience | **13–15, 16–17, 18+** (13+ only). The app isn't in the Families programme, so it has no age gate. Ads are capped at **G** (general audiences) in `src/services/ads.ts`. |
 | Unintentional appeal to children? | **No**. The art, copy and store listing are aimed at teens and young adults: no cartoon mascots, no childish language. Keep the listing that way, or Google may ask you to join Families. |
 | Content rating (IARC) | Category **Game**. No violence, sexuality, language, or drugs. **No gambling or simulated gambling**: the cards come from a deck that's also used for gambling games, but Jjak has no wagering, chips, or betting. Users can't interact or share user-generated content (the share button sends plain text through the OS). Expected result: **Everyone / PEGI 3 / USK 0**. |
 | Data safety | See below. |
