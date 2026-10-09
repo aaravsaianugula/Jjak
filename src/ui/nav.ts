@@ -19,4 +19,6 @@ export const nav = {
   path: (): void => {},
   /** the Practice room: intros and gentle boards for every mechanic met so far */
   practice: (): void => {},
+  /** "Your play style": insights, skill trend, mastery and best runs from the on-device model */
+  playstyle: (): void => {},
 };

@@ -3869,3 +3869,233 @@ button.row:active,
   padding: 0 12px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── Your play style (기풍 · 棋風): insights, skill line, mastery and best runs ── */
+.playstyle .section-label + .list {
+  margin-bottom: 0;
+}
+.style__insight {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 16px 14px;
+  animation: practice-rise 420ms var(--ease-settle) calc(var(--i, 0) * 45ms) backwards;
+}
+.style__insight + .style__insight::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--line-soft);
+}
+.style__kind {
+  font-size: var(--fs-cap);
+  font-weight: 700;
+  letter-spacing: var(--track-cap);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.style__insight--strength .style__kind {
+  color: var(--good-text);
+}
+.style__insight--edge .style__kind {
+  color: var(--accent-text);
+}
+.style__say {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+.style__note,
+.style__chart-empty {
+  margin: 10px 4px 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.style__chart-empty {
+  margin: 0;
+  padding: 18px 16px;
+}
+.style__chart {
+  margin: 0;
+  padding: 16px 16px 12px;
+  animation: practice-rise 480ms var(--ease-settle) 120ms backwards;
+}
+.style__chart svg {
+  display: block;
+  width: 100%;
+  height: 112px;
+  overflow: visible;
+}
+.style__base {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.style__line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.style__caption {
+  margin-top: 10px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.style__mech {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  animation: practice-rise 420ms var(--ease-settle) calc(var(--i, 0) * 45ms) backwards;
+}
+.style__mech + .style__mech::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 74px;
+  right: 0;
+  height: 1px;
+  background: var(--line-soft);
+}
+.style__seal {
+  color: var(--accent-text);
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: rotate(-4deg);
+}
+.style__mech-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.style__mech-name {
+  font-weight: 700;
+  font-size: var(--fs-body);
+  line-height: 1.3;
+}
+/* the band: one ink stroke on a soft track, a third, two thirds or the whole way */
+.style__band {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.style__band i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ink-soft);
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: meter-fill 640ms var(--ease-settle) 240ms backwards;
+}
+.style__band--learning i {
+  transform: scaleX(0.34);
+}
+.style__band--steady i {
+  transform: scaleX(0.67);
+}
+.style__band--home i {
+  transform: scaleX(1);
+  background: var(--good-text);
+}
+.style__band-word {
+  flex: none;
+  min-width: 64px;
+  text-align: right;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.style__runs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.style__run {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 13px 16px 14px;
+  min-width: 0;
+}
+.style__run:nth-child(2n)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--line-soft);
+}
+.style__run:nth-child(n + 3) {
+  border-top: 1px solid var(--line-soft);
+}
+.style__run-label {
+  font-size: var(--fs-cap);
+  font-weight: 700;
+  letter-spacing: var(--track-cap);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.style__run b {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.style__run small {
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  color: var(--muted);
+}
+.style__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 40px 12px 8px;
+  text-align: center;
+  animation: practice-rise 480ms var(--ease-settle) backwards;
+}
+.style__empty p {
+  margin: 0;
+  line-height: 1.5;
+}
+.style__empty-seal {
+  margin-bottom: 10px;
+  color: var(--accent-text);
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: rotate(-4deg);
+}
+.style__empty-title {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.style__privacy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 28px 4px 12px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.style__privacy svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}

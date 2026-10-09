@@ -37,6 +37,7 @@ import { marketHooks, marketScreen } from './ui/screens/market';
 import { bundlesSection } from './ui/screens/path';
 import { rank } from './services/meta';
 import { pathScreen } from './ui/screens/path';
+import { playStyleScreen } from './ui/screens/playstyle';
 import { practiceScreen } from './ui/screens/practice';
 import { sealsScreen } from './ui/screens/seals';
 import { settingsScreen } from './ui/screens/settings';
@@ -70,6 +71,7 @@ nav.market = (tab) => show(marketScreen(tab));
 nav.garden = () => show(gardenScreen());
 nav.path = () => show(pathScreen());
 nav.practice = () => show(practiceScreen());
+nav.playstyle = () => show(playStyleScreen());
 
 // Progression plugs into the Market: petal pouches + Supporter pack, rank meters on exclusives.
 marketHooks.bundlesSection = bundlesSection;
