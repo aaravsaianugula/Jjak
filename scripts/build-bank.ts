@@ -20,10 +20,12 @@ import { cpus } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import { encodeEntry } from '../src/director/bank';
+import { bankSeed, encodeSlot } from '../src/director/bank';
 import { type Metrics, funChecks, measure } from '../src/director/metrics';
-import { levelPlan } from '../src/director/plan';
-import { type Feature, featureOf, searchTiers, tierTarget } from '../src/director/search';
+import { type LevelPlan, knobRange, levelPlan } from '../src/director/plan';
+import { FEATURE_KEYS, type ReadingFeatures, encodeFeatures, featuresOf } from '../src/director/reading';
+import { type Candidate, type Feature, featureOf, funScore, searchTiers, tierTarget, tryCandidate } from '../src/director/search';
+import { TAILOR } from '../src/director/tailor';
 import { boardHash } from '../src/director/validate';
 import { buildBoard, windOf } from '../src/engine/levels';
 import { legacyJourneyLevel } from './lib/legacy-journey';
@@ -67,6 +69,78 @@ const funCode = (m: Metrics) => {
   return `${+c.foothold}${+c.crunch}${+c.finale}`;
 };
 
+/** Tailoring alternates per (level, tier), and how many pool boards are read to choose them. */
+const ALTERNATES = 2;
+const READ_AT_MOST = 5;
+/** an alternate must add at least this much lean (summed over what it leans on more) */
+const MIN_LEAN = 0.08;
+
+/** A board's reading features: the solver's line only (no playouts needed). */
+const readingOf = (c: Candidate): ReadingFeatures => featuresOf(c.board, measure(c.spec, c.board, { reading: true, random: 0, human: 0 }).reading!);
+
+const MECH_KNOBS = ['stones', 'snow', 'knots', 'gates', 'fences'] as const;
+/** fresh deals of the chosen knobs tried per tier, numbered from FRESH_FROM (clear of the search's attempts) */
+const FRESH = 5;
+const FRESH_FROM = 900;
+
+/** What a board leans on, as one vector: its reading features and its mechanic counts within the level's range. */
+function leanVector(plan: LevelPlan, c: Candidate, f: ReadingFeatures): number[] {
+  const range = knobRange(plan);
+  const mech = MECH_KNOBS.map((k) => {
+    const [lo, hi] = range[k] as [number, number];
+    return hi > lo ? (c.knobs[k] - lo) / (hi - lo) : 0;
+  });
+  return [...FEATURE_KEYS.map((k) => f[k]), ...mech];
+}
+
+/**
+ * The bank slot for one tier: its board and its features, then up to ALTERNATES other
+ * valid boards from the same search (within the d tolerance, as fun, with a foothold)
+ * that each lean clearly more on something the boards before them don't (greedy).
+ */
+function slotFor(plan: LevelPlan, tier: number, pick: Candidate, searched: readonly Candidate[]): string {
+  const hash = (c: Candidate) => boardHash(c.spec, c.board);
+  // The search's own pool, plus a few fresh seeds of the chosen knobs (same identity and
+  // counts, a different deal): these usually land within the d tolerance.
+  const fresh: Candidate[] = [];
+  if (!plan.fixed) {
+    for (let k = 0; k < FRESH; k++) {
+      const attempt = FRESH_FROM + k;
+      const c = tryCandidate(plan, pick.knobs, bankSeed(plan.n, tier, attempt), tier);
+      if (c.verdict.ok) fresh.push({ ...c, attempt, fitness: 0, feature: [] });
+    }
+  }
+  const pool = [...searched, ...fresh];
+  const f0 = readingOf(pick);
+  const boards = [{ entry: { attempt: pick.attempt, knobs: pick.knobs, d: pick.metrics.d, hash: hash(pick) }, features: encodeFeatures(f0) }];
+  if (plan.fixed) return encodeSlot(boards);
+  const seen = new Set([boards[0].entry.hash]);
+  const near = pool
+    .filter((c) => c !== pick && Math.abs(c.metrics.d - pick.metrics.d) <= TAILOR.maxDGap && c.metrics.easyOpen >= 1 && funScore(c.metrics) >= funScore(pick.metrics) - 0.1)
+    .filter((c) => {
+      const h = hash(c);
+      if (seen.has(h)) return false;
+      seen.add(h);
+      return true;
+    })
+    .sort((a, b) => Math.abs(a.metrics.d - pick.metrics.d) - Math.abs(b.metrics.d - pick.metrics.d))
+    .slice(0, READ_AT_MOST)
+    .map((c) => {
+      const f = readingOf(c);
+      return { c, f, v: leanVector(plan, c, f) };
+    });
+  let top = leanVector(plan, pick, f0);
+  for (let k = 0; k < ALTERNATES && near.length; k++) {
+    const gain = (v: number[]) => v.reduce((s, x, i) => s + Math.max(0, x - top[i]), 0);
+    near.sort((a, b) => gain(b.v) - gain(a.v));
+    const best = near.shift()!;
+    if (gain(best.v) < MIN_LEAN) break;
+    boards.push({ entry: { attempt: best.c.attempt, knobs: best.c.knobs, d: best.c.metrics.d, hash: hash(best.c) }, features: encodeFeatures(best.f) });
+    top = top.map((x, i) => Math.max(x, best.v[i]));
+  }
+  return encodeSlot(boards);
+}
+
 function runChapter(ch: number, K: number): LevelResult[] {
   const out: LevelResult[] = [];
   const recentByTier: Feature[][] = [[], [], [], [], []];
@@ -91,7 +165,7 @@ function runChapter(ch: number, K: number): LevelResult[] {
       out.push({ n, entries: [], curve: { ...curveBase, after: [], t2: null, sim: 0 }, tried: 0, rejected: {}, repaired: false, failed: true });
       continue;
     }
-    const entries = r.picks.map((c) => encodeEntry({ attempt: c.attempt, knobs: c.knobs, d: c.metrics.d, hash: boardHash(c.spec, c.board) }));
+    const entries = r.picks.map((c, t) => slotFor(plan, t, c, r.pools[t]));
     r.picks.forEach((c, t) => {
       recentByTier[t].push(c.feature);
       if (recentByTier[t].length > 3) recentByTier[t].shift();
@@ -194,7 +268,7 @@ function main() {
     const missing = entries.filter((e) => !e).length;
     const lines = [];
     for (let n = 1; n <= LEVELS; n++) lines.push('    ' + entries.slice((n - 1) * TIERS, n * TIERS).map((e) => JSON.stringify(e)).join(', '));
-    const json = `{\n  "v": 1,\n  "levels": ${LEVELS},\n  "tiers": ${TIERS},\n  "e": [\n${lines.join(',\n')}\n  ]\n}\n`;
+    const json = `{\n  "v": 2,\n  "levels": ${LEVELS},\n  "tiers": ${TIERS},\n  "e": [\n${lines.join(',\n')}\n  ]\n}\n`;
     writeFileSync(bankPath, json);
     curve.K = K;
     curve.levels = [...byN.values()].sort((a, b) => a.n - b.n);

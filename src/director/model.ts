@@ -26,8 +26,9 @@
  *     (skills.ts), so learning shows up where it happens.
  *
  * Assists are read **board by board**: a quick clear (at or under par) with a single
- * hint or shuffle is a *light assist*, the way some people like to play, not a sign the
- * board was too hard. It costs the score a little and never reads as a struggle; any
+ * hint taken early, before any real search (`MODEL.earlyHintMs`), is a *light assist*:
+ * the way some people like to play, not a sign the board was too hard. A hint after a
+ * long search is need, whatever the clear time. It costs the score a little and never reads as a struggle; any
  * other assist costs in full. This keeps hint-heavy players from sinking to the gentlest
  * tier and staying there. The leniency only ever softens the struggle reading: any
  * assist still means "not clean" and "not easy" for everything that could raise
@@ -72,6 +73,8 @@ export const MODEL = {
   lightCost: 0.06,
   /** a clear at or under this × par counts as quick (light assists, habits) */
   quickPar: 1.05,
+  /** a hint this soon after the first tap is a habit, not need (later ones always count in full) */
+  earlyHintMs: 10_000,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -116,8 +119,12 @@ export const parRatio = (r: Pick<BoardRecord, 'ms' | 'par'>) => (r.par > 0 ? r.m
 /** Cleared with no hint, shuffle or dead-end reshuffle. */
 export const isClean = (r: BoardRecord) => r.cleared && assistsOf(r) === 0;
 
-/** A quick clear (at or under par) with exactly one hint or shuffle and no dead-end reshuffle. */
-export const isLightAssist = (r: BoardRecord) => r.cleared && r.autoShuffles === 0 && r.hints + r.shuffles === 1 && parRatio(r) <= MODEL.quickPar;
+/**
+ * A quick clear (at or under par) with exactly one hint, taken early, and no shuffle or
+ * dead-end reshuffle. A hint with no recorded time (an older save) is not light.
+ */
+export const isLightAssist = (r: BoardRecord) =>
+  r.cleared && r.hints === 1 && r.shuffles === 0 && r.autoShuffles === 0 && r.hintAfterMs >= 0 && r.hintAfterMs <= MODEL.earlyHintMs && parRatio(r) <= MODEL.quickPar;
 
 /** Assists that read as need: all of them, unless the board was a light assist. */
 export const excessAssists = (r: BoardRecord) => (isLightAssist(r) ? 0 : assistsOf(r));

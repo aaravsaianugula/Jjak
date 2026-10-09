@@ -10,14 +10,15 @@
  *   par · exp(N(ln 0.9 − 1.5 (θ − d), 0.2)), with a few misreads on boards near their limit.
  */
 import { createRng, type Rng } from '../src/engine/rng';
-import { bankSpec } from '../src/director/bank';
 import { bendsOf, cardsOnBoard, initialState, movesOf, step } from '../src/director/bots';
 import { plainChallenge } from '../src/director/challenge';
 import { DIRECTOR, type TierChoice, decide, recordAttempt, tierD } from '../src/director/director';
 import { habitualAssists, ingest, isClean, isCleanOrLight, median } from '../src/director/model';
 import { designedBase, roadBase } from '../src/director/plan';
 import { shapeOfPath } from '../src/director/skills';
-import { buildBoard, windOf } from '../src/engine/levels';
+import { tailoredSpec } from '../src/director/tailor';
+import { type LevelSpec, buildBoard, windOf } from '../src/engine/levels';
+import { monthOf } from '../src/engine/board';
 import { mechanicsOf } from '../src/engine/mechanics';
 import { findPath } from '../src/engine/path';
 import { cellFraction } from '../src/services/analytics';
@@ -170,6 +171,11 @@ interface TracePair {
   edge: boolean;
   /** both cards on the outer ring */
   rim: boolean;
+  /** a card on the outer ring, and both cards inside it */
+  touchesRim: boolean;
+  inside: boolean;
+  /** legal pairs when it was made (≤ 2: a pair the player has to find) */
+  legal: number;
 }
 
 interface Opening {
@@ -188,6 +194,11 @@ interface Trace {
   mech: string[];
   twoShare: number;
   rimShare: number;
+  /** of the moments with at most two legal pairs: share whose pair sat inside the rim / touched it */
+  keyInside: number;
+  keyRim: number;
+  /** same-flower pairs with no path at the start, per pair */
+  decoyRate: number;
 }
 
 const ring = (rows: number, cols: number, i: number) => {
@@ -198,12 +209,13 @@ const ring = (rows: number, cols: number, i: number) => {
 
 const traces = new Map<string, Trace>();
 
-/** A playout of the real bank board for (n, tier), random legal order: cached. */
-export function traceOf(n: number, tier: number): Trace {
-  const key = `${n}:${tier}`;
+/** A playout of the board served (a bank board or one of its alternates), random legal order: cached. */
+export function traceOf(spec: LevelSpec): Trace {
+  const key = `${spec.seed}:${spec.tier}`;
+  const n = spec.number;
+  const tier = spec.tier;
   const hit = traces.get(key);
   if (hit) return hit;
-  const spec = bankSpec(n, tier);
   const st = initialState(spec, buildBoard(spec));
   const wind = windOf(spec);
   const rng = createRng(key);
@@ -214,6 +226,13 @@ export function traceOf(n: number, tier: number): Trace {
     depth: (ring(rows, cols, m[0]) + ring(rows, cols, m[1])) / 2,
     bends: bendsOf(st.board, m[0], m[1]),
   }));
+  // Decoys at the start: same flower, no path (what a rusher taps into).
+  const legal0 = new Set(movesOf(st).map(([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}`));
+  const cards = st.board.cells.map((v, i) => (v >= 0 ? i : -1)).filter((i) => i >= 0);
+  let decoys = 0;
+  for (let x = 0; x < cards.length; x++)
+    for (let y = x + 1; y < cards.length; y++)
+      if (monthOf(st.board.cells[cards[x]]) === monthOf(st.board.cells[cards[y]]) && !legal0.has(`${cards[x]}-${cards[y]}`)) decoys++;
   const pairs: TracePair[] = [];
   for (let k = 0; k < 200 && cardsOnBoard(st.board) > 0; k++) {
     const moves = movesOf(st);
@@ -221,11 +240,17 @@ export function traceOf(n: number, tier: number): Trace {
     const m = moves[rng.int(moves.length)];
     const path = findPath(st.board, m[0], m[1]);
     if (!path) throw new Error(`legal move without a path at level ${n} tier ${tier}`);
-    pairs.push({ ...shapeOfPath(path, rows, cols), rim: ring(rows, cols, m[0]) === 0 && ring(rows, cols, m[1]) === 0 });
+    const r0 = ring(rows, cols, m[0]) === 0;
+    const r1 = ring(rows, cols, m[1]) === 0;
+    pairs.push({ ...shapeOfPath(path, rows, cols), rim: r0 && r1, touchesRim: r0 || r1, inside: !r0 && !r1, legal: moves.length });
     if (!step(st, m, wind)) break;
   }
-  const share = (f: (p: TracePair) => boolean) => (pairs.length ? pairs.filter(f).length / pairs.length : 0);
-  const t: Trace = { pairs, opening, total, par: spec.par, mech: mechanicsOf(spec), twoShare: share((p) => p.bends === 2), rimShare: share((p) => p.rim) };
+  const share = (f: (p: TracePair) => boolean, of = pairs) => (of.length ? of.filter(f).length / of.length : 0);
+  const keyPairs = pairs.filter((p) => p.legal <= 2);
+  const t: Trace = {
+    pairs, opening, total, par: spec.par, mech: mechanicsOf(spec), twoShare: share((p) => p.bends === 2), rimShare: share((p) => p.rim),
+    keyInside: share((p) => p.inside, keyPairs), keyRim: share((p) => p.touchesRim, keyPairs), decoyRate: total ? decoys / total : 0,
+  };
   traces.set(key, t);
   return t;
 }
@@ -260,19 +285,27 @@ function pairCost(style: Style, p: TracePair): number {
   return f;
 }
 
-/** Extra effective difficulty from the board's content against the persona's blind spot. */
-function weakness(style: Style, t: Trace): number {
+/**
+ * Extra effective difficulty from the board's content against the persona's blind spot,
+ * read from its own playout of the board: 2-bend paths for the bend-blind reader; for the
+ * scanners, pairs away from where they look, and the moments with at most two legal
+ * pairs (the pair has to be found) whose pair sits there; decoys for the rusher.
+ */
+export function weakness(style: Style, t: Trace): number {
   if (style === 'bendBlind') return 0.3 * (t.twoShare - 0.4);
-  if (style === 'edge') return 0.15 * (0.5 - t.rimShare);
-  if (style === 'centre') return 0.15 * (t.rimShare - 0.3);
+  if (style === 'edge') return 0.15 * (0.5 - t.rimShare) + 0.1 * (t.keyInside - 0.4);
+  if (style === 'centre') return 0.15 * (t.rimShare - 0.3) + 0.1 * (t.keyRim - 0.6);
+  if (style === 'rusher') return 0.08 * (t.decoyRate - 2.3);
   return 0;
 }
 
 const sum = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
 
 /** One board by a habit persona of skill θ: the record built from its real play of the board. */
-export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number, n: number, tier: number, measured: number): BoardRecord {
-  const t = traceOf(n, tier);
+export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number, spec: LevelSpec, measured: number): BoardRecord {
+  const t = traceOf(spec);
+  const n = spec.number;
+  const tier = spec.tier ?? 2;
   const gap = theta - (d + weakness(style, t));
   // A typical reader clears a board at their skill in about 0.9 × par (as `playBoard`).
   const meanCost = t.pairs.length ? sum(t.pairs.map(baseCost)) / t.pairs.length : 1;
@@ -342,11 +375,13 @@ export function simulateHabits(p: HabitPersona, seed: string, boards = 300, a: A
   for (let played = 0; played < boards; played++) {
     const wasCleared = !!stars[n];
     const choice = policy(a, n, wasCleared);
-    const measured = tierD(n, choice.tier);
+    // The board the game serves: the pinned tier's, tailored by the pinned challenge.
+    const spec = tailoredSpec(n, choice.tier, choice.challenge);
+    const measured = spec.difficulty ?? tierD(n, choice.tier);
     const real = measured + 0.03 * gauss(rng);
     const theta = p.skill(n, played);
     const habit = habitualAssists(a);
-    const rec = playHabitBoard(rng, p.name, theta, real, n, choice.tier, measured);
+    const rec = playHabitBoard(rng, p.name, theta, real, spec, measured);
     ingest(a, rec, { replay: wasCleared });
     recordAttempt(a, n, rec.ended, wasCleared);
     log.push({

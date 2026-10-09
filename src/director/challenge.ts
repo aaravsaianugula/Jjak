@@ -10,7 +10,8 @@
  *    player is struggling or frozen;
  *  - rotation: a blind spot leaned on for either of the last two levels is skipped, so
  *    it's never the same trick board after board (`save.analytics.emphases` keeps the
- *    record; detours, rim routes and 2-bend paths count as one blind spot);
+ *    record; detours, rim routes and 2-bend paths count as one blind spot), and none is
+ *    leaned on more than 3 levels in any 8;
  *  - a retry or replay of a pinned level keeps its focus and weight, however long after
  *    (`pinChallenge` stores them beside the tier pin): the same board.
  * Pure apart from `noteChallenge` and `pinChallenge`, which write the save.
@@ -45,6 +46,9 @@ export interface ChallengeRequest {
 export const CHALLENGE = {
   /** new boards a focus must wait before it can return */
   gap: 2,
+  /** at most this many of the last `window` levels lean on one blind spot (the per-player record) */
+  maxPerWindow: 3,
+  window: 8,
   /** least confidence in a habit before it can be leaned on */
   minConfidence: 0.3,
   maxWeight: 0.8,
@@ -124,14 +128,24 @@ export function candidates(a: AnalyticsSave, n: number): { emphasis: Emphasis; n
  */
 export function planChallenge(a: AnalyticsSave, n: number, tier: number, calm: string | null): ChallengeRequest {
   if (calm) return plainChallenge(n, tier, calm);
-  // Every blind spot the last `gap` levels were given (a re-pinned level has two entries).
-  const levels = new Set<number>();
-  const recent = new Set<string>();
+  // Blind spots due a rest: any the last `gap` levels were given, and any already leaned
+  // on in `maxPerWindow` of the last `window` levels. A re-pinned level has two entries;
+  // both count (its board before the relief was played too).
+  const byLevel = new Map<number, Set<string>>();
   for (const e of a.emphases) {
-    if (!levels.has(e.n) && levels.size === CHALLENGE.gap) break;
-    levels.add(e.n);
-    recent.add(familyOf(e.focus));
+    const fams = byLevel.get(e.n) ?? new Set<string>();
+    fams.add(familyOf(e.focus));
+    byLevel.set(e.n, fams);
   }
+  const recent = new Set<string>();
+  const uses = new Map<string, number>();
+  [...byLevel.values()].slice(0, CHALLENGE.window).forEach((fams, i) => {
+    for (const f of fams) {
+      if (i < CHALLENGE.gap) recent.add(f);
+      uses.set(f, (uses.get(f) ?? 0) + 1);
+    }
+  });
+  for (const [f, k] of uses) if (k >= CHALLENGE.maxPerWindow) recent.add(f);
   const pick = candidates(a, n).find((c) => c.need > 0 && !recent.has(familyOf(focusOf(c.emphasis))));
   return pick ? request(n, tier, pick.emphasis, weightFor(Math.min(1, pick.need)), pick.why) : plainChallenge(n, tier, 'nothing due');
 }

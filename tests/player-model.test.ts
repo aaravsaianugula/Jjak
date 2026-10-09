@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { type ChallengeRequest, DIRECTOR, decide, masteryFloor, targetFor, tierD } from '../src/director/director';
-import { emphasisOf, focusOf, pinnedChallenge } from '../src/director/challenge';
+import { CHALLENGE, emphasisOf, familyOf, focusOf, pinnedChallenge } from '../src/director/challenge';
 import { flowState } from '../src/director/flow';
 import { MODEL, expected, habitualAssists, ingest, performance } from '../src/director/model';
 import { designedBase, levelPlan } from '../src/director/plan';
@@ -221,12 +221,13 @@ describe('assisted clears still count as progress (the tier-0 trap)', () => {
     expect(clean).toBeGreaterThan(one);
     expect(one).toBeGreaterThan(two);
     expect(two).toBeGreaterThan(q + 0.2);
-    // a light assist (one hint on a quick clear) costs a little; on a slow clear, in full
-    const light = performance(rec({ hints: 1 }));
+    // a light assist (one early hint on a quick clear) costs a little; on a slow clear, in full
+    const light = performance(rec({ hints: 1, hintAfterMs: 3000 }));
     expect(light).toBeCloseTo(performance(rec()) - 0.27 * MODEL.lightCost, 6);
     expect(clean - one).toBeCloseTo(0.27 * 0.5, 6);
-    // two hints are never light, however quick
-    expect(performance(rec({ hints: 2 }))).toBeLessThan(light - 0.2);
+    // two hints are never light, however quick; nor is a hint after a long search
+    expect(performance(rec({ hints: 2, hintAfterMs: 3000 }))).toBeLessThan(light - 0.2);
+    expect(performance(rec({ hints: 1, hintAfterMs: 30_000 }))).toBeCloseTo(performance(rec()) - 0.27 * 0.5, 6);
   });
 
   it('the floor rises with mastery evidence (rating up, deviation down)', () => {
@@ -389,6 +390,10 @@ describe('verifier fixes on the player model', () => {
     const slowHinted = history({ ms: 100_000, hints: 1, hintAfterMs: 3000 }, 14);
     expect(targetFor(slowHinted, n).flow).toBeLessThan(0);
     expect(targetFor(slowHinted, n).target).toBeLessThan(targetFor(slowClean, n).target);
+    // quick clears with a hint after a long search: need, so a miss and a struggle
+    const needed = history({ ms: 60_000, blocked: 0, hints: 1, hintAfterMs: 30_000 }, 14);
+    expect(targetFor(needed, n).flow).toBeLessThan(0);
+    expect(targetFor(needed, n).target).toBeLessThan(targetFor(hinted, n).target);
   });
 
   it('a stop-start pair rhythm (far above their usual) reads as a freeze', () => {
@@ -437,6 +442,20 @@ describe('verifier fixes on the player model', () => {
         n: c.n, tier: c.tier, focus: c.focus, weight: c.weight, rotationKey: c.rotationKey,
       });
     }
+  });
+
+  it('one blind spot is never leaned on more than three boards in any eight (the per-player record)', () => {
+    // a reader with a single strong blind spot (2-bend paths), nothing else to lean on
+    const tpl = { turnMs: [1800, 2200, 9000] as [number, number, number], gapMs: 2300, firstTaps: [[0.2, 0.5], [0.6, 0.0], [1, 0.5]] as [number, number][] };
+    const a = history(tpl, 24);
+    const fam: string[] = [];
+    for (let n = 150; n < 190; n++) {
+      const c = decide(a, n, false);
+      fam.push(familyOf(c.challenge.focus));
+      ingest(a, rec({ n, d: tierD(n, c.tier), tier: c.tier, ...tpl }));
+    }
+    expect(fam.filter((f) => f === 'bends2').length).toBeGreaterThanOrEqual(6);
+    for (let i = 0; i + 8 <= fam.length; i++) expect(fam.slice(i, i + 8).filter((f) => f === 'bends2').length, `boards ${i}–${i + 7}`).toBeLessThanOrEqual(CHALLENGE.maxPerWindow);
   });
 
   it('malformed stored foci never become an emphasis', () => {
