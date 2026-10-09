@@ -40,7 +40,7 @@ import type { AnalyticsSave } from '../services/save-analytics';
 import { TIERS, bankSpec } from './bank';
 import { type ChallengeRequest, noteChallenge, pinChallenge, pinnedChallenge, planChallenge, plainChallenge } from './challenge';
 import { flowState } from './flow';
-import { MODEL, engagement, isClean, isCleanOrLight } from './model';
+import { MODEL, cleanCredit, engagement, isClean } from './model';
 import { designedBase, levelPlan } from './plan';
 import { LEVELS_PER_CHAPTER } from '../engine/levels';
 import { ROUTE_LEVELS } from '../data/route';
@@ -168,18 +168,20 @@ export function chapterMean(n: number): number {
 
 /**
  * Recent clean-clear rates (null with too little data): `strict` counts no assist at
- * all (the dev panel), `lenient` also counts light assists (a quick clear with one hint).
+ * all (the dev panel), `lenient` is the mean clean credit (model.ts `cleanCredit`): an
+ * assisted clear counts in part, by how little its assists look like need.
  */
 export function cleanRate(a: AnalyticsSave, window = DIRECTOR.flowWindow): { strict: number; lenient: number } | null {
   const rs = a.recent.filter((r) => r.mode !== 'rush').slice(0, window);
   if (rs.length < DIRECTOR.flowMin) return null;
-  return { strict: rs.filter(isClean).length / rs.length, lenient: rs.filter(isCleanOrLight).length / rs.length };
+  return { strict: rs.filter(isClean).length / rs.length, lenient: rs.reduce((sum, r) => sum + cleanCredit(r), 0) / rs.length };
 }
 
 /**
- * The flow nudge toward the clean-clear target, read on the lenient rate. A light assist
- * counts as it would have without the hint (a quick clear); a hint on a slow clear counts
- * as a miss. So a hint can only ever take board difficulty down, never up.
+ * The flow nudge toward the clean-clear target, read on the lenient rate. An early hint
+ * on a quick clear counts as it would have without the hint; a hint on a clear at 1.5 ×
+ * par or slower counts as a miss, with a smooth ramp between. So a hint can only ever
+ * take board difficulty down, never up.
  */
 export function flowNudge(rate: { strict: number; lenient: number } | null): number {
   if (!rate) return 0;

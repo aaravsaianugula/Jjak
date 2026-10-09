@@ -12,8 +12,8 @@
 import { createRng, type Rng } from '../src/engine/rng';
 import { bendsOf, cardsOnBoard, initialState, movesOf, step } from '../src/director/bots';
 import { plainChallenge } from '../src/director/challenge';
-import { DIRECTOR, type TierChoice, decide, recordAttempt, tierD } from '../src/director/director';
-import { habitualAssists, ingest, isClean, isCleanOrLight, median } from '../src/director/model';
+import { DIRECTOR, type TierChoice, decide, masteryFloor, recordAttempt, tierD } from '../src/director/director';
+import { cleanCredit, ingest, isClean, median } from '../src/director/model';
 import { designedBase, roadBase } from '../src/director/plan';
 import { shapeOfPath } from '../src/director/skills';
 import { tailoredSpec } from '../src/director/tailor';
@@ -81,6 +81,16 @@ export interface SimOptions {
   policy?: Policy;
   /** share of clean clears on which the player takes a hint anyway (habit, not need) */
   freeHints?: number;
+  /** when that habitual hint comes, ms after the first tap (default 3000: before any real search) */
+  hintMs?: number;
+  /** the habitual assist is a shuffle instead of a hint */
+  shuffle?: boolean;
+  /**
+   * The pace of an assisted clean clear (the par-ratio sweep): this × par on a board at the
+   * player's skill instead of 0.9 × par, quicker on easier boards as every clear is
+   * (its own time scaled by this / 0.9).
+   */
+  parRatio?: number;
 }
 
 /** A control with no Director: every level at the designed tier, nothing leaned on. */
@@ -95,6 +105,8 @@ export interface SimStep {
   rating: number;
   clean: boolean;
   cleared: boolean;
+  /** the mastery floor (director.ts `masteryFloor`) when the tier was chosen */
+  floor: number;
 }
 
 /**
@@ -112,16 +124,20 @@ export function simulate(p: Persona, seed: string, boards = 300, a: AnalyticsSav
   let n = 1;
   for (let played = 0; played < boards; played++) {
     const wasCleared = !!stars[n];
+    const floor = masteryFloor(a, n);
     const choice = policy(a, n, wasCleared);
     const measured = tierD(n, choice.tier);
     const real = measured + 0.03 * gauss(rng);
     const theta = p.skill(n, played);
     let rec = playBoard(rng, theta, real, n, choice.tier, measured);
-    // A habitual hinter: takes a hint early on a board it clears cleanly anyway (no time cost).
-    if (opts.freeHints && hintRng.next() < opts.freeHints && isClean(rec)) rec = { ...rec, hints: 1, hintAfterMs: 3000, stars: 2 };
+    // A habitual assist on a board it clears cleanly anyway: a hint (early unless `hintMs`) or a shuffle.
+    if (opts.freeHints && hintRng.next() < opts.freeHints && isClean(rec)) {
+      const assist = opts.shuffle ? { shuffles: 1 } : { hints: 1, hintAfterMs: opts.hintMs ?? 3000 };
+      rec = { ...rec, ...assist, ...(opts.parRatio != null ? { ms: (rec.ms * opts.parRatio) / 0.9 } : {}), stars: 2 };
+    }
     ingest(a, rec, { replay: wasCleared });
     recordAttempt(a, n, rec.ended, wasCleared);
-    log.push({ n, tier: choice.tier, reason: choice.reason, d: measured, theta, rating: a.rating, clean: isClean(rec), cleared: rec.cleared });
+    log.push({ n, tier: choice.tier, reason: choice.reason, d: measured, theta, rating: a.rating, clean: isClean(rec), cleared: rec.cleared, floor });
     if (rec.cleared) {
       stars[n] = 1;
       n++;
@@ -142,7 +158,7 @@ export function simulate(p: Persona, seed: string, boards = 300, a: AnalyticsSav
 // use the skill-vs-difficulty curve of `playBoard`, plus a weakness term from the board's
 // content (a bend-blind reader on a board full of 2-bend paths finds it harder).
 
-export type Style = 'edge' | 'centre' | 'bendBlind' | 'rusher' | 'hinter';
+export type Style = 'edge' | 'centre' | 'bendBlind' | 'rusher' | 'hinter' | 'lateHinter';
 
 export interface HabitPersona {
   name: Style;
@@ -154,7 +170,7 @@ export interface HabitPersona {
  * Each persona sits off the road by a skill offset the policy must correct: the designed
  * tier alone (`fixedTier`) gives each of them a clean rate outside the 75–85 % band.
  */
-export const HABIT_OFFSET: Record<Style, number> = { edge: 0.15, centre: -0.04, bendBlind: 0.18, rusher: 0.18, hinter: 0.12 };
+export const HABIT_OFFSET: Record<Style, number> = { edge: 0.15, centre: -0.04, bendBlind: 0.18, rusher: 0.18, hinter: 0.12, lateHinter: 0.12 };
 
 export const HABIT_PERSONAS: Record<Style, HabitPersona> = {
   edge: { name: 'edge', skill: (n) => roadBase(n) + HABIT_OFFSET.edge },
@@ -163,7 +179,12 @@ export const HABIT_PERSONAS: Record<Style, HabitPersona> = {
   rusher: { name: 'rusher', skill: (n) => roadBase(n) + HABIT_OFFSET.rusher },
   // learns as it goes: from well under the road to above it over its first 200 boards
   hinter: { name: 'hinter', skill: (n, p) => roadBase(n) + HABIT_OFFSET.hinter - 0.12 + 0.2 * Math.min(1, p / 200) },
+  // a strong reader who takes its usual hint late (15–25 s in), after a look of its own
+  lateHinter: { name: 'lateHinter', skill: (n) => roadBase(n) + HABIT_OFFSET.lateHinter },
 };
+
+/** Personas that take a hint on most boards whatever the board (a habit, not need). */
+export const isHinter = (style: Style) => style === 'hinter' || style === 'lateHinter';
 
 interface TracePair {
   bends: number;
@@ -313,9 +334,9 @@ export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number,
   const finds = t.pairs.map((p) => pace * pairCost(style, p) * Math.exp(0.25 * gauss(rng)));
   const think = (style === 'rusher' ? 800 : 1800) * Math.exp(0.3 * gauss(rng));
   const clean = rng.next() < sigma(gap / 0.08 + Math.log(4));
-  const habitHint = style === 'hinter' && rng.next() < 0.8;
+  const habitHint = isHinter(style) && rng.next() < 0.8;
   // A hinter reaches for a hint where others give up.
-  const pQuit = Math.min(0.8, Math.max(0.1, 0.35 - 2 * gap)) * (style === 'hinter' ? 0.3 : 1);
+  const pQuit = Math.min(0.8, Math.max(0.1, 0.35 - 2 * gap)) * (isHinter(style) ? 0.3 : 1);
   const quit = !clean && rng.next() < pQuit;
   const made = quit ? Math.max(1, Math.round(t.total * (0.2 + 0.5 * rng.next()))) : t.total;
   const played = finds.slice(0, made);
@@ -345,7 +366,7 @@ export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number,
     turns: [0, 1, 2].map((k) => count((p) => p.bends === k)) as [number, number, number],
     turnMs: [0, 1, 2].map((k) => med(by((p) => p.bends === k))) as [number, number, number],
     firstTaps: firstTaps(style, t, rng),
-    hintAfterMs: hints ? Math.round(habitHint ? 4000 + 2000 * rng.next() : 20_000 + 20_000 * rng.next()) : -1,
+    hintAfterMs: hints ? Math.round(!habitHint ? 20_000 + 20_000 * rng.next() : style === 'lateHinter' ? 15_000 + 10_000 * rng.next() : 4000 + 2000 * rng.next()) : -1,
     date: '2026-10-07', hour: 20,
     detour: [count((p) => p.detour), med(by((p) => p.detour))],
     edgeRoute: [count((p) => p.edge), med(by((p) => p.edge))],
@@ -360,10 +381,8 @@ export interface HabitStep extends SimStep {
   /** the policy's target and the designed curve at this level (target − base = where the policy aims) */
   target: number;
   base: number;
-  /** the assist habit the model read before this board */
-  habit: number;
-  /** cleared clean or with a light assist (a quick clear with one hint, model.ts) */
-  cleanOrLight: boolean;
+  /** what the board counts toward the Director's clean rate, 0–1 (model.ts `cleanCredit`) */
+  credit: number;
 }
 
 /** A habit persona plays `boards` Journey boards from level 1 through the real Director and model. */
@@ -374,19 +393,19 @@ export function simulateHabits(p: HabitPersona, seed: string, boards = 300, a: A
   let n = 1;
   for (let played = 0; played < boards; played++) {
     const wasCleared = !!stars[n];
+    const floor = masteryFloor(a, n);
     const choice = policy(a, n, wasCleared);
     // The board the game serves: the pinned tier's, tailored by the pinned challenge.
     const spec = tailoredSpec(n, choice.tier, choice.challenge);
     const measured = spec.difficulty ?? tierD(n, choice.tier);
     const real = measured + 0.03 * gauss(rng);
     const theta = p.skill(n, played);
-    const habit = habitualAssists(a);
     const rec = playHabitBoard(rng, p.name, theta, real, spec, measured);
     ingest(a, rec, { replay: wasCleared });
     recordAttempt(a, n, rec.ended, wasCleared);
     log.push({
-      n, tier: choice.tier, reason: choice.reason, d: measured, theta, rating: a.rating, clean: isClean(rec), cleared: rec.cleared,
-      focus: choice.challenge.focus, habit, cleanOrLight: isCleanOrLight(rec), target: choice.target, base: designedBase(n),
+      n, tier: choice.tier, reason: choice.reason, d: measured, theta, rating: a.rating, clean: isClean(rec), cleared: rec.cleared, floor,
+      focus: choice.challenge.focus, credit: cleanCredit(rec), target: choice.target, base: designedBase(n),
     });
     if (rec.cleared) {
       stars[n] = 1;

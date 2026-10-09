@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { type ChallengeRequest, DIRECTOR, decide, masteryFloor, targetFor, tierD } from '../src/director/director';
 import { emphasisOf, familyOf, focusOf, pinnedChallenge } from '../src/director/challenge';
 import { flowState } from '../src/director/flow';
-import { MODEL, expected, habitualAssists, ingest, performance } from '../src/director/model';
+import { MODEL, cleanCredit, expected, ingest, performance } from '../src/director/model';
 import { designedBase, levelPlan } from '../src/director/plan';
 import { playerHabits } from '../src/director/profile';
 import { SKILL, shapeOfPath, skillConfidence } from '../src/director/skills';
@@ -154,9 +154,7 @@ describe('flow state from think time, pair rhythm and assists', () => {
 
   it('a habitual hinter using their usual hint is not struggling', () => {
     const a = history({ hints: 1, hintAfterMs: 4000, ms: 70_000 }, 12);
-    expect(habitualAssists(a)).toBe(1);
     expect(flowState(a).state).not.toBe('struggling');
-    expect(habitualAssists(norm())).toBe(0);
   });
 });
 
@@ -214,7 +212,7 @@ describe('assisted clears still count as progress (the tier-0 trap)', () => {
   });
 
   it('partial credit: an assisted clear scores between a quit and a clean clear, scaled by assists', () => {
-    const slow = { ms: 110_000 };
+    const slow = { ms: 140_000 }; // over 1.5 × par: assists cost their full price
     const clean = performance(rec(slow));
     const one = performance(rec({ ...slow, hints: 1 }));
     const two = performance(rec({ ...slow, hints: 2 }));
@@ -226,9 +224,58 @@ describe('assisted clears still count as progress (the tier-0 trap)', () => {
     const light = performance(rec({ hints: 1, hintAfterMs: 3000 }));
     expect(light).toBeCloseTo(performance(rec()) - 0.27 * MODEL.lightCost, 6);
     expect(clean - one).toBeCloseTo(0.27 * 0.5, 6);
-    // two hints are never light, however quick; nor is a hint after a long search
-    expect(performance(rec({ hints: 2, hintAfterMs: 3000 }))).toBeLessThan(light - 0.2);
-    expect(performance(rec({ hints: 1, hintAfterMs: 30_000 }))).toBeCloseTo(performance(rec()) - 0.27 * 0.5, 6);
+    // a second hint costs more, however quick, and a hint after a long search more than an early one
+    expect(performance(rec({ hints: 2, hintAfterMs: 3000 }))).toBeLessThan(light - 0.02);
+    expect(performance(rec({ hints: 1, hintAfterMs: 40_000 }))).toBeLessThan(light - 0.02);
+    // on a slow clear (1.5 × par and over) any assist costs its full price: a hint 0.5, a shuffle 0.6
+    const slowest = { ms: 1.5 * 90_000 };
+    expect(performance(rec({ ...slowest, hints: 1, hintAfterMs: 3000 }))).toBeCloseTo(performance(rec(slowest)) - 0.27 * 0.5, 6);
+    expect(performance(rec({ ...slowest, shuffles: 1 }))).toBeCloseTo(performance(rec(slowest)) - 0.27 * 0.6, 6);
+    // shuffles get the same treatment: one on a quick clear is light
+    expect(performance(rec({ shuffles: 1 }))).toBeCloseTo(performance(rec()) - 0.27 * MODEL.lightCost, 6);
+  });
+
+  it('no cliff: the score and the clean credit fall smoothly with hint time, pace and assist count', () => {
+    /** the largest change between neighbouring points of a sweep, and whether it never rises */
+    const sweep = (xs: number[], f: (x: number) => number) => {
+      const ys = xs.map(f);
+      let step = 0;
+      let rises = false;
+      for (let i = 1; i < ys.length; i++) {
+        step = Math.max(step, Math.abs(ys[i] - ys[i - 1]));
+        if (ys[i] > ys[i - 1] + 1e-12) rises = true;
+      }
+      return { step, rises, first: ys[0], last: ys[ys.length - 1] };
+    };
+    const range = (lo: number, hi: number, by: number) => Array.from({ length: Math.round((hi - lo) / by) + 1 }, (_, i) => lo + i * by);
+    const hintAt = (ms: number, more: Partial<BoardRecord> = {}) => rec({ ms: 70_000, blocked: 0, hints: 1, hintAfterMs: ms, ...more });
+    const paced = (ratio: number, more: Partial<BoardRecord>) => rec({ ms: ratio * 90_000, blocked: 0, ...more });
+    const cases = [
+      // hint time 0–60 s on a quick clear, in 0.5 s steps (the old rule jumped 0.12 at 10 s)
+      sweep(range(0, 60_000, 500), (t) => performance(hintAt(t))),
+      sweep(range(0, 60_000, 500), (t) => cleanCredit(hintAt(t))),
+      // pace 0.8–1.8 × par in 0.01 steps, for an early hint and for a shuffle
+      sweep(range(0.8, 1.8, 0.01), (x) => performance(paced(x, { hints: 1, hintAfterMs: 3000 }))),
+      sweep(range(0.8, 1.8, 0.01), (x) => cleanCredit(paced(x, { hints: 1, hintAfterMs: 3000 }))),
+      sweep(range(0.8, 1.8, 0.01), (x) => performance(paced(x, { shuffles: 1 }))),
+      sweep(range(0.8, 1.8, 0.01), (x) => cleanCredit(paced(x, { shuffles: 1 }))),
+    ];
+    for (const c of cases) {
+      expect(c.rises).toBe(false);
+      expect(c.step).toBeLessThan(0.03);
+      expect(c.last).toBeLessThan(c.first);
+    }
+    // credit runs the whole way: an early hint on a quick clear is a clean clear, a slow assisted clear a miss
+    expect(cleanCredit(hintAt(3000))).toBe(1);
+    expect(cleanCredit(paced(1.6, { hints: 1, hintAfterMs: 3000 }))).toBe(0);
+    // each further assist costs more, by at most one full hint's price
+    const byCount = [0, 1, 2, 3, 4].map((k) => performance(rec({ ms: 70_000, blocked: 0, hints: k, hintAfterMs: k ? 3000 : -1 })));
+    for (let k = 1; k < byCount.length; k++) {
+      expect(byCount[k]).toBeLessThan(byCount[k - 1]);
+      expect(byCount[k - 1] - byCount[k]).toBeLessThanOrEqual(0.27 * 0.5 + 1e-9);
+    }
+    const creditByCount = [1, 2, 3, 4].map((k) => cleanCredit(rec({ ms: 70_000, blocked: 0, hints: k, hintAfterMs: 3000 })));
+    for (let k = 1; k < creditByCount.length; k++) expect(creditByCount[k]).toBeLessThan(creditByCount[k - 1]);
   });
 
   it('the floor rises with mastery evidence (rating up, deviation down)', () => {
@@ -363,37 +410,28 @@ describe('ChallengeRequest', () => {
 });
 
 describe('verifier fixes on the player model', () => {
-  it('a habit is a hint on MOST quick clears: a mean of exactly one in two is no habit', () => {
-    const mixed = (hinted: number, of: number, extra = 0) => {
-      const a = defaultAnalytics();
-      for (let i = 0; i < of; i++) ingest(a, rec({ n: 30 + i, hints: (i < hinted ? 1 : 0) + (i < extra ? 1 : 0), ms: 70_000 }));
-      return habitualAssists(a);
-    };
-    expect(mixed(5, 10)).toBe(0);
-    expect(mixed(6, 10)).toBe(1);
-    expect(mixed(10, 10, 5)).toBe(1);
-    expect(mixed(10, 10, 6)).toBe(2);
-  });
-
   it('a hint never earns a harder board: no stretch, and a hint on a slow clear is a miss', () => {
     const n = 150;
     const clean = history({ ms: 60_000, blocked: 0 }, 14);
     const hinted = history({ ms: 60_000, blocked: 0, hints: 1, hintAfterMs: 3000 }, 14);
-    expect(habitualAssists(hinted)).toBe(1);
     // the same quick clears with a hint each: never a stretch, never a higher target
     expect(targetFor(clean, n).reason).toBe('stretch');
     expect(targetFor(hinted, n).reason).not.toBe('stretch');
     expect(targetFor(hinted, n).target).toBeLessThan(targetFor(clean, n).target);
     // ...and a light assist never reads as a struggle
     expect(flowState(hinted).state).not.toBe('struggling');
-    // slow clears: clean ones count toward the clean rate, hinted ones against it
+    // slow clears: clean ones count toward the clean rate, hinted ones less the slower they are
     const slowClean = history({ ms: 100_000 }, 14);
     const slowHinted = history({ ms: 100_000, hints: 1, hintAfterMs: 3000 }, 14);
-    expect(targetFor(slowHinted, n).flow).toBeLessThan(0);
+    const slowerHinted = history({ ms: 120_000, hints: 1, hintAfterMs: 3000 }, 14);
+    expect(targetFor(slowHinted, n).flow).toBeLessThanOrEqual(targetFor(slowClean, n).flow);
     expect(targetFor(slowHinted, n).target).toBeLessThan(targetFor(slowClean, n).target);
-    // quick clears with a hint after a long search: need, so a miss and a struggle
-    const needed = history({ ms: 60_000, blocked: 0, hints: 1, hintAfterMs: 30_000 }, 14);
-    expect(targetFor(needed, n).flow).toBeLessThan(0);
+    expect(targetFor(slowerHinted, n).flow).toBeLessThan(targetFor(slowHinted, n).flow);
+    // a hint on a clear at 1.5 × par or slower is a miss
+    expect(targetFor(history({ ms: 140_000, hints: 1, hintAfterMs: 3000 }, 14), n).flow).toBeLessThan(0);
+    // quick clears with a hint after a long search: more need than an early hint
+    const needed = history({ ms: 60_000, blocked: 0, hints: 1, hintAfterMs: 40_000 }, 14);
+    expect(targetFor(needed, n).flow).toBeLessThan(targetFor(hinted, n).flow);
     expect(targetFor(needed, n).target).toBeLessThan(targetFor(hinted, n).target);
   });
 

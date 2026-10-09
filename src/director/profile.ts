@@ -12,7 +12,7 @@ import { MECHANIC_IDS } from '../engine/mechanics';
 import { type AnalyticsSave, type BoardRecord, PATH_SHAPES, type PathShape } from '../services/save-analytics';
 import { save } from '../services/storage';
 import { type FlowState, flowState } from './flow';
-import { assistsOf, engagement, habitualAssists, isClean, median, parRatio, proficiency } from './model';
+import { assistsOf, engagement, isClean, median, parRatio, proficiency } from './model';
 import { shapeEvidence, skillConfidence } from './skills';
 
 export interface ScanPattern {
@@ -268,8 +268,6 @@ export interface PlayerHabits {
     longRatio: number;
     confidence: number;
   };
-  /** hints/shuffles taken even on quick clears (model.ts `habitualAssists`, 0 with too little data) */
-  assists: { habitual: number };
   /** where the player is right now (flow.ts); 'rushing' puts decoys first */
   flow: FlowState;
 }
@@ -352,7 +350,6 @@ export function playerHabits(a: AnalyticsSave = save.analytics): PlayerHabits {
     slowShapes: slowShapes(a, rs),
     weakMechanics: weakMechanics(a),
     tempo: tempoHabit(rs),
-    assists: { habitual: habitualAssists(a) },
     flow: flowState(a).state,
   };
 }
