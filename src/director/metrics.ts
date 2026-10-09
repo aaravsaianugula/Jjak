@@ -9,16 +9,19 @@
  *   - naive dead-end rate: random and greedy playouts that get stuck (would need a reshuffle)
  *   - mechanic load: what the board's twists add (library weights × how much of each)
  *   - estimated human solve time: the human-like scanner's search cost, in seconds
- *   - fun shape: an opening foothold, a mid-board crunch, an ending that opens up
+ *   - fun shape, from the human-like scanner's games: an early easy read, a squeeze
+ *     in the middle, a closing run of quick pairs (a combo finish)
  *
  * No DOM imports (runs in workers).
  */
 import { type Board, isCard, monthOf } from '../engine/board';
 import { type LevelSpec, windOf } from '../engine/levels';
 import { MECHANICS } from '../engine/mechanics';
+import { placementOrder } from '../engine/generate';
 import { findPath } from '../engine/path';
 import { type PlayState, lockedOf } from '../engine/rules';
-import { type Move, bendsOf, cloneState, initialState, movesOf, playout, proveClear, step, visiblePairs } from './bots';
+import { COMBO_WINDOW_MS, MAX_COMBO } from '../engine/session';
+import { type Move, type Playout, bendsOf, cloneState, initialState, movesOf, playout, proveClear, step, visiblePairs } from './bots';
 
 export interface Metrics {
   pairs: number;
@@ -51,13 +54,16 @@ export interface Metrics {
   humanTime: number;
   /** easily read legal pairs at the start: 0–1 bend and a short path (see `isEasy`) */
   easyOpen: number;
-  /** estimated seconds before the human-like scanner makes its first pair (mean of its games) */
-  firstSeconds: number;
+  /** seconds of play before the human-like scanner makes its first easy (0–1 bend) pair, mean of its games */
+  easySeconds: number;
+  /** pairs in the scanner's closing run: the last pairs, each with a choice on the board and found inside the combo window (mean of its games) */
+  closingRun: number;
   /**
-   * Fun shape, each 0–1 (see `funShape` and `funChecks` for the pass marks):
-   *   foothold  an easy first read inside 10 s (0 when there is none)
-   *   crunch    legal pairs dip in the middle of the game, relative to the opening
-   *   finale    in the last third nearly every pair left connects: a combo finish
+   * Fun shape, each 0–1, from the scanner's games (see `funShape`; `funChecks` has the pass marks):
+   *   foothold  an easy pair made early: 1 inside 5 s, 0.5 at 10 s, 0 from 15 s
+   *   crunch    share of games with a tight spot in the middle third: at most two
+   *             legal pairs while five or more are still on the board
+   *   finale    the closing run against a combo finish of eight pairs (or the whole board)
    */
   foothold: number;
   crunch: number;
@@ -167,32 +173,92 @@ export const isEasy = (b: Board, t: Pick<PairTrace, 'bends' | 'length'>) => t.be
 
 /** Pass marks for the fun shape (the audit reports the share of bank boards passing). */
 export const FUN = {
-  /** seconds: the first pair is found inside this */
-  firstSeconds: 10,
-  /** legal pairs in the middle third fall at least this far below the opening */
-  crunch: 0.4,
-  /** the last third connects at least this well */
-  finale: 0.75,
+  /** the scanner makes its first easy pair inside this many seconds of play */
+  footholdSeconds: 10,
+  /** a tight spot: at most this many legal pairs… */
+  tightMoves: 2,
+  /** …while at least this many pairs are still on the board */
+  tightLeft: 5,
+  /** crunch: at least this share of the scanner's games hit a tight spot in the middle third */
+  crunch: 0.5,
+  /** a pair found inside the combo window keeps the combo going */
+  comboSeconds: COMBO_WINDOW_MS / 1000,
+  /** finale: a closing run long enough to reach the top combo and hold it (or the whole board, if smaller) */
+  closingRun: MAX_COMBO + 1,
+  /** the closing run that scores a full finale */
+  fullRun: 8,
 };
 
-/** Crunch and finale of one game, from the legal pairs seen at each step. */
-export function funShape(s: readonly number[]): { crunch: number; finale: number } {
-  const n = s.length;
+/** The parts of a scanner game the fun shape reads. */
+export type ScannerGame = Pick<Playout, 'cleared' | 'total' | 'moves' | 'scans' | 'bends'>;
+
+/** Seconds a calm player spends finding one pair, from the scanner's cost. */
+const SECONDS_BASE = 1.1;
+const SECONDS_PER_CELL = 0.3;
+const secondsOf = (scan: number) => SECONDS_BASE + scan * SECONDS_PER_CELL;
+/** A game that never makes an easy pair counts as this slow. */
+const NO_EASY_SECONDS = 3 * FUN.footholdSeconds;
+
+/** Seconds of play until the scanner's first pair with at most one bend. */
+export function easySecondsOf(g: ScannerGame): number {
+  let t = 0;
+  for (let k = 0; k < g.scans.length; k++) {
+    t += secondsOf(g.scans[k]);
+    if (g.bends[k] <= 1) return Math.min(t, NO_EASY_SECONDS);
+  }
+  return NO_EASY_SECONDS;
+}
+
+/**
+ * A tight spot in the middle third of the game: few legal pairs while much of the
+ * board is left. (A game the scanner ends stuck is cut short, so its dead end can
+ * land in its "middle": a dead end with five or more pairs left counts as a squeeze.)
+ */
+export function hasTightSpot(g: ScannerGame): boolean {
+  const n = g.moves.length;
   const third = Math.max(1, Math.floor(n / 3));
-  const open = s[0] ?? 0;
-  const mid = s.slice(third, Math.max(third + 1, n - third));
-  const end = s.slice(n - third);
-  const midMin = mid.length ? Math.min(...mid) : open;
-  const crunch = open > 0 ? clamp01(1 - midMin / open) : 0;
-  // Pairs left in the last third vs legal moves there: 1 when (almost) everything connects.
-  let fin = 0;
-  end.forEach((m, k) => (fin += clamp01(m / Math.max(1, end.length - k))));
-  return { crunch, finale: end.length ? fin / end.length : 0 };
+  for (let k = third; k < n - third; k++) if (g.moves[k] <= FUN.tightMoves && g.total - k >= FUN.tightLeft) return true;
+  return false;
+}
+
+/**
+ * The closing run: counted back from the last pair, the pairs made with a choice on
+ * the board (two or more legal pairs, or the very last one) and found inside the
+ * combo window. 0 for a game that got stuck: there is no finish.
+ */
+export function closingRunOf(g: ScannerGame): number {
+  if (!g.cleared) return 0;
+  let run = 0;
+  for (let k = g.moves.length - 1; k >= 0; k--) {
+    const open = g.moves[k] >= Math.min(2, g.total - k);
+    if (!open || secondsOf(g.scans[k]) > FUN.comboSeconds) break;
+    run++;
+  }
+  return run;
+}
+
+/** The fun shape of a board, from the scanner's games on it. */
+export function funShape(games: readonly ScannerGame[]): Pick<Metrics, 'easySeconds' | 'closingRun' | 'foothold' | 'crunch' | 'finale'> {
+  if (!games.length) return { easySeconds: NO_EASY_SECONDS, closingRun: 0, foothold: 0, crunch: 0, finale: 0 };
+  const mean = (f: (g: ScannerGame) => number) => games.reduce((s, g) => s + f(g), 0) / games.length;
+  const easySeconds = mean(easySecondsOf);
+  const closingRun = mean(closingRunOf);
+  return {
+    easySeconds,
+    closingRun,
+    foothold: clamp01(1.5 - easySeconds / FUN.footholdSeconds),
+    crunch: mean((g) => (hasTightSpot(g) ? 1 : 0)),
+    finale: clamp01(closingRun / Math.max(1, Math.min(FUN.fullRun, games[0].total))),
+  };
 }
 
 /** Which fun marks a board passes. */
-export function funChecks(m: Pick<Metrics, 'easyOpen' | 'firstSeconds' | 'crunch' | 'finale'>): { foothold: boolean; crunch: boolean; finale: boolean } {
-  return { foothold: m.easyOpen >= 1 && m.firstSeconds <= FUN.firstSeconds, crunch: m.crunch >= FUN.crunch, finale: m.finale >= FUN.finale };
+export function funChecks(m: Pick<Metrics, 'pairs' | 'easySeconds' | 'crunch' | 'closingRun'>): { foothold: boolean; crunch: boolean; finale: boolean } {
+  return {
+    foothold: m.easySeconds <= FUN.footholdSeconds,
+    crunch: m.crunch >= FUN.crunch,
+    finale: m.closingRun >= Math.min(FUN.closingRun, m.pairs),
+  };
 }
 
 export interface MeasureOptions {
@@ -208,6 +274,25 @@ export interface MeasureOptions {
   reading?: boolean;
   /** solver nodes per wrong-match check in the reading (default 4000): "no clear" only counts if the proof finishes inside it */
   strandBudget?: number;
+  /** a clearing line for the solver to fall back on when its budget runs out (`measure` passes the generator's, reversed) */
+  hint?: readonly Move[];
+  /** naive play already measured with `naivePlay` (same seed and count): not played again */
+  naive?: NaivePlay;
+}
+
+export interface NaivePlay {
+  /** share of naive playouts (random + greedy) that end stuck */
+  deadEnd: number;
+  /** the greedy bot got stuck */
+  greedyStuck: boolean;
+}
+
+/** Naive play: `random` random-legal playouts and one greedy one, never reshuffling. */
+export function naivePlay(start: PlayState, wind: ReturnType<typeof windOf>, seed: string, random = 12): NaivePlay {
+  let stuck = 0;
+  for (let k = 0; k < random; k++) if (!playout(start, wind, 'random', `${seed}-r${k}`).cleared) stuck++;
+  const greedyStuck = !playout(start, wind, 'greedy', `${seed}-g`).cleared;
+  return { deadEnd: (stuck + (greedyStuck ? 1 : 0)) / (random + 1), greedyStuck };
 }
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -237,14 +322,11 @@ function centreOf(b: Board, i: number): number {
   return clamp01(depth / maxDepth);
 }
 
-/** Seconds a calm player spends finding one pair, from the scanner's cost. */
-const SECONDS_BASE = 1.1;
-const SECONDS_PER_CELL = 0.3;
-
 /** Measure a board (built from `spec` unless given). */
 export function measure(spec: LevelSpec, board: Board, opts: MeasureOptions = {}): Metrics {
   const start = initialState(spec, board);
-  return measureState(spec, start, opts);
+  const order = opts.hint ? null : placementOrder(board);
+  return measureState(spec, start, order ? { ...opts, hint: order.slice().reverse() } : opts);
 }
 
 export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOptions = {}): Metrics {
@@ -253,7 +335,7 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
   const total = start.board.cells.filter((v) => v >= 0).length / 2;
 
   // 1. The solver's line, replayed: legal moves, 2-bend share and decoys at each step.
-  const sol = proveClear(start, wind, opts.budget ?? 6000);
+  const sol = proveClear(start, wind, opts.budget ?? 6000, opts.hint);
   const line: Move[] = sol.moves ?? [];
   const counts: number[] = [];
   let legal = 0;
@@ -297,45 +379,27 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
   const minRatio = ratios.length ? Math.min(...ratios) : 0;
 
   // 2. Naive play: random-legal and greedy playouts that never reshuffle.
-  const R = opts.random ?? 12;
-  let stuck = 0;
-  for (let k = 0; k < R; k++) if (!playout(start, wind, 'random', `${seed}-r${k}`).cleared) stuck++;
-  const greedyStuck = !playout(start, wind, 'greedy', `${seed}-g`).cleared;
-  const deadEnd = (stuck + (greedyStuck ? 1 : 0)) / (R + 1);
+  const { deadEnd, greedyStuck } = opts.naive ?? naivePlay(start, wind, seed, opts.random ?? 12);
 
   // 3. The human-like scanner: time and fun shape.
   const H = opts.human ?? 6;
   let humanStuck = 0;
   let time = 0;
-  let first = 0;
-  const shapes: number[][] = [];
+  const games: Playout[] = [];
   const locks = start.hidden.size + start.knots.size;
   for (let k = 0; k < H; k++) {
     const p = playout(start, wind, 'human', `${seed}-h${k}`);
     const perPair = p.pairs ? (p.pairs * SECONDS_BASE + p.scan * SECONDS_PER_CELL) / p.pairs : SECONDS_BASE;
     // A stuck board costs the rest at the same pace plus a reshuffle's re-read.
     time += perPair * total + (p.cleared ? 0 : 10) + (wind ? 0.35 * total : 0) + 0.6 * locks + 1.2 * (spec.gates ?? 0);
-    first += SECONDS_BASE + (p.scans[0] ?? 0) * SECONDS_PER_CELL;
     if (!p.cleared) humanStuck++;
-    else shapes.push(p.moves);
+    games.push(p);
   }
   const humanTime = H ? time / H : 0;
-  const firstSeconds = H ? first / H : SECONDS_BASE;
 
-  // 4. Fun shape, from the scanner's games (or the solve if it never finished).
-  if (!shapes.length) shapes.push(counts);
-  let crunch = 0;
-  let finale = 0;
-  for (const sh of shapes) {
-    const f = funShape(sh);
-    crunch += f.crunch;
-    finale += f.finale;
-  }
-  crunch /= shapes.length;
-  finale /= shapes.length;
-  // An easy first read inside 10 s; more than one is a little better (a choice).
-  const foothold = easyOpen >= 1 && firstSeconds <= FUN.firstSeconds ? 0.6 + 0.4 * clamp01((easyOpen - 1) / 2) : 0;
-  const fun = 0.3 * foothold + 0.35 * crunch + 0.35 * finale;
+  // 4. Fun shape, from the scanner's games. The finale weighs most: a satisfying run at the end.
+  const shape = funShape(games);
+  const fun = 0.25 * shape.foothold + 0.3 * shape.crunch + 0.45 * shape.finale;
 
   const m: Metrics = {
     pairs: total,
@@ -354,10 +418,7 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
     mechLoad: mechanicLoad(spec, total),
     humanTime,
     easyOpen,
-    firstSeconds,
-    foothold,
-    crunch,
-    finale,
+    ...shape,
     fun,
     centreFirst: opening ? centreSum / opening : 0,
     d: 0,

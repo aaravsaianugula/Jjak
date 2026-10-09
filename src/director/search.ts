@@ -9,8 +9,8 @@
  *
  *   fitness = closeness to the target d
  *           + novelty against recent levels (feature-vector distance)
- *           + fun (`funScore`: an easy first read inside 10 s, a mid-board crunch,
- *             an ending that opens up for a combo finish)
+ *           + fun (`funScore`: an easy pair made inside 10 s, a squeeze mid-board,
+ *             a closing run of quick pairs for a combo finish)
  *           + an optional bias hook (endless levels tailor to a play style)
  *
  * The best candidate is then hill-climbed a few steps (one knob at a time,
@@ -58,13 +58,18 @@ export function featureOf(spec: LevelSpec, d: number): Feature {
 }
 
 /**
- * The fun part of the fitness: the fun shape (0–1), a bonus for each mark passed
- * (crunch, finale), and a large penalty for a board with no easy first read
- * inside 10 s, so the search only keeps such a board when nothing else is close.
+ * The fun part of the fitness: the fun shape (0–1), a bonus for each mark passed,
+ * and a penalty for a board where the scanner makes no easy pair inside 10 s. The
+ * penalty stays small (0.015 of d at the default weights): the rim-first scanner
+ * finds rim pairs first, and a large one overrode the tricky arrangements that put
+ * the opening inside the board (centre-first players then saw only rim openings;
+ * the validators already insist on an easy pair at the start). The combo
+ * finish weighs most (the owner wants a satisfying run at the end): at the default
+ * weights passing it is worth being 0.07 further from the target difficulty.
  */
-export function funScore(m: Pick<Metrics, 'easyOpen' | 'firstSeconds' | 'crunch' | 'finale' | 'fun'>): number {
+export function funScore(m: Pick<Metrics, 'pairs' | 'easySeconds' | 'crunch' | 'closingRun' | 'fun'>): number {
   const c = funChecks(m);
-  return m.fun + (c.crunch ? 0.15 : 0) + (c.finale ? 0.15 : 0) - (c.foothold ? 0 : 0.6);
+  return m.fun + (c.crunch ? 0.1 : 0) + (c.finale ? 0.7 : 0) - (c.foothold ? 0 : 0.15);
 }
 
 const dist = (a: Feature, b: Feature) => {

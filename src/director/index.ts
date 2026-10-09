@@ -21,7 +21,7 @@ import { ROUTE_LEVELS, routeOf } from '../data/route';
 import { type LevelSpec } from '../engine/levels';
 import { bankSpec } from './bank';
 import { chooseTier } from './director';
-import { endlessSpec, prepareEndless } from './endless';
+import { endlessEntry, endlessSpec, prepareEndless } from './endless';
 import { levelPlan } from './plan';
 
 export { type LevelPlan, designedBase, levelPlan } from './plan';
@@ -42,7 +42,8 @@ export const shownYears = (level: number): number => (level > ROUTE_LEVELS ? rou
  * level the board already made for this player. No side effects (unlike playLevel).
  */
 export function shownSpec(n: number): LevelSpec {
-  return n > ROUTE_LEVELS ? endlessSpec(n) : levelPlan(n).spec;
+  // Display only: a level not made yet shows its identity (playing it goes through playLevel).
+  return n > ROUTE_LEVELS ? (endlessEntry(n)?.spec ?? levelPlan(n).spec) : levelPlan(n).spec;
 }
 
 export async function prepareLevel(n: number): Promise<LevelSpec> {

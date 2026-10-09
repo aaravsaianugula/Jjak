@@ -14,8 +14,8 @@ export interface EndlessEntry {
   offset: number;
   /** relief re-generations after failed attempts (0 = the first board) */
   relief: number;
-  /** where it was made: the worker, the main-thread fallback, or the plan's own board */
-  src: 'worker' | 'main' | 'plan';
+  /** where it was made: the worker, the main-thread search, the bank's board for the same place (the last resort), or (older saves) the plan's own board */
+  src: 'worker' | 'main' | 'plan' | 'bank';
   /** generation order (for the cap) */
   at: number;
 }
@@ -126,7 +126,7 @@ export function hydrateEndless(raw: unknown): EndlessSave {
         target: isNum(e.target) ? e.target : spec.difficulty ?? 0.5,
         offset: isNum(e.offset) ? e.offset : 0,
         relief: isNum(e.relief) ? Math.max(0, Math.round(e.relief)) : 0,
-        src: e.src === 'main' || e.src === 'plan' ? e.src : 'worker',
+        src: e.src === 'main' || e.src === 'plan' || e.src === 'bank' ? e.src : 'worker',
         at: isNum(e.at) ? e.at : 0,
       }]);
     }

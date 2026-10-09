@@ -16,7 +16,8 @@ export interface Measured {
   fun: number;
   /** fun shape detail (bank builds from the curve-and-fun milestone on) */
   easyOpen?: number;
-  firstSeconds?: number;
+  easySeconds?: number;
+  closingRun?: number;
   crunch?: number;
   finale?: number;
 }
@@ -40,6 +41,8 @@ export interface CurveLevel {
   t2: Measured | null;
   /** per tier, the fun marks passed as three 0/1 characters: foothold, crunch, finale */
   fun?: string[];
+  /** per tier, the fun shape: [easySeconds, crunch, closingRun] */
+  funShape?: number[][];
   /** feature distance to the previous level's tier-2 board (small = alike) */
   sim: number;
   /** the pre-Director journeyLevel board, measured the same way */
@@ -188,15 +191,39 @@ export function renderAudit(c: CurveFile): string {
       return `${((100 * pass) / Math.max(1, all)).toFixed(1)} %`;
     };
     const varied = L.filter((l) => l.n > 6);
+    const feel = (l: CurveLevel) => `${l.shape}|${l.mech}|${l.goal}`;
+    const byN = new Map(L.map((l) => [l.n, l]));
+    const newFeel = varied.filter((l) => byN.has(l.n - 1) && feel(byN.get(l.n - 1)!) !== feel(l));
     out.push('## Fun');
     out.push('');
-    out.push(`Share of the ${funned.length * 5} bank boards that pass each mark (tier 4 alone in brackets):`);
+    out.push('Every mark is read off the human-like scanner\'s games on the board (src/director/metrics.ts, `FUN`).');
     out.push('');
-    out.push(`- **Early foothold** (an easy 0–1 bend pair at the start, found by the human-like scanner inside 10 s): ${rate(0)} (${rate(0, [4])})`);
-    out.push(`- **Mid-board crunch** (legal pairs in the middle third fall at least 40 % below the opening): ${rate(1)} (${rate(1, [4])})`);
-    out.push(`- **Combo finish** (the last third connects almost everything left): ${rate(2)} (${rate(2, [4])})`);
-    out.push(`- **Variety** (tier-2 board at least ${SIMILAR} from the previous level's in feature space): ${((100 * varied.filter((l) => l.sim >= SIMILAR).length) / Math.max(1, varied.length)).toFixed(1)} %`);
+    out.push('| Mark | What it means | All tiers | T0 | T1 | T2 | T3 | T4 |');
+    out.push('|---|---|---|---|---|---|---|---|');
+    const row = (k: number, name: string, what: string) => out.push(`| ${name} | ${what} | ${rate(k)} | ${[0, 1, 2, 3, 4].map((t) => rate(k, [t])).join(' | ')} |`);
+    row(0, 'Early foothold', 'the scanner makes its first easy (0–1 bend) pair inside 10 s of play');
+    row(1, 'Mid-board crunch', 'most scanner games hit a tight spot in the middle third: ≤ 2 legal pairs with ≥ 5 still on the board');
+    row(2, 'Combo finish', 'the last 6 pairs (or the whole board) each come with a choice of pairs and inside the 4 s combo window');
+    out.push(`| Variety | the tier-2 board has a different feel (shape, mechanics or goal) from the level before | ${((100 * newFeel.length) / Math.max(1, varied.length)).toFixed(1)} % | | | | | |`);
     out.push('');
+    const shaped = L.filter((l) => l.funShape && l.funShape.length === 5);
+    if (shaped.length) {
+      const q = (xs: number[], p: number) => {
+        const s = xs.slice().sort((a, b) => a - b);
+        return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : NaN;
+      };
+      const dist = (xs: number[]) => [0.1, 0.25, 0.5, 0.75, 0.9].map((p) => f2(q(xs, p))).join(' · ');
+      const col = (k: number, tiers = [0, 1, 2, 3, 4]) => shaped.flatMap((l) => tiers.map((t) => l.funShape![t][k]));
+      out.push('Distributions (10th · 25th · 50th · 75th · 90th percentile; tier 4 alone in the second column):');
+      out.push('');
+      out.push('| Measure | All tiers | Tier 4 |');
+      out.push('|---|---|---|');
+      out.push(`| Seconds to the first easy pair | ${dist(col(0))} | ${dist(col(0, [4]))} |`);
+      out.push(`| Share of games with a mid-board tight spot | ${dist(col(1))} | ${dist(col(1, [4]))} |`);
+      out.push(`| Closing run (pairs) | ${dist(col(2))} | ${dist(col(2, [4]))} |`);
+      out.push(`| Feature distance to the previous level (tier 2) | ${dist(varied.map((l) => l.sim))} | |`);
+      out.push('');
+    }
   }
 
   // 6. Too similar to neighbours.

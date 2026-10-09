@@ -7,7 +7,7 @@ import { ROUTE_LEVELS } from '../src/data/route';
 import { bankEntry } from '../src/director/bank';
 import { initialState, proveClear } from '../src/director/bots';
 import { measure } from '../src/director/metrics';
-import { arrangeOf, designedBase, levelPlan, planSpec, tierKnobs } from '../src/director/plan';
+import { arrangeOf, designedBase, levelPlan, planSpec, roadBase, tierKnobs } from '../src/director/plan';
 import { buildBoard, windOf } from '../src/engine/levels';
 
 const mean = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
@@ -31,6 +31,16 @@ describe('designed curve', () => {
       const sorted = b.slice().sort((x, y) => x - y);
       expect(b[6]).toBeLessThanOrEqual(sorted[1]);
       expect(b[0]).toBeLessThanOrEqual(sorted[1]);
+    }
+  });
+
+  it('the road never steps down, not even where a new year starts, and leaves room above it', () => {
+    let prev = roadBase(1);
+    for (let n = 2; n <= 6 * ROUTE_LEVELS; n++) {
+      const b = roadBase(n);
+      expect(b, `level ${n}`).toBeGreaterThanOrEqual(prev);
+      expect(b, `level ${n}`).toBeLessThanOrEqual(0.75);
+      prev = b;
     }
   });
 

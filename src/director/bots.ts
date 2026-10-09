@@ -69,6 +69,8 @@ export interface BotCtx {
   last: Move | null;
   /** the human scanner's cost for its last choice: cells looked at + bends read */
   scanCost: number;
+  /** the human scanner's bends on its last choice (0–2) */
+  scanBends: number;
   /** a per-playout attention style for the human scanner: weight of the rim vs the last pair */
   rimBias: number;
 }
@@ -158,6 +160,7 @@ const human: Bot = (st, moves, ctx) => {
   }
   // Cost: cards looked at until the first pair came into view, then the bends read.
   ctx.scanCost = Math.min(...seenAt) + 1 + 1.5 * bestBends;
+  ctx.scanBends = bestBends;
   return moves[best];
 };
 
@@ -173,6 +176,8 @@ export interface Playout {
   scan: number;
   /** human scanner only: the scan cost of each pair, in order */
   scans: number[];
+  /** human scanner only: the bends of each pair it made, in order */
+  bends: number[];
   /** legal moves seen at each step */
   moves: number[];
 }
@@ -182,28 +187,30 @@ export function playout(start: PlayState, wind: Wind | null, bot: BotId | Bot, s
   const st = cloneState(start);
   const play = typeof bot === 'string' ? BOTS[bot] : bot;
   const rng = createRng(seed);
-  const ctx: BotCtx = { rng, wind, last: null, scanCost: 0, rimBias: 0.35 + rng.next() * 0.5 };
+  const ctx: BotCtx = { rng, wind, last: null, scanCost: 0, scanBends: 0, rimBias: 0.35 + rng.next() * 0.5 };
   const total = cardsOnBoard(st.board) / 2;
   let pairs = 0;
   let scan = 0;
   const scans: number[] = [];
+  const bends: number[] = [];
   const seen: number[] = [];
   for (let k = 0; k < maxSteps; k++) {
-    if (cardsOnBoard(st.board) === 0) return { cleared: true, pairs, total, scan, scans, moves: seen };
+    if (cardsOnBoard(st.board) === 0) return { cleared: true, pairs, total, scan, scans, bends, moves: seen };
     let moves = movesOf(st);
     if (!moves.length) {
-      if (releaseIfStuck(st)) return { cleared: false, pairs, total, scan, scans, moves: seen };
+      if (releaseIfStuck(st)) return { cleared: false, pairs, total, scan, scans, bends, moves: seen };
       moves = movesOf(st);
     }
     seen.push(moves.length);
     const m = play(st, moves, ctx);
     scan += ctx.scanCost;
     scans.push(ctx.scanCost);
+    bends.push(ctx.scanBends);
     ctx.last = m;
     pairs++;
-    if (!step(st, m, wind)) return { cleared: cardsOnBoard(st.board) === 0, pairs, total, scan, scans, moves: seen };
+    if (!step(st, m, wind)) return { cleared: cardsOnBoard(st.board) === 0, pairs, total, scan, scans, bends, moves: seen };
   }
-  return { cleared: false, pairs, total, scan, scans, moves: seen };
+  return { cleared: false, pairs, total, scan, scans, bends, moves: seen };
 }
 
 /** Convenience: play a spec's board with a persona. */
@@ -232,8 +239,12 @@ const stateKey = (st: PlayState) =>
  * Wind and falling leaves move cards, so there every pair is a decision and the
  * search orders them by how many pairs they leave. The found line is replayed
  * from the start before it is returned, so a proof is always a real clear.
+ *
+ * `hint` is a line to fall back on when the search runs out of budget (the
+ * generator's placement order, reversed: see `placementOrder`). It counts only if
+ * it replays through the rules to an empty board, so a wrong hint costs one replay.
  */
-export function proveClear(start: PlayState, wind: Wind | null, budget = 6000): Proof {
+export function proveClear(start: PlayState, wind: Wind | null, budget = 6000, hint?: readonly Move[]): Proof {
   const seen = new Set<string>();
   const path: Move[] = [];
   let nodes = 0;
@@ -298,15 +309,22 @@ export function proveClear(start: PlayState, wind: Wind | null, budget = 6000): 
   };
 
   const found = dfs(cloneState(start));
-  if (!found) return { moves: null, nodes, exhausted };
-  // Replay the line from the start: every pair legal, no reshuffle, board empty.
-  const st = cloneState(start);
-  for (const m of path) {
-    const legal = movesOf(st).some((x) => x[0] === m[0] && x[1] === m[1]);
-    if (!legal) return { moves: null, nodes, exhausted: false };
-    if (!step(st, m, wind) && cardsOnBoard(st.board) > 0) return { moves: null, nodes, exhausted: false };
+  if (!found) {
+    if (exhausted && hint && clears(start, hint, wind)) return { moves: hint.slice(), nodes, exhausted: false };
+    return { moves: null, nodes, exhausted };
   }
-  return cardsOnBoard(st.board) === 0 ? { moves: path.slice(), nodes, exhausted: false } : { moves: null, nodes, exhausted: false };
+  return clears(start, path, wind) ? { moves: path.slice(), nodes, exhausted: false } : { moves: null, nodes, exhausted: false };
+}
+
+/** Replay a line from the start: every pair legal (in either order), no reshuffle, board empty. */
+function clears(start: PlayState, line: readonly Move[], wind: Wind | null): boolean {
+  const st = cloneState(start);
+  for (const m of line) {
+    const legal = movesOf(st).some((x) => (x[0] === m[0] && x[1] === m[1]) || (x[0] === m[1] && x[1] === m[0]));
+    if (!legal) return false;
+    if (!step(st, m, wind) && cardsOnBoard(st.board) > 0) return false;
+  }
+  return cardsOnBoard(st.board) === 0;
 }
 
 /** Same-flower pairs a player can see right now (both cards pickable), joined or not. */

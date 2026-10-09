@@ -33,14 +33,14 @@
 import { GOAL_IDS, type GoalId } from '../engine/goals';
 import { type LevelSpec, type Mechanic } from '../engine/levels';
 import { type Board, isGate } from '../engine/board';
-import { buildBoard, maxStones } from '../engine/levels';
+import { buildBoard, maxStones, windOf } from '../engine/levels';
 import { createRng } from '../engine/rng';
 import { bendsOf, initialState, movesOf } from './bots';
-import { type MeasureOptions, type Metrics, measure } from './metrics';
+import { type MeasureOptions, type Metrics, measure, naivePlay } from './metrics';
 import { type Knobs, type LevelPlan, LAYOUTS, PARTNERS, SIZES, WIND_CYCLE, clampKnobs, clashes, knobRange, levelPlan, parOf, planSpec, tierKnobs } from './plan';
 import type { PlayStyle } from './profile';
 import { type Feature, featureOf, funScore, neighbour, novelty, tierFor } from './search';
-import { type Verdict, validate } from './validate';
+import { type Verdict, deadEndsOk, validate } from './validate';
 
 export const ENDLESS = {
   /** freshness window: the player's last endless levels */
@@ -425,9 +425,10 @@ interface Measured extends Built {
 /**
  * Run one endless search (worker or main thread): the bank's generate-and-test with
  * a wall-clock budget. Every candidate is built, measured by the bots and put through
- * the same hard validators as the bank; the fittest valid board that is also fresh
+ * the same hard validators as the bank (the dead-end gate before the solver, which
+ * saves solving boards that are rejected anyway); the fittest valid board that is also fresh
  * wins (else the fittest valid one). Returns null only if nothing valid turned up
- * before the hard deadline (the caller falls back to the plan's own board).
+ * before the hard deadline (the caller then serves the bank's proven board, endless-fallback.ts).
  *
  * Tailoring screens seeds cheaply first: with a stretch on, each knob setting builds
  * one or two extra boards and measures only the one whose opening leans the way the
@@ -476,7 +477,15 @@ export function runEndlessJob(job: EndlessJob, now: () => number = () => Date.no
       return null;
     }
     const t0 = now();
-    const metrics = measure(b.spec, b.board, job.measure);
+    // The dead-end gate first: a board outside the tier's band is rejected whatever
+    // else it measures, so it is never solved or played by the scanner.
+    const naive = naivePlay(initialState(b.spec, b.board), windOf(b.spec), b.spec.seed, job.measure.random ?? 12);
+    if (!deadEndsOk(b.spec, tier, naive.deadEnd, plan)) {
+      tried++;
+      rejected['dead-ends'] = (rejected['dead-ends'] ?? 0) + 1;
+      return null;
+    }
+    const metrics = measure(b.spec, b.board, { ...job.measure, naive });
     b.spec.difficulty = metrics.d;
     const verdict = validate(b.spec, b.board, metrics, { tier, plan, elapsedMs: b.ms + now() - t0, timeBudgetMs: job.candidateBudgetMs, skipRebuild: true });
     const feature = featureOf(b.spec, metrics.d);

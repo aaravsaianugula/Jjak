@@ -57,7 +57,8 @@ const pick = (m: Metrics) => ({
   humanTime: +m.humanTime.toFixed(1),
   fun: +m.fun.toFixed(3),
   easyOpen: m.easyOpen,
-  firstSeconds: +m.firstSeconds.toFixed(1),
+  easySeconds: +m.easySeconds.toFixed(1),
+  closingRun: +m.closingRun.toFixed(2),
   crunch: +m.crunch.toFixed(3),
   finale: +m.finale.toFixed(3),
 });
@@ -108,6 +109,7 @@ function runChapter(ch: number, K: number): LevelResult[] {
         knobs: r.picks.map((c) => `${c.knobs.stones}${c.knobs.layout[0]} m${c.knobs.months}${c.knobs.snow ? ` sn${c.knobs.snow}` : ''}${c.knobs.knots ? ` k${c.knobs.knots}` : ''}${c.knobs.gates ? ` g${c.knobs.gates}` : ''}${c.knobs.fences ? ` f${c.knobs.fences}` : ''}`),
         t2: pick(r.picks[2].metrics),
         fun: r.picks.map((c) => funCode(c.metrics)),
+        funShape: r.picks.map((c) => [+c.metrics.easySeconds.toFixed(1), +c.metrics.crunch.toFixed(2), +c.metrics.closingRun.toFixed(1)]),
         sim,
       },
       tried: r.tried,

@@ -17,7 +17,16 @@ import { type Rng } from './rng';
  * order that is the *last placed* pair of the month, so a gate counts as open
  * for the placements before it and closed from then on. Fences live in
  * `base.walls` and `reachable` respects them, so the guarantee holds for both.
+ *
+ * Wind and falling leaves move cards, and snow and knots lock some, so on those
+ * boards the reverse order is only a guess: a solver that uses it (see
+ * `placementOrder`) must replay it through the rules before trusting it.
  */
+const ORDERS = new WeakMap<Board, [number, number][]>();
+
+/** The cells of each pair in the order they were placed (boards from the generator only). */
+export const placementOrder = (b: Board): [number, number][] | undefined => ORDERS.get(b);
+
 function placePairs(
   base: Board,
   slots: number[],
@@ -44,6 +53,7 @@ function placePairs(
     for (const s of slots) b.cells[s] = EMPTY;
     const order = rng.shuffle(pairs.slice());
     const free = new Set(slots);
+    const placedCells: [number, number][] = [];
     let ok = true;
     // Gates: index of the last pair of each month in `order` (the first one cleared in reverse).
     const lastOf = new Array(13).fill(-1);
@@ -120,6 +130,7 @@ function placePairs(
         free.delete(y);
         if (free.size === 0 || healthy()) {
           placed = true;
+          placedCells.push([x, y]);
           break;
         }
         b.cells[x] = EMPTY;
@@ -132,7 +143,10 @@ function placePairs(
         break;
       }
     }
-    if (ok) return b;
+    if (ok) {
+      ORDERS.set(b, placedCells);
+      return b;
+    }
   }
   return null;
 }
