@@ -219,6 +219,10 @@ describe('assisted clears still count as progress (the tier-0 trap)', () => {
     expect(clean).toBeGreaterThan(one);
     expect(one).toBeGreaterThan(two);
     expect(two).toBeGreaterThan(q + 0.2);
+    // a habitual hint costs a little; one beyond the habit costs in full
+    expect(performance(rec({ hints: 1 }), 1)).toBeGreaterThan(one + 0.08);
+    expect(performance(rec({ hints: 1 }), 1)).toBeGreaterThan(clean - 0.04);
+    expect(performance(rec({ hints: 2 }), 1)).toBeCloseTo(one - 0.27 * 0.12, 6);
   });
 
   it('the floor rises with mastery evidence (rating up, deviation down)', () => {
