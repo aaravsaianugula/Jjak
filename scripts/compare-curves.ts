@@ -49,7 +49,7 @@ for (let a = 1; a <= 600; a += 50) {
 say('');
 
 // 2. The spread of tier-2 d inside each place.
-say('### Tier-2 d per place: 10th / 50th / 90th percentile of its 12 levels, before → after', '', '| Place | Before | After | Place | Before | After |', '|---|---|---|---|---|---|');
+say('### Tier-2 d per place: 10th / 50th / 90th percentile (nearest rank) of its 12 levels, before → after', '', '| Place | Before | After | Place | Before | After |', '|---|---|---|---|---|---|');
 const spread = (L: CurveLevel[], ch: number) => {
   const d = L.filter((l) => l.ch === ch).map((l) => l.after[2]);
   return `${f2(q(d, 0.1))} / ${f2(q(d, 0.5))} / ${f2(q(d, 0.9))}`;
@@ -91,7 +91,7 @@ const count = (L: CurveLevel[]) => {
 const cB = count(B);
 const cA = count(A);
 const firstOf = (L: CurveLevel[], m: string) => L.find((l) => mechsOf(l).includes(m))?.n;
-say('### Mechanic mix (level-tiers whose level carries the mechanic, of 3000)', '', '| Mechanic | Before | After | First level (after) |', '|---|---|---|---|');
+say(`### Mechanic mix (level-tiers whose level carries the mechanic, of ${B.length * 5} before and ${A.length * 5} after)`, '', '| Mechanic | Before | After | First level (after) |', '|---|---|---|---|');
 for (const m of [...new Set([...cB.keys(), ...cA.keys()])].sort((x, y) => (cA.get(y) ?? 0) - (cA.get(x) ?? 0))) {
   say(`| ${m}${cB.has(m) ? '' : ' (new)'} | ${cB.get(m) ?? 0} | ${cA.get(m) ?? 0} | ${firstOf(A, m) ?? '–'} |`);
 }

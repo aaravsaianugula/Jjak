@@ -102,6 +102,17 @@ function leanVector(plan: LevelPlan, c: Candidate, f: ReadingFeatures): number[]
   return [...FEATURE_KEYS.map((k) => f[k]), ...mech];
 }
 
+/**
+ * An alternate's 2-bend lean counts only if the board's legal moves along the solver's
+ * line also hold a larger 2-bend share than the tier's board (metrics.twoBend). The
+ * reading feature counts the pairs that one line takes; a player who takes other pairs
+ * meets the legal moves, so a lean the legal moves don't show is not served as one: the
+ * stored twoBend feature of such an alternate is capped at the tier's board's.
+ */
+function confirmTwoBend(f: ReadingFeatures, c: Candidate, f0: ReadingFeatures, pick: Candidate): ReadingFeatures {
+  return c.metrics.twoBend > pick.metrics.twoBend ? f : { ...f, twoBend: Math.min(f.twoBend, f0.twoBend) };
+}
+
 const median = (xs: number[]) => {
   const s = xs.slice().sort((a, b) => a - b);
   return s.length ? s[Math.floor(s.length / 2)] : 0;
@@ -124,7 +135,7 @@ function slotFor(plan: LevelPlan, tier: number, pick: Candidate, searched: reado
   const readOf = (c: Candidate, h: string) => {
     let r = read.get(h);
     if (!r) {
-      const f = readingOf(c);
+      const f = confirmTwoBend(readingOf(c), c, f0, pick);
       r = { c, f, v: leanVector(plan, c, f) };
       read.set(h, r);
     }
