@@ -42,19 +42,77 @@ export function sealSvg(n: number): string {
 export const sealLabel = (n: number, waiting: boolean, first: number) =>
   waiting ? `seal ${n}, waits for seal ${first}` : `seal ${n}, its turn now`;
 
-/** A blot of wet ink in card units (static; how wet it looks comes from CSS `--wet`). */
+/**
+ * A closed outline around (cx, cy) in polar form: `r(θ)` gives the radius at
+ * each angle. Smoothed through the midpoints, so the edge is one continuous
+ * brushed line (ragged, never broken into dots).
+ */
+function polarPath(cx: number, cy: number, r: (t: number) => number, n = 96): string {
+  const pts: [number, number][] = [];
+  for (let k = 0; k < n; k++) {
+    const t = (k / n) * Math.PI * 2;
+    const rr = r(t);
+    pts.push([cx + rr * Math.cos(t), cy + rr * Math.sin(t)]);
+  }
+  const f = (v: number) => v.toFixed(1);
+  const mid = (a: [number, number], b: [number, number]) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const m0 = mid(pts[n - 1], pts[0]);
+  let d = `M${f(m0[0])} ${f(m0[1])}`;
+  for (let k = 0; k < n; k++) {
+    const m = mid(pts[k], pts[(k + 1) % n]);
+    d += `Q${f(pts[k][0])} ${f(pts[k][1])} ${f(m[0])} ${f(m[1])}`;
+  }
+  return `${d}Z`;
+}
+
+/** A soft bump of `h` around angle `at` (radians), `w` wide. */
+const lobe = (t: number, at: number, w: number, h: number) => {
+  const dt = Math.atan2(Math.sin(t - at), Math.cos(t - at));
+  return h * Math.exp(-((dt / w) ** 2));
+};
+
+/**
+ * The blot's silhouette: heavy where the brush landed (upper left), a drag
+ * pulled out towards the lower right as it lifted, a smaller pooled lobe to
+ * the left, and a ragged edge where the ink caught the paper's fibres.
+ * `grow` widens it for the bleed rings around it.
+ */
+const blotRadius = (grow: number, rag: number) => (t: number) =>
+  30 * (1 + grow) +
+  4.5 * Math.sin(2 * t + 0.6) +
+  3 * Math.sin(3 * t + 2.2) +
+  lobe(t, 0.95, 0.32, 26) + // the drag, down and to the right
+  lobe(t, 2.75, 0.38, 9) + // pooled lobe, left
+  lobe(t, -1.35, 0.3, 6) + // a swell at the top
+  rag * (1.6 * Math.sin(13 * t + 0.4) + 1.1 * Math.sin(23 * t + 1.9) + 0.7 * Math.sin(37 * t + 0.2));
+
+const BLOT = polarPath(46, 64, blotRadius(0, 1));
+/** Where the ink soaked into the hanji: two feathered rings, wider and calmer. */
+const BLEED_NEAR = polarPath(46, 64, blotRadius(0.12, 1.4));
+const BLEED_FAR = polarPath(47, 65, blotRadius(0.26, 0.8));
+/** A torn square of paper under the blot (seen on the dark theme). */
+const PATCH = polarPath(50, 70, (t) => {
+  const c = Math.abs(Math.cos(t));
+  const s = Math.abs(Math.sin(t));
+  return Math.min(46 / Math.max(c, 1e-3), 62 / Math.max(s, 1e-3)) * 0.98 + 1.2 * Math.sin(19 * t + 0.7) + 0.8 * Math.sin(31 * t);
+}, 160);
+
+/**
+ * A blot of wet ink in card units (static). How wet it looks comes from CSS
+ * `--wet` (1 freshly laid … near 0 almost dry): the deep ink layer thins over a
+ * paler dried-ink layer of the same shape, the feathered edge goes matte, and
+ * the wet sheen goes first. It stays one solid shape throughout.
+ */
 export function inkSvg(): string {
   return (
     `<svg class="ink__art" viewBox="0 0 100 140" aria-hidden="true">` +
-    // Where the ink soaks into the paper: a wider, faint copy of the shape.
-    `<path class="ink__bleed" d="M47 14C70 11 92 28 91 54C95 80 86 112 63 124C46 133 18 126 10 102C2 80 6 54 13 39C20 24 32 15 47 14Z"/>` +
-    // The blot itself: one brushed shape, heavier where the brush landed.
-    `<path class="ink__blot" d="M49 22C68 20 84 34 83 55C87 77 80 103 62 114C48 122 27 117 19 98C12 80 15 59 21 45C27 31 37 23 49 22Z"/>` +
-    // The brush's drag as it lifted, still part of the same shape.
-    `<path class="ink__blot" d="M62 112C70 116 76 122 79 129C80 131.5 77.6 132.6 75.8 130.6C71.6 125.6 66 120.4 58 116Z"/>` +
-    // Wet sheen: a soft light curve that goes as the ink dries.
-    `<path class="ink__sheen" d="M33 44C38 35 47 31 56 32" fill="none" stroke-width="4.2" stroke-linecap="round"/>` +
-    `<path class="ink__sheen" d="M27 62C27 57 28.4 53 30.4 50" fill="none" stroke-width="2.6" stroke-linecap="round"/>` +
+    `<path class="ink__patch" d="${PATCH}"/>` +
+    `<path class="ink__bleed ink__bleed--far" d="${BLEED_FAR}"/>` +
+    `<path class="ink__bleed" d="${BLEED_NEAR}"/>` +
+    `<path class="ink__dry" d="${BLOT}"/>` +
+    `<path class="ink__wet" d="${BLOT}"/>` +
+    // Wet sheen: a small light crescent where the pooled ink catches the light.
+    `<path class="ink__sheen" d="M30 50C33 42 40 37.5 48 37C42 40.5 37.5 45.5 35 52.5C33.4 53.6 30.6 52.6 30 50Z"/>` +
     `</svg>`
   );
 }
