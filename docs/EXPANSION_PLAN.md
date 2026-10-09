@@ -137,18 +137,41 @@ challenging; each player gets boards near their flow zone; nothing is ever unsol
    Every board writes a capped record: time vs par, think time to the first pair, median gap
    between pairs, the first taps (row/column fractions: scan pattern), blocked-path taps,
    reselects, hints/shuffles/auto-shuffles, best combo, Fever, bends per pair and time per bend
-   count, quits and restarts, hour and date. It folds into:
+   count, quits and restarts, hour and date; also per path shape (detours, routes round the
+   rim) the count and time to find, the pair rhythm (spread of the gaps), the longest find
+   and fast misreads (blocked taps within a second of selecting). Older saves hydrate the
+   new fields to safe defaults. It folds into:
    - a **skill rating** in difficulty units (Elo/Glicko-style: expected vs actual performance,
      step size shrinking with experience, so one bad board doesn't swing it);
-   - **per-mechanic proficiency** (rolling score, quits, replays);
-   - an **engagement signal** from the last few boards: *frustration* (quits, restarts, assists,
-     far over par) vs *boredom* (several fast, clean clears in a row).
+   - **skill ratings per path shape** (straight, one-bend, two-bend, detour, rim route;
+     `skills.ts`) and **per mechanic**, each with its own deviation (shrinks with evidence,
+     grows with time away). A shape's score is the board's score shifted by how long that
+     shape took against the player's own pace on the same board;
+   - an **engagement signal** and a **flow state** (`flow.ts`): *struggling* (quits, restarts,
+     assists beyond habit, far over par), *frozen* (think time or one find far above their
+     norm), *rushing* (many fast misreads), *bored* (quick clean clears in a row), else *flow*;
+   - **habits** (`PlayerHabits` in `profile.ts`): scan region (edges vs centre, top vs
+     bottom), slow path shapes, weak mechanics, rush vs freeze, the assist habit; each with a
+     confidence, "unknown" while thin.
+   Assists are read against the player's **habit** (hints taken even on quick clears): a
+   habitual hint costs a little, assists beyond it in full. Hinted clears count as progress
+   (partial credit), so hint-heavy players are not trapped on the gentlest tier.
 3. **Director** (`src/director/director.ts`, the adjustment policy). Target difficulty for level n =
    designed curve (sawtooth inside a chapter, rising across the road) + skill offset (±0.2) +
-   pacing (relief after struggle, stretch after an easy streak). Mapped to one of **5 tiers**.
-   Aim: **75–85 % of boards cleared without assists**, with real peaks. A level's tier is
-   **pinned** when first started, so a retry or replay is the same board; after two failed
-   attempts the Director may re-pin one tier lower (relief).
+   pacing from the flow state (relief after struggle, ease when frozen, a breather after a
+   peak or festival, a stretch after an easy streak) + a nudge toward 80 % clean clears.
+   Mapped to one of **5 tiers**, with hysteresis (keep the last tier unless another is clearly
+   closer), a **mastery floor** (rating − 2·dev − 0.05, rising with evidence; skipped while
+   struggling) and **at most one tier per board**.
+   Aim: **75–85 % of boards cleared without assists** (beyond habit), with real peaks. A
+   level's tier is **pinned** when first started, so a retry or replay is the same board;
+   after two failed attempts the Director may re-pin one tier lower (relief).
+   It also returns a **`ChallengeRequest`** (`challenge.ts`): the tier plus an emphasis inside
+   it (a slow path shape, a weak mechanic on this level, decoys for a rusher, key pairs where
+   they don't look first), a weight 0–1 and a rotation key. Calm on teaching, rest, relief
+   and breather boards; a blind spot waits two levels before it returns
+   (`save.analytics.emphases`); the challenge never changes the tier. Measured with habit
+   personas on the real bank boards (`tests/persona-habits.test.ts`).
 4. **Generator** (`src/director/search.ts`, constructive inside generate-and-test). For level n and
    tier t it builds K candidates with the solvable-by-construction generator from
    `seed(n, t, attempt)`, varying the knobs (stone count and layout, months, snow/knot/gate/fence

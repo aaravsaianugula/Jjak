@@ -54,7 +54,35 @@ export interface BoardRecord {
   /** local date key and hour when the board started */
   date: string;
   hour: number;
+  /**
+   * Pairs whose path wasted steps (went away and came back, a U), and the median ms
+   * spent finding them. Optional in memory; hydrated to [0, 0] for older saves.
+   */
+  detour?: [number, number];
+  /** pairs whose path ran round the outside of the board, and the median ms to find them */
+  edgeRoute?: [number, number];
+  /** pair rhythm: coefficient of variation of the times between pairs (-1 = unknown) */
+  gapCv?: number;
+  /** the longest time spent finding one pair, ms (0 = unknown): freezes */
+  longMs?: number;
+  /** blocked taps made within a second of selecting the first card: fast misreads */
+  quickMisses?: number;
 }
+
+/** A Glicko-style rating for one skill (a path shape or a mechanic), in board-difficulty units. */
+export interface SkillRating {
+  r: number;
+  /** uncertainty: shrinks with evidence, grows with time away */
+  dev: number;
+  /** boards that fed it */
+  n: number;
+}
+
+/** Path shapes the player model rates separately (see src/director/skills.ts). */
+export const PATH_SHAPES = ['straight', 'oneBend', 'twoBend', 'detour', 'edge'] as const;
+export type PathShape = (typeof PATH_SHAPES)[number];
+/** a new skill rating's deviation */
+export const SKILL_DEV_START = 0.25;
 
 export interface MechanicStat {
   /** boards played with it */
@@ -64,6 +92,9 @@ export interface MechanicStat {
   quits: number;
   /** replays of an already-cleared board that had it (a sign of enjoyment) */
   replays: number;
+  /** skill rating on boards with it (board-difficulty units) and its deviation */
+  r: number;
+  dev: number;
 }
 
 export interface AnalyticsSave {
@@ -90,10 +121,15 @@ export interface AnalyticsSave {
   sessions: { count: number; ms: number };
   /** the Director's dev-panel log of the last choice (dev builds only read it) */
   last?: { n: number; tier: number; target: number; d: number; reason: string };
+  /** a rating per path shape (only shapes seen so far) */
+  shapes: Partial<Record<PathShape, SkillRating>>;
+  /** the Director's recent challenge emphases, most recent first, capped: rotation and pin stability */
+  emphases: { n: number; focus: string; w: number }[];
 }
 
 export const RECENT_CAP = 40;
 export const DAYS_CAP = 60;
+export const EMPHASES_CAP = 8;
 
 export const defaultAnalytics = (): AnalyticsSave => ({
   v: 1,
@@ -106,12 +142,16 @@ export const defaultAnalytics = (): AnalyticsSave => ({
   tries: { n: 0, count: 0 },
   days: [],
   sessions: { count: 0, ms: 0 },
+  shapes: {},
+  emphases: [],
 });
 
 const num = (v: unknown, d: number, lo = -Infinity, hi = Infinity) =>
   typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
 
 const MODES: readonly BoardRecord['mode'][] = ['journey', 'daily', 'zen', 'rush'];
+const pair = (v: unknown): [number, number] =>
+  Array.isArray(v) && v.length === 2 ? [num(v[0], 0, 0), num(v[1], 0, 0)] : [0, 0];
 const trio = (v: unknown): [number, number, number] =>
   Array.isArray(v) && v.length === 3 ? [num(v[0], 0, 0), num(v[1], 0, 0), num(v[2], 0, 0)] : [0, 0, 0];
 
@@ -156,24 +196,52 @@ export function hydrateRecord(raw: unknown): BoardRecord | null {
     hintAfterMs: num(r.hintAfterMs, -1, -1),
     date: typeof r.date === 'string' ? r.date : '',
     hour: num(r.hour, -1, -1, 23),
+    detour: pair(r.detour),
+    edgeRoute: pair(r.edgeRoute),
+    gapCv: num(r.gapCv, -1, -1),
+    longMs: num(r.longMs, 0, 0),
+    quickMisses: num(r.quickMisses, 0, 0),
   };
 }
+
+const skill = (v: unknown, r: number): SkillRating | null => {
+  if (!v || typeof v !== 'object') return null;
+  const s = v as Partial<SkillRating>;
+  return { r: num(s.r, r, 0, 1.5), dev: num(s.dev, SKILL_DEV_START, 0.02, 0.5), n: num(s.n, 0, 0) };
+};
 
 /** Merge a stored slice over the defaults; drop anything malformed. */
 export function hydrateAnalytics(raw: unknown): AnalyticsSave {
   const base = defaultAnalytics();
   if (!raw || typeof raw !== 'object') return base;
   const r = raw as Partial<AnalyticsSave>;
+  const rating = num(r.rating, base.rating, 0, 1.5);
   const mech: Record<string, MechanicStat> = {};
   if (r.mech && typeof r.mech === 'object') {
     for (const [k, v] of Object.entries(r.mech)) {
       if (!v || typeof v !== 'object') continue;
-      mech[k] = { n: num(v.n, 0, 0), score: num(v.score, 0.5, 0, 1), quits: num(v.quits, 0, 0), replays: num(v.replays, 0, 0) };
+      mech[k] = {
+        n: num(v.n, 0, 0), score: num(v.score, 0.5, 0, 1), quits: num(v.quits, 0, 0), replays: num(v.replays, 0, 0),
+        r: num(v.r, rating, 0, 1.5), dev: num(v.dev, SKILL_DEV_START, 0.02, 0.5),
+      };
     }
   }
+  const shapes: AnalyticsSave['shapes'] = {};
+  if (r.shapes && typeof r.shapes === 'object') {
+    for (const k of PATH_SHAPES) {
+      const s = skill((r.shapes as Record<string, unknown>)[k], rating);
+      if (s && typeof (r.shapes as Record<string, { r?: unknown }>)[k]?.r === 'number') shapes[k] = s;
+    }
+  }
+  const emphases = Array.isArray(r.emphases)
+    ? r.emphases
+        .filter((e): e is { n: number; focus: string; w: number } => !!e && typeof e === 'object' && typeof e.focus === 'string' && Number.isFinite(e.n))
+        .map((e) => ({ n: num(e.n, 0, 0), focus: e.focus, w: num(e.w, 0, 0, 1) }))
+        .slice(0, EMPHASES_CAP)
+    : [];
   return {
     ...base,
-    rating: num(r.rating, base.rating, 0, 1.5),
+    rating,
     dev: num(r.dev, base.dev, 0.02, 0.5),
     boards: num(r.boards, 0, 0),
     recent: Array.isArray(r.recent)
@@ -194,5 +262,7 @@ export function hydrateAnalytics(raw: unknown): AnalyticsSave {
             reason: typeof r.last.reason === 'string' ? r.last.reason : '',
           }
         : undefined,
+    shapes,
+    emphases,
   };
 }
