@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { type ChallengeRequest, DIRECTOR, decide, masteryFloor, targetFor, tierD } from '../src/director/director';
-import { CHALLENGE, emphasisOf, familyOf, focusOf, pinnedChallenge } from '../src/director/challenge';
+import { emphasisOf, familyOf, focusOf, pinnedChallenge } from '../src/director/challenge';
 import { flowState } from '../src/director/flow';
 import { MODEL, expected, habitualAssists, ingest, performance } from '../src/director/model';
 import { designedBase, levelPlan } from '../src/director/plan';
@@ -444,7 +444,7 @@ describe('verifier fixes on the player model', () => {
     }
   });
 
-  it('one blind spot is never leaned on more than three boards in any eight (the per-player record)', () => {
+  it('rotation: one blind spot is never leaned on more than three boards in any eight', () => {
     // a reader with a single strong blind spot (2-bend paths), nothing else to lean on
     const tpl = { turnMs: [1800, 2200, 9000] as [number, number, number], gapMs: 2300, firstTaps: [[0.2, 0.5], [0.6, 0.0], [1, 0.5]] as [number, number][] };
     const a = history(tpl, 24);
@@ -455,7 +455,7 @@ describe('verifier fixes on the player model', () => {
       ingest(a, rec({ n, d: tierD(n, c.tier), tier: c.tier, ...tpl }));
     }
     expect(fam.filter((f) => f === 'bends2').length).toBeGreaterThanOrEqual(6);
-    for (let i = 0; i + 8 <= fam.length; i++) expect(fam.slice(i, i + 8).filter((f) => f === 'bends2').length, `boards ${i}–${i + 7}`).toBeLessThanOrEqual(CHALLENGE.maxPerWindow);
+    for (let i = 0; i + 8 <= fam.length; i++) expect(fam.slice(i, i + 8).filter((f) => f === 'bends2').length, `boards ${i}–${i + 7}`).toBeLessThanOrEqual(3);
   });
 
   it('malformed stored foci never become an emphasis', () => {
