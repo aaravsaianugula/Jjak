@@ -6,12 +6,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import { MIN_LEAN, leanVector, pickAlternates } from '../scripts/lib/leans';
-import { type BankEntry, TIERS, bankCandidates, decodeSlot, encodeSlot } from '../src/director/bank';
+import { BANK_LEVELS, type BankEntry, TIERS, bankCandidates, decodeSlot, encodeSlot } from '../src/director/bank';
 import { type ChallengeRequest } from '../src/director/challenge';
 import { type Knobs, type LevelPlan, knobRange, levelPlan } from '../src/director/plan';
 import { FEATURE_KEYS, type ReadingFeatures, encodeFeatures } from '../src/director/reading';
 import { MECH_KNOBS, chooseCandidate, leanOf } from '../src/director/tailor';
-import { BANK_LEVELS } from '../src/director/bank';
 import { FOCI } from '../src/services/save-analytics';
 
 const flat = (v: number): ReadingFeatures => Object.fromEntries(FEATURE_KEYS.map((k) => [k, v])) as unknown as ReadingFeatures;
@@ -90,6 +89,8 @@ describe('the builder stores the leans tailoring reads', () => {
       const at = (b: Board) => ({ b, v: leanVector(plan, b.knobs, b.f) });
       const faint = { ...primary, f: { ...flat(0.3), decoys: 0.3 + MIN_LEAN / 2 } };
       expect(pickAlternates(top, [at(faint)])).toHaveLength(0);
+      const clear = { ...primary, f: { ...flat(0.3), decoys: 0.3 + MIN_LEAN * 1.25 } };
+      expect(pickAlternates(top, [at(clear)])).toHaveLength(1);
       // a second board with more seals adds nothing once one is kept
       expect(pickAlternates(top, [at(moreSeals), at({ ...moreSeals, d: 0.405 })]).map((k) => k.b)).toEqual([moreSeals]);
       const edgy = { ...primary, f: { ...flat(0.3), edge: 0.7 } };
