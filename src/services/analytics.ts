@@ -67,6 +67,8 @@ export const tracking = () => live?.session ?? null;
 function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: number): BoardRecord {
   const s = l.session;
   const spec = s.spec;
+  const mode = spec.mode;
+  if (mode === 'practice') throw new Error('practice boards are never recorded (src/services/events.ts drops them)');
   const ms = ended === 'clear' && s.done ? s.elapsedMs(s.finishedAt) : Math.min(boardTime(s, now), l.lastAt + IDLE_TAIL_MS);
   // Time spent finding each pair: from the previous pair (or the start) to this one.
   const finds = l.pairs.map((p, i) => ({ ms: p.t - (i ? l.pairs[i - 1].t : 0), turns: p.turns }));
@@ -74,7 +76,7 @@ function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: n
     Math.round(median(finds.filter((f) => f.turns === k).map((f) => f.ms))),
   ) as [number, number, number];
   return {
-    mode: spec.mode,
+    mode,
     n: spec.mode === 'journey' ? spec.number : 0,
     tier: spec.tier ?? -1,
     d: Math.round(specD(spec) * 1000) / 1000,

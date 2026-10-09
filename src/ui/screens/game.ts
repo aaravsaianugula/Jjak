@@ -8,6 +8,8 @@ import { findPath } from '../../engine/path';
 import { fencesMarkup, gateInner, gateLabel } from '../../art/mechanics';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, rushLevel, zenLevel } from '../../engine/levels';
 import { levelPlan } from '../../director';
+import { practiceBoards } from '../../director/practice';
+import { MECHANICS } from '../../engine/mechanics';
 import { isBonus } from '../../data/deck';
 import { ROUTE_LEVELS, SEASON_NAMES, calendarSeason, festivalTitle, placeLine, routeOf } from '../../data/route';
 import { roadGoesOn } from '../reveal';
@@ -62,6 +64,7 @@ function titleFor(spec: LevelSpec): string {
   if (spec.mode === 'daily') return `Daily #${spec.number}`;
   if (spec.mode === 'rush') return 'Rush';
   if (spec.mode === 'zen') return 'Zen';
+  if (spec.mode === 'practice') return 'Practice';
   return `Level ${spec.number}`;
 }
 
@@ -69,6 +72,8 @@ let uid = 0;
 
 export function gameScreen(initialSpec: LevelSpec): Screen {
   let spec = initialSpec;
+  /** a Practice room board: no assists, no records, no rewards (its events never leave the bus) */
+  const practice = spec.mode === 'practice' && spec.practice ? MECHANICS[spec.practice] : null;
   let session = new Session(spec, performance.now());
   let total = cardsLeft(session.board);
   const gid = ++uid;
@@ -132,7 +137,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         ? `${dailyTheme(spec.seed.replace('daily-', '')).name} · same board worldwide`
         : rush
           ? `Score attack · best ${fmt(save.rush.best)}`
-          : 'No clock, no pressure';
+          : practice
+            ? `${practice.name} · board ${spec.number} of ${practiceBoards(practice.id).length}`
+            : 'No clock, no pressure';
 
   // Rhythm row: the live combo, its draining window, and the Fever tag. It sits
   // between the HUD and the board, so it never covers a card.
@@ -175,7 +182,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     rhythm,
     stage,
     coach,
-    h('nav', { class: 'toolbar', 'aria-label': 'Tools' }, hintBtn, shuffleBtn, restartBtn),
+    // Practice spends nothing: no hints or shuffles (they're the player's own), just Restart.
+    h('nav', { class: 'toolbar', 'aria-label': 'Tools' }, ...(practice ? [restartBtn] : [hintBtn, shuffleBtn, restartBtn])),
     sr,
   );
   const progressEl = bar.parentElement!;
@@ -1025,8 +1033,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   /** A completed card set: named banner, bonus, and a record for the seal book. */
   function showYaku(list: Yaku[]) {
-    for (const y of list) if (!save.yakuSeen.includes(y.id)) save.yakuSeen.push(y.id);
-    persist();
+    if (!practice) {
+      for (const y of list) if (!save.yakuSeen.includes(y.id)) save.yakuSeen.push(y.id);
+      persist();
+    }
     const y = list[list.length - 1];
     const bonus = list.reduce((n, x) => n + x.bonus, 0);
     sfx.reveal();
@@ -1295,6 +1305,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     if (!coach.hidden) setCoach(null);
   }
   function startTutorial() {
+    if (practice && wind && wind !== 'down') setTimeout(() => breeze(stage, wind, true, stageW, stageH), 250);
     if (spec.mode !== 'journey') return;
     if (spec.number === 1) {
       // The first-minute intro taught the rule; Level 1 just glows the first pair (free).
@@ -1341,11 +1352,45 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     haptic.success();
     live('Board cleared!');
     await wait(900);
+    if (practice) return showPracticeResult();
     const papersBefore = completedMonths().length;
     const summary = recordClear(session);
     emit('clear', { session, summary });
     const seals = checkSeals();
     showResult(summary, seals, completedMonths().length > papersBefore);
+  }
+
+  /** A practice board's end: time and score only, then the next board, again, or the room. */
+  function showPracticeResult() {
+    const secs = session.elapsedMs(session.finishedAt);
+    const heading = 'Practice board cleared';
+    const content = frag(`<div class="result result--practice">
+      <div class="result__head"><div class="seal result__seal ja">${esc(practice!.glyph)}</div><div><div class="result__kicker">Practice · 稽古</div><h2>${esc(heading)}</h2><div class="muted">${esc(sub)}</div></div></div>
+      <div class="statline">
+        <div><b>${formatTime(secs)}</b><span>Time</span></div>
+        <div><b>${fmt(session.score)}</b><span>Score</span></div>
+        <div><b>×${session.bestCombo}</b><span>Best combo</span></div>
+      </div>
+      <p class="muted result__note">Practice doesn’t count toward blossoms, petals or your level.</p>
+    </div>`);
+    const actions = h('div', { class: 'sheet__actions result__actions' });
+    content.append(actions);
+    const sheet = openSheet(content, { dismissible: false, label: heading });
+    const go = (fn: () => void) => () => {
+      sheet.close();
+      fn();
+    };
+    const boards = practiceBoards(practice!.id);
+    const next = boards[spec.number];
+    if (next) actions.append(h('button', { class: 'btn btn--primary btn--block btn--next', onclick: go(() => nav.game(next)), html: `Board ${next.number} ${ICONS.play}` }));
+    actions.append(
+      h(
+        'div',
+        { class: 'sheet__row' },
+        h('button', { class: next ? 'btn btn--ghost' : 'btn btn--primary', onclick: go(() => nav.game({ ...spec })), html: `${ICONS.restart}<span>Again</span>` }),
+        h('button', { class: 'btn btn--ghost', onclick: go(() => nav.practice()) }, 'Practice room'),
+      ),
+    );
   }
 
   /** Petal shower across the stage when a board is cleared. */
@@ -1679,8 +1724,11 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     session.startedAt += performance.now() - pausedAt;
   }
 
+  /** Where leaving a board goes: Home, or back to the Practice room. */
+  const exit = () => (practice ? nav.practice() : nav.home());
+
   function leave() {
-    if ((session.done || session.pairsMade === 0) && !(rush && rush.round > 0)) nav.home();
+    if ((session.done || session.pairsMade === 0) && !(rush && rush.round > 0)) exit();
     else openPause();
   }
 
@@ -1712,7 +1760,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           <button class="btn btn--ghost" data-p="how">${ICONS.hint}<span>Rules</span></button>
         </div>
         <button class="btn btn--quiet btn--block" data-p="intro">${ICONS.play}<span>Replay intro</span></button>
-        <button class="btn btn--quiet btn--block" data-p="home">Leave to Home</button>
+        <button class="btn btn--quiet btn--block" data-p="home">${practice ? 'Back to Practice' : 'Leave to Home'}</button>
       </div>
     </div>`);
     const sheet = openSheet(content, { label: 'Paused' });
@@ -1736,11 +1784,11 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       }
       if (act === 'intro') {
         // Over the pause sheet, so the clock stays stopped.
-        openIntro(replayIntroFor(spec), contextOf(spec), 'Back');
+        openIntro(spec.practice ?? replayIntroFor(spec), contextOf(spec), 'Back');
         return;
       }
       sheet.close();
-      if (act === 'home') nav.home();
+      if (act === 'home') exit();
       if (act === 'restart') restartBoard();
     });
     void sheet.closed.then(() => {
@@ -1780,7 +1828,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     const goalText = goal ? goalNeed() : '';
     const goalNote = goal ? `<div class="intro__goal"><span class="intro__goal-mark" aria-hidden="true">${ICONS.blossom}</span><span><b>${esc(goal.name)}</b> <span class="intro__goal-native">${goal.native}</span><br>${esc(goalText)}</span></div>` : '';
     const card = frag(`<div class="intro${spec.festival ? ' intro--festival' : ''}" aria-hidden="true">
-      <div class="intro__kicker">${esc(spec.mode === 'journey' ? (place ? (spec.festival ? `${festivalTitle(place)} · 祭` : placeLine(place)) : `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}`) : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : 'Zen · 禅')}</div>
+      <div class="intro__kicker">${esc(spec.mode === 'journey' ? (place ? (spec.festival ? `${festivalTitle(place)} · 祭` : placeLine(place)) : `${chapterOf(spec.number).name} · ${chapterOf(spec.number).ko} · ${chapterOf(spec.number).ja}`) : spec.mode === 'daily' ? dailyTheme(spec.seed.replace('daily-', '')).name : rush ? 'Score attack' : practice ? `Practice · ${practice.name}` : 'Zen · 禅')}</div>
       <div class="intro__title">${esc(titleFor(spec))}</div>
       <svg class="intro__rule" viewBox="0 0 120 8" preserveAspectRatio="none"><path d="M1 4.6C20 2.6 52 2.4 80 3.1S112 4.2 119 3.6C110 5.4 84 5.7 58 5.8S14 6.3 1 4.6Z"/></svg>
       <div class="intro__sub">${esc([rush ? '' : `${total / 2} pairs`, twistNote].filter(Boolean).join(' · '))}</div>

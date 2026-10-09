@@ -16,6 +16,7 @@ import { slidePill } from '../motion';
 import { MECHANIC_IDS, MECHANICS } from '../../engine/mechanics';
 import { DemoPlayer } from '../demo';
 import { type DemoScript, BASIC_DEMOS, GOAL_DEMOS, MECHANIC_DEMOS, VARIANTS_DEMO } from '../demos';
+import { practiceMet } from './practice';
 import { replayIntro } from './welcome';
 
 export function settingsScreen(): Screen {
@@ -61,6 +62,7 @@ export function settingsScreen(): Screen {
       <h2 class="section-label" id="set-help">Help &amp; privacy</h2>
       <div class="list list--icons" role="group" aria-labelledby="set-help">
         <button class="row" data-act="how">${row(ICONS.help, 'How to play')}${chevron}</button>
+        ${practiceMet().length ? `<button class="row" data-act="practice">${row(ICONS.play, 'Practice', 'Intros and gentle boards for ideas you’ve met')}${chevron}</button>` : ''}
         ${ads.privacyOptionsRequired ? `<button class="row" data-act="consent">${row(ICONS.shield, 'Ad privacy choices', 'Change your consent')}${chevron}</button>` : ''}
         <a class="row" href="${esc(LINKS.privacy)}" target="_blank" rel="noopener">${row(ICONS.doc, 'Privacy policy')}<span class="row__end" aria-hidden="true">${ICONS.external}</span><span class="sr-only">(opens in browser)</span></a>
         <button class="row row--danger" data-act="reset">${row(ICONS.trash, 'Reset progress', 'Clears levels, petals and album')}${chevron}</button>
@@ -115,7 +117,8 @@ export function settingsScreen(): Screen {
       return;
     }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
-    if (act === 'how') showHowToPlay();
+    if (act === 'how') showHowToPlay({ practice: true });
+    if (act === 'practice') nav.practice();
     if (act === 'buy') {
       if (!Capacitor.isNativePlatform()) return toast('Remove ads is available in the Android app from Google Play.');
       if (await openRemoveAds()) nav.settings();
@@ -149,7 +152,7 @@ export function settingsScreen(): Screen {
  * bends, combos, every mechanic, goals), one line each for the Market, Garden
  * and Flower Path, and Replay intro.
  */
-export function showHowToPlay(): void {
+export function showHowToPlay(opts: { practice?: boolean } = {}): void {
   const tiles: { label: string; script: DemoScript; wide?: boolean }[] = [
     { label: 'Same flower', script: VARIANTS_DEMO },
     { label: 'Up to two bends', script: BASIC_DEMOS.bends },
@@ -178,9 +181,15 @@ export function showHowToPlay(): void {
   });
   const replay = h('button', { class: 'btn btn--ghost btn--block', html: `${ICONS.play}<span>Replay intro</span>` });
   const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
-  content.append(h('div', { class: 'sheet__actions' }, replay, btn));
+  // The Practice room, once there's something in it (not from a board: leaving would quit it).
+  const practice = opts.practice && practiceMet().length ? h('button', { class: 'btn btn--ghost btn--block', html: `${ICONS.play}<span>Practice room</span>` }) : null;
+  content.append(h('div', { class: 'sheet__actions' }, ...(practice ? [practice] : []), replay, btn));
   const s = openSheet(content, { label: 'How to play', close: true });
   btn.addEventListener('click', () => s.close());
+  practice?.addEventListener('click', () => {
+    s.close();
+    nav.practice();
+  });
   replay.addEventListener('click', () => replayIntro());
 
   // Loop only the tiles on screen.

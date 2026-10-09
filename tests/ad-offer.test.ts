@@ -21,7 +21,7 @@ import {
 
 /** A local date (month is 1-based), at noon unless an hour is given. */
 const day = (y: number, m: number, d: number, hour = 12): Date => new Date(y, m - 1, d, hour);
-const fresh = (over: Partial<OfferState> = {}): OfferState => ({ adFree: false, never: false, firstShown: false, lastMonth: null, ...over });
+const fresh = (over: Partial<OfferState> = {}): OfferState => ({ adFree: false, never: false, firstShown: false, lastMonth: null, lastAsk: null, ...over });
 const asked = (lastMonth: string, over: Partial<OfferState> = {}): OfferState => fresh({ firstShown: true, lastMonth, ...over });
 
 describe('festival calendar', () => {
@@ -54,14 +54,15 @@ describe('festival calendar', () => {
   });
 
   it('a window runs from the festival date through the sixth day after it', () => {
-    expect(festivalOn(day(2026, 8, 12))).toBeNull();
-    expect(festivalOn(day(2026, 8, 13))?.en).toBe('Obon');
-    expect(festivalOn(day(2026, 8, 19))?.en).toBe('Obon');
-    expect(festivalOn(day(2026, 8, 20))).toBeNull();
-    expect(festivalOn(day(2026, 4, 1))?.en).toBe('Hanami');
-    expect(festivalOn(day(2026, 4, 7))?.en).toBe('Hanami');
-    expect(festivalOn(day(2026, 4, 8))).toBeNull();
-    expect(festivalOn(day(2026, 3, 31))).toBeNull();
+    // 2028: no lunar festival week near these dates.
+    expect(festivalOn(day(2028, 8, 12))).toBeNull();
+    expect(festivalOn(day(2028, 8, 13))?.en).toBe('Obon');
+    expect(festivalOn(day(2028, 8, 19))?.en).toBe('Obon');
+    expect(festivalOn(day(2028, 8, 20))).toBeNull();
+    expect(festivalOn(day(2028, 4, 1))?.en).toBe('Hanami');
+    expect(festivalOn(day(2028, 4, 7))?.en).toBe('Hanami');
+    expect(festivalOn(day(2028, 4, 8))).toBeNull();
+    expect(festivalOn(day(2028, 3, 31))).toBeNull();
   });
 
   it('uses the local calendar day: the first minute and the last minute of a day count', () => {
@@ -71,10 +72,11 @@ describe('festival calendar', () => {
     expect(festivalOn(new Date(2026, 11, 31, 23, 59, 59))).toBeNull();
   });
 
-  it('leap days fall outside every window', () => {
-    expect(festivalOn(day(2028, 2, 29))).toBeNull();
-    expect(festivalOn(day(2028, 2, 9))?.en).toBe('Setsubun');
-    expect(festivalOn(day(2028, 2, 10))).toBeNull();
+  it('leap days fall outside every fixed window', () => {
+    // 2036: Seollal and Daeboreum are over by February 17.
+    expect(festivalOn(day(2036, 2, 29))).toBeNull();
+    expect(festivalOn(day(2036, 2, 9))?.en).toBe('Setsubun');
+    expect(festivalOn(day(2036, 2, 10))).toBeNull();
   });
 
   it('keys months by local year and month', () => {
@@ -86,24 +88,24 @@ describe('festival calendar', () => {
 
 describe('when the offer is due', () => {
   it('asks once on first start, outside any festival', () => {
-    expect(offerDue(day(2026, 10, 1), fresh())).toEqual({ kind: 'first' });
+    expect(offerDue(day(2026, 10, 2), fresh())).toEqual({ kind: 'first', month: '2026-10' });
   });
 
   it('carries the festival on a first start inside its week, so the first ask can hold the festival price', () => {
-    expect(offerDue(day(2026, 7, 9), fresh())).toEqual({ kind: 'first', festival: FESTIVALS[6] });
+    expect(offerDue(day(2026, 7, 9), fresh())).toEqual({ kind: 'first', festival: FESTIVALS[6], month: '2026-07' });
   });
 
   it('never asks a player who owns Remove ads or said "Don’t ask again"', () => {
-    expect(offerDue(day(2026, 10, 1), fresh({ adFree: true }))).toBeNull();
-    expect(offerDue(day(2026, 10, 1), fresh({ never: true }))).toBeNull();
+    expect(offerDue(day(2026, 10, 2), fresh({ adFree: true }))).toBeNull();
+    expect(offerDue(day(2026, 10, 2), fresh({ never: true }))).toBeNull();
     expect(offerDue(day(2026, 10, 9), asked('2026-09', { adFree: true }))).toBeNull();
     expect(offerDue(day(2026, 10, 9), asked('2026-09', { never: true }))).toBeNull();
   });
 
   it('after the first ask, asks only inside this month’s festival week', () => {
     expect(offerDue(day(2026, 10, 8), asked('2026-09'))).toBeNull();
-    expect(offerDue(day(2026, 10, 9), asked('2026-09'))).toEqual({ kind: 'festival', festival: FESTIVALS[9] });
-    expect(offerDue(day(2026, 10, 15), asked('2026-09'))).toEqual({ kind: 'festival', festival: FESTIVALS[9] });
+    expect(offerDue(day(2026, 10, 9), asked('2026-09'))).toEqual({ kind: 'festival', festival: FESTIVALS[9], month: '2026-10' });
+    expect(offerDue(day(2026, 10, 15), asked('2026-09'))).toEqual({ kind: 'festival', festival: FESTIVALS[9], month: '2026-10' });
     expect(offerDue(day(2026, 10, 16), asked('2026-09'))).toBeNull();
   });
 
@@ -113,53 +115,152 @@ describe('when the offer is due', () => {
 
   it('a first start and a festival in the same month make one ask', () => {
     const now = day(2026, 10, 3);
-    expect(offerDue(now, fresh())).toEqual({ kind: 'first' });
-    const after = recordOffer(defaultAdOffer(), now);
+    const first = offerDue(now, fresh());
+    expect(first).toEqual({ kind: 'first', month: '2026-10' });
+    const after = recordOffer(defaultAdOffer(), now, first!);
     expect(offerDue(day(2026, 10, 10), { adFree: false, ...after })).toBeNull();
     // A first ask inside the festival week also counts for that week.
-    const inside = recordOffer(defaultAdOffer(), day(2026, 10, 9));
+    const inside = recordOffer(defaultAdOffer(), day(2026, 10, 9), offerDue(day(2026, 10, 9), fresh())!);
     expect(offerDue(day(2026, 10, 11), { adFree: false, ...inside })).toBeNull();
   });
 
   it('a month that was skipped entirely does not stop the next one', () => {
-    expect(offerDue(day(2026, 12, 22), asked('2026-08'))).toEqual({ kind: 'festival', festival: FESTIVALS[11] });
+    expect(offerDue(day(2026, 12, 22), asked('2026-08'))).toEqual({ kind: 'festival', festival: FESTIVALS[11], month: '2026-12' });
   });
 
-  it('crosses the year: asked in December, asked again for the New Year', () => {
-    const dec = recordOffer({ never: false, firstShown: true, lastMonth: '2026-11' }, day(2026, 12, 23));
+  it('crosses the year: asked in December, asked again in the New Year week once two weeks have passed', () => {
+    const dec = recordOffer({ ...defaultAdOffer(), firstShown: true, lastMonth: '2026-11' }, day(2026, 12, 23), {
+      kind: 'festival',
+      festival: FESTIVALS[11],
+      month: '2026-12',
+    });
     expect(dec.lastMonth).toBe('2026-12');
-    expect(offerDue(new Date(2027, 0, 1, 0, 5), { adFree: false, ...dec })).toEqual({ kind: 'festival', festival: FESTIVALS[0] });
+    expect(offerDue(new Date(2027, 0, 1, 0, 5), { adFree: false, ...dec })).toBeNull();
+    expect(offerDue(new Date(2027, 0, 6, 0, 5), { adFree: false, ...dec })).toEqual({ kind: 'festival', festival: FESTIVALS[0], month: '2027-01' });
   });
 
   it('the same month a year later is a new month', () => {
-    expect(offerDue(day(2027, 10, 9), asked('2026-10'))).toEqual({ kind: 'festival', festival: FESTIVALS[9] });
+    expect(offerDue(day(2027, 10, 9), asked('2026-10'))).toEqual({ kind: 'festival', festival: FESTIVALS[9], month: '2027-10' });
+  });
+});
+
+describe('lunar festival weeks', () => {
+  it('Seollal’s week runs from its eve; the others’ from the day itself', () => {
+    expect(festivalOn(day(2026, 2, 15))).toBeNull();
+    expect(festivalOn(day(2026, 2, 16))?.id).toBe('seollal');
+    expect(festivalOn(day(2026, 2, 16))).toMatchObject({ month: 2, day: 17 });
+    expect(festivalOn(day(2026, 2, 22))?.id).toBe('seollal');
+    expect(festivalOn(day(2026, 2, 23))).toBeNull();
+    expect(festivalOn(day(2028, 5, 27))).toBeNull();
+    expect(festivalOn(day(2028, 5, 28))?.id).toBe('dano');
+    expect(festivalOn(day(2028, 6, 3))?.id).toBe('dano');
+    expect(festivalOn(day(2028, 6, 4))).toBeNull();
+  });
+
+  it('a lunar festival is shown over a fixed one on the days their weeks overlap', () => {
+    expect(festivalOn(day(2026, 9, 24))?.id).toBe('chubun');
+    expect(festivalOn(day(2026, 9, 25))?.id).toBe('chuseok');
+    expect(festivalOn(day(2026, 9, 28))?.id).toBe('chuseok');
+    expect(festivalOn(day(2026, 3, 3))?.id).toBe('daeboreum');
+  });
+
+  it('Seollal and Chuseok take the month from a fixed festival: the fixed one shows but never asks', () => {
+    // Autumn equinox week (Sep 22–28) and Chuseok (from Sep 25) share September 2026.
+    expect(festivalOn(day(2026, 9, 22))?.id).toBe('chubun');
+    expect(offerDue(day(2026, 9, 22), asked('2026-08'))).toBeNull();
+    expect(offerDue(day(2026, 9, 25), asked('2026-08'))).toMatchObject({ kind: 'festival', month: '2026-09', festival: { id: 'chuseok' } });
+    // Setsubun (Feb 3–9) and Seollal (eve Feb 16) share February 2026.
+    expect(festivalOn(day(2026, 2, 5))?.id).toBe('setsubun');
+    expect(offerDue(day(2026, 2, 5), asked('2026-01'))).toBeNull();
+    // Seollal from its eve in January 2028 quiets the New Year week, not February's.
+    expect(offerDue(day(2028, 1, 3), asked('2027-12'))).toBeNull();
+    expect(offerDue(day(2028, 1, 26), asked('2027-12'))).toMatchObject({ month: '2028-01', festival: { id: 'seollal' } });
+    expect(offerDue(day(2028, 2, 5), asked('2028-01'))).toMatchObject({ month: '2028-02', festival: { id: 'setsubun' } });
+  });
+
+  it('a minor lunar festival is a peer: the first festival week the player meets carries the month’s one ask', () => {
+    // May 2028: Children’s Day (May 5–11) and Dano (from May 28).
+    expect(offerDue(day(2028, 5, 6), asked('2028-04'))).toMatchObject({ month: '2028-05', festival: { id: 'childrens-day' } });
+    expect(offerDue(day(2028, 5, 29), asked('2028-05'))).toBeNull();
+    expect(offerDue(day(2028, 5, 29), asked('2028-04'))).toMatchObject({ month: '2028-05', festival: { id: 'dano' } });
+    // Hinamatsuri and Daeboreum share March 3–9, 2026: one ask, under the festival shown.
+    expect(offerDue(day(2026, 3, 4), asked('2026-02'))).toMatchObject({ month: '2026-03', festival: { id: 'daeboreum' } });
+    expect(offerDue(day(2026, 3, 8), asked('2026-03'))).toBeNull();
+  });
+
+  it('a week that crosses into the next month asks once, for the month it starts in', () => {
+    // Chuseok 2026 runs Sep 25 – Oct 1.
+    expect(offerDue(day(2026, 10, 1), asked('2026-08'))).toMatchObject({ month: '2026-09', festival: { id: 'chuseok' } });
+    // Asked in September (more than two weeks before): its October tail never asks again.
+    expect(offerDue(day(2026, 10, 1), asked('2026-09', { lastAsk: '2026-09-02' }))).toBeNull();
+    // A first start on its tail counts for September too.
+    expect(offerDue(day(2026, 10, 1), fresh())).toMatchObject({ kind: 'first', month: '2026-09', festival: { id: 'chuseok' } });
+  });
+
+  it('never asks within 14 days of the last ask, even in a new month', () => {
+    const due = offerDue(day(2026, 10, 1), asked('2026-08'))!;
+    const tail = recordOffer({ ...defaultAdOffer(), firstShown: true, lastMonth: '2026-08' }, day(2026, 10, 1), due);
+    expect(tail).toMatchObject({ lastMonth: '2026-09', lastAsk: '2026-10-01' });
+    expect(offerDue(day(2026, 10, 9), { adFree: false, ...tail })).toBeNull();
+    expect(offerDue(day(2026, 10, 14), { adFree: false, ...tail })).toBeNull();
+    expect(offerDue(day(2026, 10, 15), { adFree: false, ...tail })).toMatchObject({ month: '2026-10', festival: { id: 'hangeul-day' } });
+  });
+
+  it('after the table ends (and before it starts) the fixed calendar runs alone', () => {
+    expect(festivalOn(day(2046, 9, 22))?.id).toBe('chubun');
+    expect(offerDue(day(2046, 9, 22), asked('2046-08'))).toMatchObject({ month: '2046-09', festival: { id: 'chubun' } });
+    expect(offerDue(day(2046, 2, 5), asked('2046-01'))).toMatchObject({ festival: { id: 'setsubun' } });
+    expect(offerDue(day(2025, 9, 22), asked('2025-08'))).toMatchObject({ festival: { id: 'chubun' } });
   });
 });
 
 describe('recording an ask', () => {
-  it('marks the first ask done and remembers the month, keeping "Don’t ask again" as it was', () => {
-    const s: AdOfferSave = { never: false, firstShown: false, lastMonth: null };
-    expect(recordOffer(s, day(2026, 7, 7))).toEqual({ never: false, firstShown: true, lastMonth: '2026-07' });
-    expect(s).toEqual({ never: false, firstShown: false, lastMonth: null });
+  it('marks the first ask done and remembers the ask’s month and day, keeping "Don’t ask again" as it was', () => {
+    const s: AdOfferSave = defaultAdOffer();
+    expect(recordOffer(s, day(2026, 7, 7), { kind: 'first', festival: FESTIVALS[6], month: '2026-07' })).toEqual({
+      never: false,
+      firstShown: true,
+      lastMonth: '2026-07',
+      lastAsk: '2026-07-07',
+    });
+    expect(s).toEqual(defaultAdOffer());
+  });
+
+  it('never moves the remembered month backwards (a first ask on a tail day of last month’s week)', () => {
+    const odd = { ...defaultAdOffer(), lastMonth: '2026-10' };
+    const due = offerDue(day(2026, 10, 1), { adFree: false, ...odd })!;
+    expect(due).toMatchObject({ kind: 'first', month: '2026-09' });
+    expect(recordOffer(odd, day(2026, 10, 1), due)).toMatchObject({ lastMonth: '2026-10', lastAsk: '2026-10-01' });
   });
 });
 
 describe('saved offer state', () => {
   it('starts unasked', () => {
-    expect(defaultAdOffer()).toEqual({ never: false, firstShown: false, lastMonth: null });
+    expect(defaultAdOffer()).toEqual({ never: false, firstShown: false, lastMonth: null, lastAsk: null });
   });
 
   it('a save from before this feature (or a damaged one) loads as unasked', () => {
     expect(hydrateAdOffer(undefined)).toEqual(defaultAdOffer());
     expect(hydrateAdOffer(null)).toEqual(defaultAdOffer());
     expect(hydrateAdOffer('nope')).toEqual(defaultAdOffer());
-    expect(hydrateAdOffer({ never: 'yes', firstShown: 1, lastMonth: 202610 })).toEqual(defaultAdOffer());
+    expect(hydrateAdOffer({ never: 'yes', firstShown: 1, lastMonth: 202610, lastAsk: 5 })).toEqual(defaultAdOffer());
     expect(hydrateAdOffer({ lastMonth: '10/2026' })).toEqual(defaultAdOffer());
   });
 
   it('keeps what was saved, field by field', () => {
-    expect(hydrateAdOffer({ never: true })).toEqual({ never: true, firstShown: false, lastMonth: null });
-    expect(hydrateAdOffer({ never: false, firstShown: true, lastMonth: '2026-10' })).toEqual({ never: false, firstShown: true, lastMonth: '2026-10' });
+    expect(hydrateAdOffer({ never: true })).toEqual({ never: true, firstShown: false, lastMonth: null, lastAsk: null });
+    const saved = { never: false, firstShown: true, lastMonth: '2026-10', lastAsk: '2026-10-09' };
+    expect(hydrateAdOffer(saved)).toEqual(saved);
+  });
+
+  it('a save that only knows the month of its last ask assumes the month’s last day, so spacing holds', () => {
+    expect(hydrateAdOffer({ firstShown: true, lastMonth: '2026-09' })).toMatchObject({ lastAsk: '2026-09-30' });
+    expect(hydrateAdOffer({ firstShown: true, lastMonth: '2028-02' })).toMatchObject({ lastAsk: '2028-02-29' });
+    expect(hydrateAdOffer({ firstShown: true, lastMonth: '2026-09', lastAsk: '2026-02-30' })).toMatchObject({ lastAsk: '2026-09-30' });
+    expect(hydrateAdOffer({ firstShown: true, lastMonth: '2026-09', lastAsk: '2026-9-1' })).toMatchObject({ lastAsk: '2026-09-30' });
+    const old = hydrateAdOffer({ never: false, firstShown: true, lastMonth: '2026-09' });
+    expect(offerDue(day(2026, 10, 13), { adFree: false, ...old })).toBeNull();
+    expect(offerDue(day(2026, 10, 14), { adFree: false, ...old })).toMatchObject({ festival: { id: 'hangeul-day' } });
   });
 });
 

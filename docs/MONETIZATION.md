@@ -81,9 +81,14 @@ triggered from Home by `askRemoveAdsIfDue` in `src/ui/remove-ads.ts`):
 * **First start:** the first time a player reaches Home (for a new player that's after the
   intro, the first minute and the first board). Existing players who update are asked once
   the same way, since they were never asked before.
-* **Then at most once a month, during that month's festival week** (the festival's date and
-  the six days after it, by the phone's own calendar day). The first ask counts for its month,
-  so a first start inside a festival week is one ask, not two.
+* **Then at most once a month, during a festival week** (seven days from the festival's date,
+  or from Seollal's eve, by the phone's own calendar day), and **never within 14 days of the
+  last ask**. A week asks for the month it **starts** in: a week that runs into the next month
+  (Chuseok from 30 September) is one ask for its first month, and its tail days never ask
+  again. The first ask counts the same way, so a first start inside a festival week is one
+  ask, not two. Saves from before the ask date was kept assume the last ask was on the last
+  day of its month, so the spacing holds for them too. (A phone clock set back in time simply
+  holds the asks until the calendar passes the last one again.)
 * **Never** once ads are off (Remove ads, the festival product or the Supporter pack), and
   never after **"Don't ask again"**, a quiet button beside "Not now" that appears only on
   these asks. It's a preference: Reset progress keeps it (and keeps the ask history, so a
@@ -93,8 +98,8 @@ triggered from Home by `askRemoveAdsIfDue` in `src/ui/remove-ads.ts`):
   player leaves Home before it's time, the next visit to Home asks instead; if they opened
   Remove ads themselves this session, a later launch asks instead.
 
-**Festival calendar.** Twelve fixed-date Korean and Japanese festivals, one per month. Lunar
-festivals (Seollal, Chuseok, Dano) are left out on purpose: their dates move every year.
+**Festival calendar.** Twelve fixed-date Korean and Japanese festivals, one per month, plus
+Korea's lunar festivals while the verified date table lasts (`src/services/lunar-festivals.ts`).
 
 | Month | Festival | Native name | Week |
 |---|---|---|---|
@@ -110,6 +115,35 @@ festivals (Seollal, Chuseok, Dano) are left out on purpose: their dates move eve
 | Oct | Hangeul Day | 한글날 | Oct 9–15 |
 | Nov | Shichi-Go-San | 七五三 | Nov 15–21 |
 | Dec | Dongji | 동지 · 冬至 | Dec 22–28 |
+
+| Lunar festival | Lunar date | Native name | Seal | Rank | Week | 2026 |
+|---|---|---|---|---|---|---|
+| Seollal | 1/1 | 설날 | 설 | major | from the eve (lunar 12/29 or 12/30) | Feb 16–22 |
+| Jeongwol Daeboreum | 1/15 | 정월대보름 | 望 | minor | from the day | Mar 3–9 |
+| Dano | 5/5 | 단오 | 端 | minor | from the day | Jun 19–25 |
+| Chilseok | 7/7 | 칠석 | 星 | minor | from the day | Aug 19–25 |
+| Chuseok · Tsukimi | 8/15 | 추석 · お月見 · 十五夜 | 月 | major | from the day | Sep 25–Oct 1 |
+
+* **Dates are read, never computed.** The table covers **2026–2045**, from KASI's official
+  Korean lunar calendar (the converter at astro.kasi.re.kr, `/life/lunc`; Seollal eves read back
+  through `/life/solc`), and every one of the 100 dates was cross-checked against the
+  `korean-lunar-calendar` package 0.4.0; Seollal and Chuseok also against the Korean public
+  holidays in the `holidays` package 0.106. No date disagreed. `tests/lunar-festivals.test.ts`
+  pins every date, and fails from 2044 on as a reminder to add the next years the same way.
+  After 2045 (or on a phone set before 2026) the fixed festivals run alone.
+* **Seollal and Chuseok take their month.** A fixed festival whose month holds the start of a
+  Seollal or Chuseok week never asks that month (Setsubun in a February Seollal year, the
+  New Year week when Seollal's eve falls in January, the equinox in a September Chuseok year).
+  Its week still shows its seal and price if the player opens Remove ads themselves.
+* **Daeboreum, Dano and Chilseok are peers** of the fixed festivals: whichever festival week
+  the player meets first carries the month's one ask.
+* **Overlapping days** show the major festival, else the minor one, else the one that began
+  last (e.g. Chuseok over the equinox, Daeboreum over Hinamatsuri on 3–9 March 2026).
+* **Names.** Japanese names only where Japan keeps the same night: Tsukimi (お月見, 十五夜) is
+  Chuseok's full moon, so the two share a week. Seollal isn't kept in Japan as such. Japan moved
+  Tango no Sekku to 5 May (our fixed Children's Day week) and keeps Tanabata on 7 July (our
+  fixed July week), so Dano and Chilseok are Korea's lunar days and separate weeks: Chilseok
+  and Tanabata are the same legend on two calendars, each with its own seal (星 and 夕).
 
 **The festival price.** A second one-time, non-consumable product, `jjak_remove_ads_festival`
 (suggested **US$2.49** against the regular US$2.99; Play sets local prices). It does exactly

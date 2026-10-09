@@ -7,7 +7,7 @@ import { type GoalId } from './goals';
 import { type Wind } from './moves';
 import { createRng, type Rng } from './rng';
 
-export type ModeId = 'journey' | 'daily' | 'zen' | 'rush';
+export type ModeId = 'journey' | 'daily' | 'zen' | 'rush' | 'practice';
 
 export interface LevelSpec {
   mode: ModeId;
@@ -44,6 +44,8 @@ export interface LevelSpec {
   layout?: StoneLayout;
   /** goal board: the third blossom is this goal instead of par */
   goal?: GoalId;
+  /** Practice room: the mechanic this practice board is for (mode 'practice') */
+  practice?: Mechanic;
   /** Level Director: the skill tier this board was built for (0 gentle … 4 hardest) */
   tier?: number;
   /** Level Director: measured difficulty of this board, 0–1 (for the dev panel and analytics) */

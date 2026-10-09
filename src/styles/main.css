@@ -3787,3 +3787,85 @@ button.row:active,
 .chapter__name {
   margin: 0;
 }
+
+/* ── Practice room (연습 · 稽古): ideas met on the road, their intros and gentle boards ── */
+.practice__note {
+  margin: 2px 4px 14px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.practice__empty {
+  margin: 24px 4px;
+  text-align: center;
+}
+.practice__row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  animation: practice-rise 420ms var(--ease-settle) calc(var(--i, 0) * 45ms) backwards;
+}
+.practice__row + .practice__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 74px;
+  right: 0;
+  height: 1px;
+  background: var(--line-soft);
+}
+@keyframes practice-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.practice__mark {
+  margin-top: 2px;
+  color: var(--accent-text);
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: rotate(-4deg);
+}
+.practice__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.practice__title {
+  font-weight: 700;
+  font-size: var(--fs-body);
+  line-height: 1.3;
+}
+.practice__native {
+  margin-left: 4px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.practice__rule {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: var(--muted);
+}
+.practice__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 8px;
+}
+.practice__boards {
+  display: inline-flex;
+  gap: 8px;
+}
+.practice__board {
+  min-width: 40px;
+  justify-content: center;
+  padding: 0 12px;
+  font-variant-numeric: tabular-nums;
+}

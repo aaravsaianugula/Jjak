@@ -135,8 +135,8 @@ export function openRemoveAds(opts: RemoveAdsOptions = {}): Promise<boolean> {
 }
 
 /**
- * The game's own ask, from Home: on first start, then once in each month's festival week
- * (src/services/ad-offer.ts). Android only. Waits for the launch loader to go and Play's
+ * The game's own ask, from Home: on first start, then at most once a month in a festival
+ * week and never within 14 days of the last ask (src/services/ad-offer.ts). Android only. Waits for the launch loader to go and Play's
  * prices to arrive, lets the daily gift and any other sheet finish first, and gives up
  * if the player has left Home by then (the next visit to Home tries again) or has already
  * opened the sheet themselves this session (a later launch asks instead).
@@ -155,7 +155,7 @@ export async function askRemoveAdsIfDue(home: HTMLElement): Promise<boolean> {
   const now = new Date();
   const due = offerDue(now, { adFree: save.adFree, ...save.adOffer });
   if (!due || seenThisSession) return save.adFree;
-  save.adOffer = recordOffer(save.adOffer, now);
+  save.adOffer = recordOffer(save.adOffer, now, due);
   persist();
   return openRemoveAds({ prompted: true, festival: due.festival ?? null });
 }

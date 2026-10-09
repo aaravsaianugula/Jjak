@@ -17,4 +17,6 @@ export const nav = {
   market: (_tab?: string): void => {},
   garden: (): void => {},
   path: (): void => {},
+  /** the Practice room: intros and gentle boards for every mechanic met so far */
+  practice: (): void => {},
 };

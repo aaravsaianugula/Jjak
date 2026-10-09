@@ -51,6 +51,7 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 | **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif), equipped in the Market. 12 to collect, plus 6 to buy. |
 | **Flower Road map** | Any time | A winding route through all 50 places with blossoms and stamps; open a place to replay any of its levels. |
 | **Zen** | Any time | Endless, untimed, no stars. |
+| **Practice room 연습 · 稽古** | Any time | Every idea met on the road (its intro seen, or its first board behind you) with its animated intro to watch again and 3 gentle boards: the Director's tier-0, solver-proven bank boards for the first levels that feature it. From Settings (and How to play there). Practice never counts: no blossoms, petals, level, missions, skill rating or tier pins, and no hints or shuffles spent. Built from the mechanic registry, so new mechanics join on their own. |
 | **Rush** | Minutes | 60-second score attack: pairs add time, cleared boards add more, boards grow. Personal best, plus an optional rewarded "keep going +20 s" once per run. |
 | **Fever** | Seconds | A ×5 combo starts 6 s of 만개 · 満開 "full bloom": double points and a glowing board. |
 | **Card sets on the board** | Per board | Clearing every card of a real Go-Stop / Koi-Koi set (yaku) within one board scores a named bonus: 고도리 Godori +700, 猪鹿蝶 +700, 홍단/청단/초단 +500, 月見酒/花見酒 +400, 삼광 Three brights +900, 오광 Five brights +2000. The intro card hints when a board holds one. |
