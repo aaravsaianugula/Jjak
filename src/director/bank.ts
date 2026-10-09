@@ -12,7 +12,7 @@
  * and up to two **alternates**: other solver-proven boards for the same level and tier,
  * within `TAILOR.maxDGap` of its d, that read differently (key pairs elsewhere, more
  * 2-bend paths, more decoys). A slot is `entry + features` repeated, primary first; the
- * Director's challenge picks among them (tailor.ts). A 16-character slot (v1) is the
+ * Director's challenge picks among them (tailor.ts). A bare-entry slot (v1) is the
  * primary alone, with no features.
  */
 import data from '../data/level-bank.json';
@@ -64,8 +64,11 @@ export function encodeEntry(e: BankEntry): string {
   );
 }
 
+/** Characters in one encoded board entry (knobs, d and the board hash). */
+export const ENTRY_CHARS = 20;
+
 export function decodeEntry(s: string): BankEntry | null {
-  if (!s || s.length !== 20) return null;
+  if (!s || s.length !== ENTRY_CHARS) return null;
   const n = (a: number, b: number) => parseInt(s.slice(a, b), 36);
   const layout = LAYOUT_CODE[s[3] as keyof typeof LAYOUT_CODE];
   if (!layout) return null;
@@ -78,7 +81,7 @@ export function decodeEntry(s: string): BankEntry | null {
 }
 
 /** Characters per board in a v2 slot: the entry and its reading features. */
-export const SLOT_BOARD = 16 + FEATURE_KEYS.length;
+export const SLOT_BOARD = ENTRY_CHARS + FEATURE_KEYS.length;
 
 export interface BankCandidate {
   entry: BankEntry;
@@ -86,19 +89,19 @@ export interface BankCandidate {
   features: ReadingFeatures | null;
 }
 
-/** A slot's boards, primary first (one 16-character entry in a v1 slot). */
+/** A slot's boards, primary first (a v1 slot is one bare entry). */
 export function decodeSlot(s: string): BankCandidate[] {
   if (typeof s !== 'string') return [];
-  if (s.length === 16) {
+  if (s.length === ENTRY_CHARS) {
     const entry = decodeEntry(s);
     return entry ? [{ entry, features: null }] : [];
   }
   const out: BankCandidate[] = [];
   if (s.length % SLOT_BOARD !== 0) return out;
   for (let i = 0; i < s.length; i += SLOT_BOARD) {
-    const entry = decodeEntry(s.slice(i, i + 16));
+    const entry = decodeEntry(s.slice(i, i + ENTRY_CHARS));
     if (!entry) return i ? out : [];
-    out.push({ entry, features: decodeFeatures(s.slice(i + 16, i + SLOT_BOARD)) });
+    out.push({ entry, features: decodeFeatures(s.slice(i + ENTRY_CHARS, i + SLOT_BOARD)) });
   }
   return out;
 }
@@ -114,7 +117,7 @@ const slotOf = (n: number, tier: number): string | null => {
 /** The bank entry for level n at tier t, or null if the bank doesn't have one. */
 export function bankEntry(n: number, tier: number): BankEntry | null {
   const s = slotOf(n, tier);
-  return s ? decodeEntry(s.slice(0, 16)) : null;
+  return s ? decodeEntry(s.slice(0, ENTRY_CHARS)) : null;
 }
 
 /** Every board the bank holds for level n at tier t, the tier's own board first. */
