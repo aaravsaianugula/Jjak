@@ -33,6 +33,13 @@ export interface MechanicDef {
 }
 
 const SLIDERS: Mechanic[] = ['leaves', 'wind'];
+/**
+ * Torii and streams are terrain: fixed cells cards can't slide over or into, so
+ * they never share a board with sliding. Snow, knots, gates and fences mix
+ * freely with them (all four only ever open space or close fixed edges, and the
+ * generator and solver respect every one).
+ */
+const TERRAIN_CLASHES: Mechanic[] = SLIDERS;
 
 export const MECHANICS: Record<Mechanic, MechanicDef> = {
   stones: {
@@ -41,7 +48,7 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   },
   leaves: {
     id: 'leaves', name: 'Falling leaves', native: '낙엽 · 落葉', glyph: '落', rule: 'After each pair, cards drop to fill the gaps.',
-    introChapter: MECHANIC_INTRO.leaves, slides: true, clashes: ['wind', 'snow', 'fences'], on: (s) => windOf(s) === 'down', weight: 0.1,
+    introChapter: MECHANIC_INTRO.leaves, slides: true, clashes: ['wind', 'snow', 'fences', 'torii', 'streams'], on: (s) => windOf(s) === 'down', weight: 0.1,
   },
   snow: {
     id: 'snow', name: 'First snow', native: '첫눈 · 初雪', glyph: '雪', rule: 'Snowy cards turn over when a neighbour clears.',
@@ -57,7 +64,7 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   },
   wind: {
     id: 'wind', name: 'Wind', native: '바람 · 風', glyph: '風', rule: 'After each pair, cards drift with the wind.',
-    introChapter: MECHANIC_INTRO.wind, slides: true, clashes: ['leaves', 'snow', 'fences'], on: (s) => { const w = windOf(s); return !!w && w !== 'down'; }, weight: 0.14,
+    introChapter: MECHANIC_INTRO.wind, slides: true, clashes: ['leaves', 'snow', 'fences', 'torii', 'streams'], on: (s) => { const w = windOf(s); return !!w && w !== 'down'; }, weight: 0.14,
   },
   gates: {
     id: 'gates', name: 'Gates', native: '문 · 門', glyph: '門', rule: 'A gate opens when you pair its flower.',
@@ -66,6 +73,14 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   fences: {
     id: 'fences', name: 'Fences', native: '울타리 · 垣', glyph: '垣', rule: 'Paths can’t cross a bamboo fence.',
     introChapter: MECHANIC_INTRO.fences, clashes: SLIDERS, on: (s) => (s.fences ?? 0) > 0, weight: 0.12,
+  },
+  torii: {
+    id: 'torii', name: 'Torii', native: '토리이 · 鳥居', glyph: '鳥', rule: 'Into one torii, out of its twin, same way on.',
+    introChapter: MECHANIC_INTRO.torii, clashes: TERRAIN_CLASHES, on: (s) => (s.torii ?? 0) > 0, weight: 0.12,
+  },
+  streams: {
+    id: 'streams', name: 'Streams', native: '개울 · 小川', glyph: '川', rule: 'Paths cross water straight. No turning on it.',
+    introChapter: MECHANIC_INTRO.streams, clashes: TERRAIN_CLASHES, on: (s) => (s.streams ?? 0) > 0, weight: 0.1,
   },
 };
 
