@@ -397,6 +397,9 @@ describe('skill trend', () => {
     // a steady rating draws a level line across the middle
     expect(flatLine).toBe('M6 50 L150 50 L294 50');
     expect(trendLine([], 300, 100, 6)).toBe('');
+    // a move too small to be called a rise draws small: under half the chart's height
+    const under = trendLine([0.3, 0.3 + INSIGHT.trendMove * 1.5 - 0.001], 300, 100, 6).match(/-?\d+(\.\d+)?/g)!.map(Number);
+    expect(Math.abs(under[3] - under[1])).toBeLessThan((100 - 12) / 2);
   });
 
   it('the summary names a direction only past the noise, and only with enough boards', () => {

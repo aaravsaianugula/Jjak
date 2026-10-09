@@ -64,6 +64,8 @@ export const INSIGHT = {
   /** the move (d units, first third to last third) that reads as risen or eased: the larger of trendMove and trendZ · dev */
   trendMove: 0.05,
   trendZ: 1.5,
+  /** the chart's vertical scale spans at least this (d units), so a move below the claim threshold draws small */
+  trendSpan: 0.25,
 };
 
 export const MASTERY = {
@@ -234,13 +236,14 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 
 /**
  * An SVG path through the series inside a w × h box with `pad` inset. The vertical
- * scale spans at least 0.1 rating units, so small wobbles stay small.
+ * scale spans at least `trendSpan` rating units, so the picture never shows a climb
+ * the words call steady.
  */
 export function trendLine(series: readonly number[], w: number, h: number, pad: number): string {
   if (series.length < 2) return '';
   const lo = Math.min(...series);
   const hi = Math.max(...series);
-  const span = Math.max(hi - lo, 0.1);
+  const span = Math.max(hi - lo, INSIGHT.trendSpan);
   const mid = (lo + hi) / 2;
   const x = (i: number) => pad + ((w - 2 * pad) * i) / (series.length - 1);
   const y = (v: number) => h / 2 - ((v - mid) / span) * (h - 2 * pad);
