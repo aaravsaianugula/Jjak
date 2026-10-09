@@ -125,11 +125,14 @@ export interface AnalyticsSave {
   shapes: Partial<Record<PathShape, SkillRating>>;
   /** the Director's recent challenge emphases, most recent first, capped: rotation and pin stability */
   emphases: { n: number; focus: string; w: number }[];
+  /** the rating after each rated board, oldest first, capped: the play-style trend line */
+  trail: number[];
 }
 
 export const RECENT_CAP = 40;
 export const DAYS_CAP = 60;
 export const EMPHASES_CAP = 8;
+export const TRAIL_CAP = 120;
 
 export const defaultAnalytics = (): AnalyticsSave => ({
   v: 1,
@@ -144,6 +147,7 @@ export const defaultAnalytics = (): AnalyticsSave => ({
   sessions: { count: 0, ms: 0 },
   shapes: {},
   emphases: [],
+  trail: [],
 });
 
 const num = (v: unknown, d: number, lo = -Infinity, hi = Infinity) =>
@@ -264,5 +268,8 @@ export function hydrateAnalytics(raw: unknown): AnalyticsSave {
         : undefined,
     shapes,
     emphases,
+    trail: Array.isArray(r.trail)
+      ? r.trail.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)).map((v) => num(v, 0, 0, 1.5)).slice(-TRAIL_CAP)
+      : [],
   };
 }

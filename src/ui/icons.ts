@@ -4,6 +4,8 @@ const icon = (d: string, extra = '') =>
 
 export const ICONS = {
   back: icon('<path d="M15 5l-7 7 7 7"/>'),
+  /** a brushed line rising over a baseline: "Your play style" */
+  style: icon('<path d="M3 20h18"/><path d="M4 15.5c2.2-.4 3.3-4 5.6-4 2 0 2.4 2.6 4.4 2.6 2.4 0 3.4-5.6 6-7.6"/>'),
   close: icon('<path d="M6 6l12 12M18 6L6 18"/>'),
   gear: icon('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2"/><circle cx="12" cy="12" r="7"/>'),
   hint: icon('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z"/>'),

@@ -63,6 +63,7 @@ export function settingsScreen(): Screen {
       <div class="list list--icons" role="group" aria-labelledby="set-help">
         <button class="row" data-act="how">${row(ICONS.help, 'How to play')}${chevron}</button>
         ${practiceMet().length ? `<button class="row" data-act="practice">${row(ICONS.play, 'Practice', 'Intros and gentle boards for ideas you’ve met')}${chevron}</button>` : ''}
+        <button class="row" data-act="playstyle">${row(ICONS.style, 'Your play style', 'Strengths, growth edges and best runs')}${chevron}</button>
         ${ads.privacyOptionsRequired ? `<button class="row" data-act="consent">${row(ICONS.shield, 'Ad privacy choices', 'Change your consent')}${chevron}</button>` : ''}
         <a class="row" href="${esc(LINKS.privacy)}" target="_blank" rel="noopener">${row(ICONS.doc, 'Privacy policy')}<span class="row__end" aria-hidden="true">${ICONS.external}</span><span class="sr-only">(opens in browser)</span></a>
         <button class="row row--danger" data-act="reset">${row(ICONS.trash, 'Reset progress', 'Clears levels, petals and album')}${chevron}</button>
@@ -119,6 +120,7 @@ export function settingsScreen(): Screen {
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
     if (act === 'how') showHowToPlay({ practice: true });
     if (act === 'practice') nav.practice();
+    if (act === 'playstyle') nav.playstyle();
     if (act === 'buy') {
       if (!Capacitor.isNativePlatform()) return toast('Remove ads is available in the Android app from Google Play.');
       if (await openRemoveAds()) nav.settings();

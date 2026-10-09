@@ -32,7 +32,7 @@
  */
 import { type LevelSpec } from '../engine/levels';
 import { MECHANICS, mechanicsOf } from '../engine/mechanics';
-import { type AnalyticsSave, type BoardRecord, DAYS_CAP, type PathShape, RECENT_CAP } from '../services/save-analytics';
+import { type AnalyticsSave, type BoardRecord, DAYS_CAP, type PathShape, RECENT_CAP, TRAIL_CAP } from '../services/save-analytics';
 import { designedBase } from './plan';
 import { SKILL, ageSkill, newSkill, shapeScores, stepSkill } from './skills';
 
@@ -215,6 +215,8 @@ export function ingest(a: AnalyticsSave, r: BoardRecord, opts: IngestOptions = {
     a.rating = clamp(a.rating + clamp(step, -MODEL.maxStep, MODEL.maxStep), 0, 1.5);
     a.dev = Math.max(MODEL.devMin, a.dev * Math.pow(MODEL.devDecay, w));
     a.boards++;
+    // The play-style trend line (rounded: the save stays small).
+    a.trail = [...a.trail, Math.round(a.rating * 1000) / 1000].slice(-TRAIL_CAP);
     // Skills: the board's score on its mechanics; per path shape, that score shifted by pace.
     for (const m of r.mech) stepSkill(a.mech[m], p, expected(a.mech[m].r, r.d), w);
     for (const [k, o] of Object.entries(shapeScores(r, p)) as [PathShape, { score: number; weight: number }][]) {
