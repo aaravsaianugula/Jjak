@@ -79,7 +79,7 @@ export interface Metrics {
 //   pairs    every pair of that line in order, as a `PairTrace`: its two cells,
 //            the bends (0/1/2) and length of its path, whether the path runs along
 //            the rim or outside it (edge route), whether it is a long detour, and
-//            whether it is critical (the board hinges on it)
+//            whether it is critical (it must come before every other legal pair)
 //   decoys   same-flower pairs, both pickable, with no path at the start
 //   opening  where the easy first reads sit (row/column fractions, 0 = top/left)
 // Cells are row-major indices into the board as built. Computed only on request
@@ -104,9 +104,10 @@ export interface PairTrace {
   /** another legal pairing of the same flower at this point leads to a dead end (a tempting wrong match) */
   strands: boolean;
   /**
-   * The board hinges on this pair: matched the wrong way it strands the board, or
-   * it is one of at most two legal pairs and clearing it opens new ones (so it
-   * must come before them).
+   * The board hinges on this pair: it must come before every other legal pair. There
+   * is at least one other, and each of them, matched now instead, is proven to strand
+   * the board (an unfinished proof never counts, as for `strands`). A forced pair (the
+   * only legal one) is not critical: there is no order to get wrong.
    */
   critical: boolean;
 }
@@ -401,23 +402,24 @@ function readLine(start: PlayState, wind: ReturnType<typeof windOf>, line: Move[
   }
   const centroid = (k: 'row' | 'col') => (footholds.length ? footholds.reduce((s, f) => s + f[k], 0) / footholds.length : 0.5);
 
+  // Matching w now leaves no clear, proven inside the budget (unfinished proofs don't count).
+  const deadAfter = (w: Move): boolean => {
+    const x = cloneState(st);
+    if (!step(x, w, wind)) return cardsLeft(x) > 0;
+    const p = proveClear(x, wind, strandBudget);
+    return !p.moves && !p.exhausted;
+  };
+
   // The line, pair by pair.
   const pairs: PairTrace[] = [];
   let moves = moves0;
   for (const m of line) {
     const t = pairTrace(st.board, m[0], m[1]);
     const month = monthOf(st.board.cells[m[0]]);
-    let strands = false;
-    for (const w of moves) {
-      if (pairKey(w) === pairKey(m) || monthOf(st.board.cells[w[0]]) !== month) continue;
-      const x = cloneState(st);
-      if (!step(x, w, wind)) strands = cardsLeft(x) > 0;
-      else {
-        const p = proveClear(x, wind, strandBudget);
-        strands = !p.moves && !p.exhausted;
-      }
-      if (strands) break;
-    }
+    const others = moves.filter((w) => pairKey(w) !== pairKey(m));
+    const strands = others.some((w) => monthOf(st.board.cells[w[0]]) === month && deadAfter(w));
+    // Critical: every other legal pair dead-ends (stops at the first one that doesn't).
+    const critical = others.length > 0 && others.every(deadAfter);
     const before = new Set(moves.map(pairKey));
     step(st, m, wind);
     const next = movesOf(st);
@@ -432,7 +434,7 @@ function readLine(start: PlayState, wind: ReturnType<typeof windOf>, line: Move[
       legalBefore: moves.length,
       opens,
       strands,
-      critical: strands || (moves.length <= 2 && opens > 0),
+      critical,
     });
     moves = next;
   }

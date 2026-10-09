@@ -12,7 +12,7 @@
  *                                                  bored (3+ quick clean clears) → stretch +0.08
  *                                                  rushing    → none (their quick clears aren't
  *                                                  boredom; the challenge leans on decoys instead)
- *          + flow                                  a nudge (±0.08) toward an 80 % clean-clear rate,
+ *          + flow                                  a nudge (±0.1, over the last 20 boards) toward an 80 % clean-clear rate,
  *            "clean" being clean or a light assist (one hint on a quick clear, model.ts):
  *            a hint on a slow clear counts as a miss, so hints never earn a harder board;
  *            stretch boards follow strictly clean streaks only.
@@ -78,21 +78,21 @@ export const DIRECTOR = {
   fullConfidenceAt: 6,
   /** clean-clear target and the window/gain of the flow nudge */
   flowTarget: 0.8,
-  flowWindow: 12,
+  flowWindow: 20,
   flowMin: 6,
   /**
    * Aim a touch below skill on average: the sawtooth's peaks cost more clean
    * clears than its rests give back (success is concave above 50 %).
    */
   aim: -0.025,
-  flowGain: 1.2,
-  flowMax: 0.08,
+  flowGain: 1.5,
+  flowMax: 0.1,
   /**
    * Hysteresis: keep the last board's tier unless another sits this much closer to the
    * target. Bank boards' measured d scatter a little from level to level, so without it
    * the nearest tier flips back and forth on noise; pacing moves (≥ 0.05) still act.
    */
-  hold: 0.025,
+  hold: 0.035,
   /** mastery floor: rating − devs · dev − margin */
   floorDevs: 2,
   floorMargin: 0.05,
