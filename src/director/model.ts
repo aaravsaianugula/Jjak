@@ -22,11 +22,19 @@
  *     mechanic, plus quits and replays (enjoyment), in `save.analytics.mech`.
  *  3. An **engagement signal** from the last few boards: frustration (quits, restarts,
  *     assists, far over par, many blocked taps) vs boredom (fast, clean clears in a row).
+ *  4. **Skill ratings per path shape and per mechanic** with their own deviations
+ *     (skills.ts), so learning shows up where it happens.
+ *
+ * Assists are read against the player's **habit** (`habitualAssists`): someone who
+ * takes one hint on boards they clear quickly anyway is not struggling when they take
+ * it again. Habitual assists cost a little; assists beyond the habit cost in full.
+ * This keeps hint-heavy players from sinking to the gentlest tier and staying there.
  */
 import { type LevelSpec } from '../engine/levels';
 import { MECHANICS, mechanicsOf } from '../engine/mechanics';
-import { type AnalyticsSave, type BoardRecord, DAYS_CAP, RECENT_CAP } from '../services/save-analytics';
+import { type AnalyticsSave, type BoardRecord, DAYS_CAP, type PathShape, RECENT_CAP } from '../services/save-analytics';
 import { designedBase } from './plan';
+import { SKILL, ageSkill, newSkill, shapeScores, stepSkill } from './skills';
 
 export const MODEL = {
   /** logistic scale in d units: R − d = +S lifts E from 0.70 to ~0.86 */
@@ -95,17 +103,46 @@ export const parRatio = (r: Pick<BoardRecord, 'ms' | 'par'>) => (r.par > 0 ? r.m
 /** Cleared with no hint, shuffle or dead-end reshuffle. */
 export const isClean = (r: BoardRecord) => r.cleared && assistsOf(r) === 0;
 
+/** Assists the player chose beyond their habit (dead-end reshuffles always count). */
+export const excessAssists = (r: BoardRecord, habit = 0) => Math.max(0, r.hints + r.shuffles - habit) + r.autoShuffles;
+
+/** Cleared with no assist beyond the player's habit (= `isClean` for habit 0). */
+export const isCleanFor = (r: BoardRecord, habit: number) => r.cleared && excessAssists(r, habit) === 0;
+
+/** Boards a habit is read from (most recent first) and how many quick clears it needs. */
+const HABIT_WINDOW = 20;
+const HABIT_MIN = 5;
+
+/**
+ * The hints and shuffles this player takes even on boards they clear quickly (at or
+ * under par): the rounded mean over recent quick clears, 0–2 (so a hint on most quick
+ * clears reads as 1); 0 with too little data. A habit is a way of playing, not a sign
+ * the board was too hard.
+ */
+export function habitualAssists(a: AnalyticsSave): number {
+  const quick = a.recent
+    .filter((r) => r.mode !== 'rush' && r.cleared && parRatio(r) <= 1.05)
+    .slice(0, HABIT_WINDOW)
+    .map((r) => r.hints + r.shuffles);
+  if (quick.length < HABIT_MIN) return 0;
+  return clamp(Math.round(quick.reduce((s, v) => s + v, 0) / quick.length), 0, 2);
+}
+
 /**
  * Performance on one board, 0–1.
  *   abandoned:  0.05 + 0.15 · progress                       (0.05–0.20)
  *   cleared:    0.45 + 0.27 · clean + 0.20 · speed + 0.08 · accuracy
- *     clean    = 1 − 0.5·hints − 0.6·shuffles − 0.35·dead-end reshuffles (≥ 0)
+ *     clean    = 1 − 0.5·hints − 0.6·shuffles − 0.35·dead-end reshuffles (≥ 0);
+ *                the first `habit` hints/shuffles cost 0.12 each instead (partial credit)
  *     speed    = (1.75 − time/par), clamped 0–1 (≤ 0.75 par → 1, ≥ 1.75 par → 0)
  *     accuracy = 1 − 3 · blocked taps per pair (≥ 0)
  */
-export function performance(r: BoardRecord): number {
+export function performance(r: BoardRecord, habit = 0): number {
   if (!r.cleared) return 0.05 + 0.15 * clamp(r.pairs > 0 ? r.made / r.pairs : 0, 0, 1);
-  const clean = clamp(1 - 0.5 * r.hints - 0.6 * r.shuffles - 0.35 * r.autoShuffles, 0, 1);
+  const habitHints = Math.min(habit, r.hints);
+  const habitShuffles = Math.min(habit - habitHints, r.shuffles);
+  const extra = 0.5 * (r.hints - habitHints) + 0.6 * (r.shuffles - habitShuffles) + 0.35 * r.autoShuffles;
+  const clean = clamp(1 - 0.12 * (habitHints + habitShuffles) - extra, 0, 1);
   const speed = clamp(1.75 - parRatio(r), 0, 1);
   const accuracy = clamp(1 - (3 * r.blocked) / Math.max(1, r.pairs), 0, 1);
   return clamp(0.45 + 0.27 * clean + 0.2 * speed + 0.08 * accuracy, 0, 1);
@@ -147,18 +184,23 @@ export function noteDay(a: AnalyticsSave, date: string): void {
  */
 export function ingest(a: AnalyticsSave, r: BoardRecord, opts: IngestOptions = {}): number {
   if (r.mode === 'rush') return 0;
-  const p = performance(r);
-  // Days away make the model less sure (Glicko's rating-period growth).
+  // The habit as it stood before this board (a board can't excuse itself).
+  const p = performance(r, habitualAssists(a));
+  // Days away make the model less sure (Glicko's rating-period growth), every skill too.
   const prev = a.days[0];
   if (prev && r.date && prev !== r.date) {
     const away = dayNumber(r.date) - dayNumber(prev) - 1;
-    if (away > 0) a.dev = Math.min(MODEL.devMax, Math.sqrt(a.dev * a.dev + MODEL.devIdle * MODEL.devIdle * away));
+    if (away > 0) {
+      a.dev = Math.min(MODEL.devMax, Math.sqrt(a.dev * a.dev + MODEL.devIdle * MODEL.devIdle * away));
+      for (const s of Object.values(a.shapes)) if (s) ageSkill(s, MODEL.devIdle, away);
+      for (const st of Object.values(a.mech)) ageSkill(st, MODEL.devIdle, away);
+    }
   }
   noteDay(a, r.date);
   a.recent = [r, ...a.recent].slice(0, RECENT_CAP);
 
   for (const m of r.mech) {
-    const st = (a.mech[m] ??= { n: 0, score: p, quits: 0, replays: 0 });
+    const st = (a.mech[m] ??= { n: 0, score: p, quits: 0, replays: 0, r: a.rating, dev: SKILL.devStart });
     st.score = st.n === 0 ? p : st.score + MODEL.mechAlpha * (p - st.score);
     st.n++;
     if (r.ended === 'quit') st.quits++;
@@ -173,6 +215,13 @@ export function ingest(a: AnalyticsSave, r: BoardRecord, opts: IngestOptions = {
     a.rating = clamp(a.rating + clamp(step, -MODEL.maxStep, MODEL.maxStep), 0, 1.5);
     a.dev = Math.max(MODEL.devMin, a.dev * Math.pow(MODEL.devDecay, w));
     a.boards++;
+    // Skills: the board's score on its mechanics; per path shape, that score shifted by pace.
+    for (const m of r.mech) stepSkill(a.mech[m], p, expected(a.mech[m].r, r.d), w);
+    for (const [k, o] of Object.entries(shapeScores(r, p)) as [PathShape, { score: number; weight: number }][]) {
+      const s = (a.shapes[k] ??= newSkill(a.rating));
+      stepSkill(s, o.score, expected(s.r, r.d), w * o.weight);
+      s.n++;
+    }
   }
   return p;
 }
@@ -220,20 +269,21 @@ export interface Engagement {
 }
 
 /** How much one board looked like a struggle, 0–1. */
-export function struggleOf(r: BoardRecord): number {
+export function struggleOf(r: BoardRecord, habit = 0): number {
   if (!r.cleared) return 1;
   const ratio = parRatio(r);
   const slow = ratio > 2 ? 0.4 : ratio > 1.5 ? 0.2 : 0;
   const misreads = r.blocked / Math.max(1, r.pairs) > 0.35 ? 0.2 : 0;
-  return clamp(0.35 * assistsOf(r) + slow + misreads, 0, 1);
+  return clamp(0.35 * excessAssists(r, habit) + slow + misreads, 0, 1);
 }
 
-/** A fast, clean clear: under par, no assists, few misreads. */
-export const isEasy = (r: BoardRecord) => isClean(r) && parRatio(r) <= 1 && r.blocked / Math.max(1, r.pairs) < 0.2;
+/** A fast, clean clear: under par, no assists beyond habit, few misreads. */
+export const isEasy = (r: BoardRecord, habit = 0) => isCleanFor(r, habit) && parRatio(r) <= 1 && r.blocked / Math.max(1, r.pairs) < 0.2;
 
 const RECENCY = [1, 0.7, 0.5, 0.35, 0.25];
 
 export function engagement(a: AnalyticsSave): Engagement {
+  const habit = habitualAssists(a);
   const rs = a.recent.filter((r) => r.mode !== 'rush');
   const last = rs.slice(0, RECENCY.length);
   let wsum = 0;
@@ -241,13 +291,13 @@ export function engagement(a: AnalyticsSave): Engagement {
   let bo = 0;
   last.forEach((r, i) => {
     wsum += RECENCY[i];
-    fr += RECENCY[i] * struggleOf(r);
-    bo += RECENCY[i] * (isEasy(r) ? 1 : 0);
+    fr += RECENCY[i] * struggleOf(r, habit);
+    bo += RECENCY[i] * (isEasy(r, habit) ? 1 : 0);
   });
   let streak = 0;
-  while (streak < rs.length && isEasy(rs[streak])) streak++;
+  while (streak < rs.length && isEasy(rs[streak], habit)) streak++;
   let struggles = 0;
-  while (struggles < rs.length && struggleOf(rs[struggles]) >= 0.5) struggles++;
+  while (struggles < rs.length && struggleOf(rs[struggles], habit) >= 0.5) struggles++;
   const frustration = wsum ? fr / wsum : 0;
   const boredom = wsum ? bo / wsum : 0;
   const mood = frustration >= 0.45 || struggles >= 1 ? 'struggling' : streak >= 3 ? 'cruising' : 'flow';

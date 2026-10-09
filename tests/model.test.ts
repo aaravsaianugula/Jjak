@@ -9,6 +9,7 @@ import { DIRECTOR, decide, pinnedTier, recordAttempt, targetFor, tierD } from '.
 import { MODEL, engagement, expected, ingest, performance, proficiency } from '../src/director/model';
 import { designedBase } from '../src/director/plan';
 import { playStyle } from '../src/director/profile';
+import { SKILL } from '../src/director/skills';
 import { journeyLevel, rushLevel } from '../src/engine/levels';
 import { Session } from '../src/engine/session';
 import { tracking } from '../src/services/analytics';
@@ -348,7 +349,8 @@ describe('analytics save slice', () => {
     expect(a.tries).toEqual({ n: 0, count: 0 });
     expect(a.days).toEqual(['2026-10-01']);
     expect(a.sessions).toEqual({ count: 0, ms: 0 });
-    expect(a.mech).toEqual({ stones: { n: 0, score: 1, quits: 0, replays: 0 } });
+    // the per-mechanic skill rating hydrates from the overall rating, with a fresh deviation
+    expect(a.mech).toEqual({ stones: { n: 0, score: 1, quits: 0, replays: 0, r: a.rating, dev: SKILL.devStart } });
     expect(a.recent).toHaveLength(1);
     expect(a.recent[0]).toMatchObject({ cleared: false, ended: 'quit', turns: [0, 0, 0], firstTaps: [[0, 1]], mech: ['stones'], hour: 23, d: -1 });
     expect(a.last).toMatchObject({ n: 0, reason: '' });
