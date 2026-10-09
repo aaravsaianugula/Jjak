@@ -98,6 +98,10 @@ describe('habit sentences', () => {
     const out = insightsFrom(h, a);
     expect(out).toContainEqual({ kind: 'strength', key: 'mech:snow', text: 'You’re at home with First snow.' });
     expect(out).toContainEqual({ kind: 'edge', key: 'mech:wind', text: 'Wind is your growth edge. The Practice room has gentle boards for it.' });
+    // "at home" in words only where the mastery band says "at home" too
+    a.mech = { snow: stat(0.45, MASTERY.homeConf - 0.05) };
+    expect(masteryBand(a.mech.snow, a.rating)).toBe('steady');
+    expect(insightsFrom(blank(), a)).toEqual([]);
     // ids the game no longer knows are skipped, never printed raw
     a.mech = { comet: stat(0.5, 1) };
     expect(texts(habits({ weakMechanics: [{ id: 'meteor', rating: 0.3, gap: -0.1, confidence: 1 }] }), a)).toEqual([]);

@@ -27,7 +27,7 @@ export const INSIGHT = {
   shapeMin: HABITS.shapeMin,
   /** spread (d units) between the best and least shape before either is named */
   shapeSpread: 0.03,
-  /** rating above the overall (d units) that makes a mechanic a strength */
+  /** rating above the overall (d units) that makes an "at home" mechanic a named strength */
   mechGap: 0.03,
   /** most sentences shown at once */
   max: 5,
@@ -85,7 +85,8 @@ function shapeInsights(h: PlayerHabits, a: AnalyticsSave): Insight[] {
 function mechInsights(h: PlayerHabits, a: AnalyticsSave): Insight[] {
   const out: Insight[] = [];
   const best = Object.entries(a.mech)
-    .filter(([id, st]) => mechName(id) && st.n >= 3 && skillConfidence(st) >= INSIGHT.minConf && st.r >= a.rating + INSIGHT.mechGap)
+    // Named only where its mastery band reads "at home" too, so the two never disagree.
+    .filter(([id, st]) => mechName(id) && st.n >= 3 && masteryBand(st, a.rating) === 'home' && st.r >= a.rating + INSIGHT.mechGap)
     .sort(([, x], [, y]) => y.r - x.r)[0];
   if (best) out.push({ kind: 'strength', key: `mech:${best[0]}`, text: `You’re at home with ${mechName(best[0])}.` });
   const edge = h.weakMechanics.find((m) => mechName(m.id) && m.confidence >= INSIGHT.minConf);
