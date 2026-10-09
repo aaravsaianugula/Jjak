@@ -470,6 +470,10 @@
 .torii__ripple {
   stroke: var(--water-ink);
 }
+/* Torii are dealt in with the cards (reduced motion skips the deal entirely). */
+.game .torii.is-deal {
+  animation: g-deal 400ms var(--g-ease-out) var(--deal, 0ms) both;
+}
 /* A path just went through: the twin it came out of answers with a small lift. */
 .torii.is-through {
   animation: torii-through 520ms var(--ease-settle) both;
