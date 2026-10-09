@@ -85,6 +85,17 @@ describe('the builder stores the leans tailoring reads', () => {
       expect(cands[i].knobs.seals).toBe(sHi);
     });
 
+    it('keeps only a clear lean over the boards kept before it, at most two', () => {
+      const top = leanVector(plan, primary.knobs, primary.f);
+      const at = (b: Board) => ({ b, v: leanVector(plan, b.knobs, b.f) });
+      const faint = { ...primary, f: { ...flat(0.3), decoys: 0.3 + MIN_LEAN / 2 } };
+      expect(pickAlternates(top, [at(faint)])).toHaveLength(0);
+      // a second board with more seals adds nothing once one is kept
+      expect(pickAlternates(top, [at(moreSeals), at({ ...moreSeals, d: 0.405 })]).map((k) => k.b)).toEqual([moreSeals]);
+      const edgy = { ...primary, f: { ...flat(0.3), edge: 0.7 } };
+      expect(pickAlternates(top, [at(moreSeals), at(moreDecoys), at(edgy)])).toHaveLength(2);
+    });
+
     it('serves the plain board when no alternate has more seals', () => {
       const cands = stored([moreDecoys]);
       expect(cands).toHaveLength(2);
