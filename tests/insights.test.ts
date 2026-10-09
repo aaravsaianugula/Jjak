@@ -42,7 +42,6 @@ const blank = (): PlayerHabits => ({
   slowShapes: [],
   weakMechanics: [],
   tempo: { style: 'unknown', misreadRate: 0, thinkMs: 0, longRatio: 0, confidence: 0 },
-  assists: { habitual: 0 },
   flow: 'flow',
 });
 const habits = (o: { [K in keyof PlayerHabits]?: Partial<PlayerHabits[K]> | PlayerHabits[K] }): PlayerHabits => {
@@ -52,7 +51,6 @@ const habits = (o: { [K in keyof PlayerHabits]?: Partial<PlayerHabits[K]> | Play
     ...o,
     scan: { ...b.scan, ...(o.scan as object) },
     tempo: { ...b.tempo, ...(o.tempo as object) },
-    assists: { ...b.assists, ...(o.assists as object) },
   } as PlayerHabits;
 };
 /** a skill whose deviation gives this confidence */
