@@ -13,10 +13,11 @@
  *
  * No DOM imports (runs in workers).
  */
-import { type Board } from '../engine/board';
+import { type Board, isCard, monthOf } from '../engine/board';
 import { type LevelSpec, windOf } from '../engine/levels';
 import { MECHANICS } from '../engine/mechanics';
-import { type PlayState } from '../engine/rules';
+import { findPath } from '../engine/path';
+import { type PlayState, lockedOf } from '../engine/rules';
 import { type Move, bendsOf, cloneState, initialState, movesOf, playout, proveClear, step, visiblePairs } from './bots';
 
 export interface Metrics {
@@ -48,7 +49,16 @@ export interface Metrics {
   mechLoad: number;
   /** estimated seconds for a calm human clear (search-cost model) */
   humanTime: number;
-  /** fun shape, each 0–1 */
+  /** easily read legal pairs at the start: 0–1 bend and a short path (see `isEasy`) */
+  easyOpen: number;
+  /** estimated seconds before the human-like scanner makes its first pair (mean of its games) */
+  firstSeconds: number;
+  /**
+   * Fun shape, each 0–1 (see `funShape` and `funChecks` for the pass marks):
+   *   foothold  an easy first read inside 10 s (0 when there is none)
+   *   crunch    legal pairs dip in the middle of the game, relative to the opening
+   *   finale    in the last third nearly every pair left connects: a combo finish
+   */
   foothold: number;
   crunch: number;
   finale: number;
@@ -57,6 +67,132 @@ export interface Metrics {
   centreFirst: number;
   /** folded difficulty, 0–1 */
   d: number;
+  /** the pair-by-pair reading of the board (only when measured with `reading: true`) */
+  reading?: BoardReading;
+}
+
+// ---------------------------------------------------------------------------
+// The reading contract (for tailoring boards to a player's blind spots).
+//
+// `BoardReading` describes one board the way a player reads it, from the
+// solver's proven line:
+//   pairs    every pair of that line in order, as a `PairTrace`: its two cells,
+//            the bends (0/1/2) and length of its path, whether the path runs along
+//            the rim or outside it (edge route), whether it is a long detour, and
+//            whether it is critical (the board hinges on it)
+//   decoys   same-flower pairs, both pickable, with no path at the start
+//   opening  where the easy first reads sit (row/column fractions, 0 = top/left)
+// Cells are row-major indices into the board as built. Computed only on request
+// (`measure(..., { reading: true })`): the bank and endless searches don't pay it.
+
+export interface PairTrace {
+  /** the two cells, in the order the solve picked them */
+  a: number;
+  b: number;
+  /** turns in the path, 0–2 */
+  bends: number;
+  /** path length in cell steps (corner to corner, Manhattan) */
+  length: number;
+  /** the path leaves the board or runs along its rim: an edge route */
+  edge: boolean;
+  /** the path is at least two steps longer than the straight distance: a detour */
+  detour: boolean;
+  /** legal pairs on the board just before this one */
+  legalBefore: number;
+  /** pairs that became legal by clearing this one */
+  opens: number;
+  /** another legal pairing of the same flower at this point leads to a dead end (a tempting wrong match) */
+  strands: boolean;
+  /**
+   * The board hinges on this pair: matched the wrong way it strands the board, or
+   * it is one of at most two legal pairs and clearing it opens new ones (so it
+   * must come before them).
+   */
+  critical: boolean;
+}
+
+export interface DecoyPair {
+  a: number;
+  b: number;
+}
+
+export interface Foothold {
+  a: number;
+  b: number;
+  /** the pair's mid-point as fractions of the board, 0 = top / left, 1 = bottom / right */
+  row: number;
+  col: number;
+}
+
+export interface OpeningRegion {
+  /** the easy first reads (0–1 bend, short), see `isEasy` */
+  footholds: Foothold[];
+  /** their centroid (0.5, 0.5 when there are none) */
+  row: number;
+  col: number;
+}
+
+export interface BoardReading {
+  pairs: PairTrace[];
+  decoys: DecoyPair[];
+  opening: OpeningRegion;
+}
+
+/** Path facts of a connectable pair (null if the two cells don't connect). */
+export function pairTrace(b: Board, i: number, j: number): Pick<PairTrace, 'a' | 'b' | 'bends' | 'length' | 'edge' | 'detour'> | null {
+  const path = findPath(b, i, j);
+  if (!path) return null;
+  const outside = (r: number, c: number) => r < 0 || c < 0 || r >= b.rows || c >= b.cols;
+  let length = 0;
+  let edge = false;
+  for (let k = 1; k < path.length; k++) {
+    const p = path[k - 1];
+    const q = path[k];
+    const len = Math.abs(q.r - p.r) + Math.abs(q.c - p.c);
+    length += len;
+    if (outside(q.r, q.c)) edge = true;
+    // A segment running along the rim itself (not just stepping off a rim cell).
+    const alongRow = p.r === q.r && (p.r === 0 || p.r === b.rows - 1);
+    const alongCol = p.c === q.c && (p.c === 0 || p.c === b.cols - 1);
+    if (len >= 2 && (alongRow || alongCol)) edge = true;
+  }
+  const s = path[0];
+  const t = path[path.length - 1];
+  const straight = Math.abs(s.r - t.r) + Math.abs(s.c - t.c);
+  return { a: i, b: j, bends: Math.max(0, Math.min(2, path.length - 2)), length, edge, detour: length >= straight + 2 };
+}
+
+/** An easy read: at most one bend, and a path no longer than the board's long side. */
+export const isEasy = (b: Board, t: Pick<PairTrace, 'bends' | 'length'>) => t.bends <= 1 && t.length <= Math.max(b.rows, b.cols);
+
+/** Pass marks for the fun shape (the audit reports the share of bank boards passing). */
+export const FUN = {
+  /** seconds: the first pair is found inside this */
+  firstSeconds: 10,
+  /** legal pairs in the middle third fall at least this far below the opening */
+  crunch: 0.4,
+  /** the last third connects at least this well */
+  finale: 0.75,
+};
+
+/** Crunch and finale of one game, from the legal pairs seen at each step. */
+export function funShape(s: readonly number[]): { crunch: number; finale: number } {
+  const n = s.length;
+  const third = Math.max(1, Math.floor(n / 3));
+  const open = s[0] ?? 0;
+  const mid = s.slice(third, Math.max(third + 1, n - third));
+  const end = s.slice(n - third);
+  const midMin = mid.length ? Math.min(...mid) : open;
+  const crunch = open > 0 ? clamp01(1 - midMin / open) : 0;
+  // Pairs left in the last third vs legal moves there: 1 when (almost) everything connects.
+  let fin = 0;
+  end.forEach((m, k) => (fin += clamp01(m / Math.max(1, end.length - k))));
+  return { crunch, finale: end.length ? fin / end.length : 0 };
+}
+
+/** Which fun marks a board passes. */
+export function funChecks(m: Pick<Metrics, 'easyOpen' | 'firstSeconds' | 'crunch' | 'finale'>): { foothold: boolean; crunch: boolean; finale: boolean } {
+  return { foothold: m.easyOpen >= 1 && m.firstSeconds <= FUN.firstSeconds, crunch: m.crunch >= FUN.crunch, finale: m.finale >= FUN.finale };
 }
 
 export interface MeasureOptions {
@@ -68,6 +204,10 @@ export interface MeasureOptions {
   budget?: number;
   /** seed for the playouts (default: the spec's seed) */
   seed?: string;
+  /** also trace the board pair by pair (`Metrics.reading`); off in the searches */
+  reading?: boolean;
+  /** solver nodes per wrong-match check in the reading (default 4000): "no clear" only counts if the proof finishes inside it */
+  strandBudget?: number;
 }
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -121,10 +261,15 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
   let decoySum = 0;
   let decoySteps = 0;
   let centreSum = 0;
+  let easyOpen = 0;
   {
     const st = cloneState(start);
     const moves0 = movesOf(st);
-    for (const m of moves0) centreSum += (centreOf(st.board, m[0]) + centreOf(st.board, m[1])) / 2;
+    for (const m of moves0) {
+      centreSum += (centreOf(st.board, m[0]) + centreOf(st.board, m[1])) / 2;
+      const t = pairTrace(st.board, m[0], m[1]);
+      if (t && isEasy(st.board, t)) easyOpen++;
+    }
     for (let k = 0; k <= line.length; k++) {
       const moves = k === 0 ? moves0 : movesOf(st);
       if (k < line.length || moves.length) counts.push(moves.length);
@@ -162,6 +307,7 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
   const H = opts.human ?? 6;
   let humanStuck = 0;
   let time = 0;
+  let first = 0;
   const shapes: number[][] = [];
   const locks = start.hidden.size + start.knots.size;
   for (let k = 0; k < H; k++) {
@@ -169,37 +315,27 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
     const perPair = p.pairs ? (p.pairs * SECONDS_BASE + p.scan * SECONDS_PER_CELL) / p.pairs : SECONDS_BASE;
     // A stuck board costs the rest at the same pace plus a reshuffle's re-read.
     time += perPair * total + (p.cleared ? 0 : 10) + (wind ? 0.35 * total : 0) + 0.6 * locks + 1.2 * (spec.gates ?? 0);
+    first += SECONDS_BASE + (p.scans[0] ?? 0) * SECONDS_PER_CELL;
     if (!p.cleared) humanStuck++;
     else shapes.push(p.moves);
   }
   const humanTime = H ? time / H : 0;
+  const firstSeconds = H ? first / H : SECONDS_BASE;
 
   // 4. Fun shape, from the scanner's games (or the solve if it never finished).
   if (!shapes.length) shapes.push(counts);
-  let foothold = 0;
   let crunch = 0;
   let finale = 0;
-  for (const s of shapes) {
-    const n = s.length;
-    const third = Math.max(1, Math.floor(n / 3));
-    const open = s[0] ?? 0;
-    const mid = s.slice(third, Math.max(third + 1, n - third));
-    const end = s.slice(n - third);
-    const midMin = mid.length ? Math.min(...mid) : open;
-    foothold += clamp01((open - 1) / 3);
-    crunch += open > 0 ? clamp01(1 - midMin / open) : 0;
-    // Pairs left in the last third vs legal moves there: 1 when (almost) everything connects.
-    let fin = 0;
-    end.forEach((m, k) => {
-      const left = end.length - k;
-      fin += clamp01(m / Math.max(1, left));
-    });
-    finale += end.length ? fin / end.length : 0;
+  for (const sh of shapes) {
+    const f = funShape(sh);
+    crunch += f.crunch;
+    finale += f.finale;
   }
-  foothold /= shapes.length;
   crunch /= shapes.length;
   finale /= shapes.length;
-  const fun = (foothold + crunch + finale) / 3;
+  // An easy first read inside 10 s; more than one is a little better (a choice).
+  const foothold = easyOpen >= 1 && firstSeconds <= FUN.firstSeconds ? 0.6 + 0.4 * clamp01((easyOpen - 1) / 2) : 0;
+  const fun = 0.3 * foothold + 0.35 * crunch + 0.35 * finale;
 
   const m: Metrics = {
     pairs: total,
@@ -217,6 +353,8 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
     humanStuck: H ? humanStuck / H : 0,
     mechLoad: mechanicLoad(spec, total),
     humanTime,
+    easyOpen,
+    firstSeconds,
     foothold,
     crunch,
     finale,
@@ -225,7 +363,80 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
     d: 0,
   };
   m.d = foldD(m);
+  if (opts.reading) m.reading = readLine(start, wind, line, opts.strandBudget ?? 4000);
   return m;
+}
+
+/** Order-free key of a pair of cells. */
+const pairKey = (m: Move) => (m[0] < m[1] ? m[0] * 4096 + m[1] : m[1] * 4096 + m[0]);
+const cardsLeft = (st: PlayState) => st.board.cells.reduce((n, v) => n + (isCard(v) ? 1 : 0), 0);
+
+/** The pair-by-pair reading along a proven line (see `BoardReading`). */
+function readLine(start: PlayState, wind: ReturnType<typeof windOf>, line: Move[], strandBudget: number): BoardReading {
+  const { rows, cols } = start.board;
+  const st = cloneState(start);
+  const frac = (i: number, j: number) => ({
+    row: rows > 1 ? (Math.floor(i / cols) + Math.floor(j / cols)) / 2 / (rows - 1) : 0.5,
+    col: cols > 1 ? ((i % cols) + (j % cols)) / 2 / (cols - 1) : 0.5,
+  });
+
+  // Opening: the easy first reads, and the decoys (same flower, both pickable, no path).
+  const moves0 = movesOf(st);
+  const footholds: Foothold[] = [];
+  for (const m of moves0) {
+    const t = pairTrace(st.board, m[0], m[1]);
+    if (t && isEasy(st.board, t)) footholds.push({ a: m[0], b: m[1], ...frac(m[0], m[1]) });
+  }
+  const legal0 = new Set(moves0.map(pairKey));
+  const locked = lockedOf(st);
+  const open: number[] = [];
+  st.board.cells.forEach((v, i) => isCard(v) && !locked.has(i) && open.push(i));
+  const decoys: DecoyPair[] = [];
+  for (let x = 0; x < open.length; x++) {
+    for (let y = x + 1; y < open.length; y++) {
+      const a = open[x];
+      const b = open[y];
+      if (monthOf(st.board.cells[a]) === monthOf(st.board.cells[b]) && !legal0.has(pairKey([a, b]))) decoys.push({ a, b });
+    }
+  }
+  const centroid = (k: 'row' | 'col') => (footholds.length ? footholds.reduce((s, f) => s + f[k], 0) / footholds.length : 0.5);
+
+  // The line, pair by pair.
+  const pairs: PairTrace[] = [];
+  let moves = moves0;
+  for (const m of line) {
+    const t = pairTrace(st.board, m[0], m[1]);
+    const month = monthOf(st.board.cells[m[0]]);
+    let strands = false;
+    for (const w of moves) {
+      if (pairKey(w) === pairKey(m) || monthOf(st.board.cells[w[0]]) !== month) continue;
+      const x = cloneState(st);
+      if (!step(x, w, wind)) strands = cardsLeft(x) > 0;
+      else {
+        const p = proveClear(x, wind, strandBudget);
+        strands = !p.moves && !p.exhausted;
+      }
+      if (strands) break;
+    }
+    const before = new Set(moves.map(pairKey));
+    step(st, m, wind);
+    const next = movesOf(st);
+    const opens = next.filter((n) => !before.has(pairKey(n))).length;
+    pairs.push({
+      a: m[0],
+      b: m[1],
+      bends: t?.bends ?? 0,
+      length: t?.length ?? 0,
+      edge: t?.edge ?? false,
+      detour: t?.detour ?? false,
+      legalBefore: moves.length,
+      opens,
+      strands,
+      critical: strands || (moves.length <= 2 && opens > 0),
+    });
+    moves = next;
+  }
+  return { pairs, decoys, opening: { footholds, row: centroid('row'), col: centroid('col') } };
 }
 
 

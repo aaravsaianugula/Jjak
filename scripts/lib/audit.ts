@@ -14,6 +14,11 @@ export interface Measured {
   deadEnd: number;
   humanTime: number;
   fun: number;
+  /** fun shape detail (bank builds from the curve-and-fun milestone on) */
+  easyOpen?: number;
+  firstSeconds?: number;
+  crunch?: number;
+  finale?: number;
 }
 
 export interface CurveLevel {
@@ -33,6 +38,8 @@ export interface CurveLevel {
   knobs?: string[];
   /** tier-2 metrics */
   t2: Measured | null;
+  /** per tier, the fun marks passed as three 0/1 characters: foothold, crunch, finale */
+  fun?: string[];
   /** feature distance to the previous level's tier-2 board (small = alike) */
   sim: number;
   /** the pre-Director journeyLevel board, measured the same way */
@@ -84,6 +91,8 @@ export function renderAudit(c: CurveFile): string {
   const last = (k: number) => L.filter((l) => l.ch >= 50 - k);
   const first = (k: number) => L.filter((l) => l.ch < k && l.n > 6);
   out.push(`Rise across the road (tier 2): first five places ${f2(mean(first(5).map((l) => l.after[2])))} → last five places ${f2(mean(last(5).map((l) => l.after[2])))}; before: ${f2(mean(first(5).filter((l) => l.before).map((l) => l.before!.d)))} → ${f2(mean(last(5).filter((l) => l.before).map((l) => l.before!.d)))}.`);
+  out.push('');
+  out.push(`Per tier, first five places → last five: ${[0, 1, 2, 3, 4].map((t) => `tier ${t} ${f2(mean(first(5).map((l) => l.after[t])))} → ${f2(mean(last(5).map((l) => l.after[t])))}`).join('; ')}.`);
   const unsolvedBefore = L.filter((l) => l.before && !l.before.solved).map((l) => l.n);
   out.push('');
   out.push(`Before the Director, ${unsolvedBefore.length} Journey boards had no clear without a reshuffle (the solver found none): ${unsolvedBefore.slice(0, 40).join(', ')}${unsolvedBefore.length > 40 ? ', …' : ''}. Every bank board is solver-proven.`);
@@ -127,6 +136,24 @@ export function renderAudit(c: CurveFile): string {
   }
   out.push(`Sawtooth check (tier 2: the rest board among the four easiest of its chapter, the open board in the easier half, the peak among the four hardest): **${saw} of ${chapters} chapters** pass.${flat.length ? ` Chapters that don't: ${flat.join(', ')}.` : ''}`);
   out.push('');
+  // The stricter shape: the peak is the chapter's single hardest board, the festival
+  // sits below it, and the open and rest boards are both among the four easiest.
+  let strictSaw = 0;
+  let peakTop = 0;
+  let festBelow = 0;
+  for (let ch = 1; ch < 50; ch++) {
+    const c2 = L.filter((l) => l.ch === ch);
+    if (c2.length !== 12) continue;
+    const d = c2.map((l) => l.after[2]);
+    const sorted = d.slice().sort((x, y) => x - y);
+    const top = d[10] >= Math.max(...d);
+    const fest = d[11] < d[10];
+    if (top) peakTop++;
+    if (fest) festBelow++;
+    if (top && fest && d[6] <= sorted[3] && d[0] <= sorted[3]) strictSaw++;
+  }
+  out.push(`Strict sawtooth (tier 2): the peak is the chapter's hardest board in **${peakTop} of ${chapters}**, the festival sits below the peak in **${festBelow}**, and all of that with the open and rest boards among the four easiest in **${strictSaw}**.`);
+  out.push('');
 
   // 4. Outliers.
   const outliers: string[] = [];
@@ -148,7 +175,31 @@ export function renderAudit(c: CurveFile): string {
   }
   out.push('');
 
-  // 5. Too similar to neighbours.
+  // 5. Fun: the marks every board is checked for (src/director/metrics.ts, FUN).
+  const funned = L.filter((l) => l.fun && l.fun.length === 5);
+  if (funned.length) {
+    const rate = (k: number, tiers = [0, 1, 2, 3, 4]) => {
+      let pass = 0;
+      let all = 0;
+      for (const l of funned) for (const t of tiers) {
+        all++;
+        if (l.fun![t][k] === '1') pass++;
+      }
+      return `${((100 * pass) / Math.max(1, all)).toFixed(1)} %`;
+    };
+    const varied = L.filter((l) => l.n > 6);
+    out.push('## Fun');
+    out.push('');
+    out.push(`Share of the ${funned.length * 5} bank boards that pass each mark (tier 4 alone in brackets):`);
+    out.push('');
+    out.push(`- **Early foothold** (an easy 0–1 bend pair at the start, found by the human-like scanner inside 10 s): ${rate(0)} (${rate(0, [4])})`);
+    out.push(`- **Mid-board crunch** (legal pairs in the middle third fall at least 40 % below the opening): ${rate(1)} (${rate(1, [4])})`);
+    out.push(`- **Combo finish** (the last third connects almost everything left): ${rate(2)} (${rate(2, [4])})`);
+    out.push(`- **Variety** (tier-2 board at least ${SIMILAR} from the previous level's in feature space): ${((100 * varied.filter((l) => l.sim >= SIMILAR).length) / Math.max(1, varied.length)).toFixed(1)} %`);
+    out.push('');
+  }
+
+  // 6. Too similar to neighbours.
   const alike = L.filter((l) => l.n > 6 && l.sim < SIMILAR);
   out.push('## Too similar to neighbours');
   out.push('');
@@ -161,7 +212,7 @@ export function renderAudit(c: CurveFile): string {
   }
   out.push('');
 
-  // 6. Per-chapter table.
+  // 7. Per-chapter table.
   out.push('## Per place (mean d of the 12 levels)');
   out.push('');
   out.push('| Place | Before | T0 | T2 | T4 | Base |');

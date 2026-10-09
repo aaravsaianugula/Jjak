@@ -39,7 +39,7 @@ import { bendsOf, initialState, movesOf } from './bots';
 import { type MeasureOptions, type Metrics, measure } from './metrics';
 import { type Knobs, type LevelPlan, LAYOUTS, PARTNERS, SIZES, WIND_CYCLE, clampKnobs, clashes, knobRange, levelPlan, parOf, planSpec, tierKnobs } from './plan';
 import type { PlayStyle } from './profile';
-import { type Feature, featureOf, neighbour, novelty, tierFor } from './search';
+import { type Feature, featureOf, funScore, neighbour, novelty, tierFor } from './search';
 import { type Verdict, validate } from './validate';
 
 export const ENDLESS = {
@@ -480,7 +480,7 @@ export function runEndlessJob(job: EndlessJob, now: () => number = () => Date.no
     b.spec.difficulty = metrics.d;
     const verdict = validate(b.spec, b.board, metrics, { tier, plan, elapsedMs: b.ms + now() - t0, timeBudgetMs: job.candidateBudgetMs, skipRebuild: true });
     const feature = featureOf(b.spec, metrics.d);
-    let fitness = -3 * Math.abs(metrics.d - job.target) + 0.3 * novelty(feature, job.recent) + 0.25 * metrics.fun;
+    let fitness = -3 * Math.abs(metrics.d - job.target) + 0.3 * novelty(feature, job.recent) + 0.3 * funScore(metrics);
     fitness += bias.centreFirst * (metrics.centreFirst - 0.5) + bias.twoBend * (metrics.twoBend - 0.45) + bias.finale * (metrics.finale - 0.5);
     if (!fresh(b.spec, feature)) fitness -= 3;
     tried++;

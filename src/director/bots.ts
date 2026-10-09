@@ -171,6 +171,8 @@ export interface Playout {
   total: number;
   /** human scanner only: summed scan cost (cells looked at + bends read) */
   scan: number;
+  /** human scanner only: the scan cost of each pair, in order */
+  scans: number[];
   /** legal moves seen at each step */
   moves: number[];
 }
@@ -184,22 +186,24 @@ export function playout(start: PlayState, wind: Wind | null, bot: BotId | Bot, s
   const total = cardsOnBoard(st.board) / 2;
   let pairs = 0;
   let scan = 0;
+  const scans: number[] = [];
   const seen: number[] = [];
   for (let k = 0; k < maxSteps; k++) {
-    if (cardsOnBoard(st.board) === 0) return { cleared: true, pairs, total, scan, moves: seen };
+    if (cardsOnBoard(st.board) === 0) return { cleared: true, pairs, total, scan, scans, moves: seen };
     let moves = movesOf(st);
     if (!moves.length) {
-      if (releaseIfStuck(st)) return { cleared: false, pairs, total, scan, moves: seen };
+      if (releaseIfStuck(st)) return { cleared: false, pairs, total, scan, scans, moves: seen };
       moves = movesOf(st);
     }
     seen.push(moves.length);
     const m = play(st, moves, ctx);
     scan += ctx.scanCost;
+    scans.push(ctx.scanCost);
     ctx.last = m;
     pairs++;
-    if (!step(st, m, wind)) return { cleared: cardsOnBoard(st.board) === 0, pairs, total, scan, moves: seen };
+    if (!step(st, m, wind)) return { cleared: cardsOnBoard(st.board) === 0, pairs, total, scan, scans, moves: seen };
   }
-  return { cleared: false, pairs, total, scan, moves: seen };
+  return { cleared: false, pairs, total, scan, scans, moves: seen };
 }
 
 /** Convenience: play a spec's board with a persona. */

@@ -9,7 +9,8 @@
  *
  *   fitness = closeness to the target d
  *           + novelty against recent levels (feature-vector distance)
- *           + fun (an opening foothold, a mid-board crunch, an ending that opens up)
+ *           + fun (`funScore`: an easy first read inside 10 s, a mid-board crunch,
+ *             an ending that opens up for a combo finish)
  *           + an optional bias hook (endless levels tailor to a play style)
  *
  * The best candidate is then hill-climbed a few steps (one knob at a time,
@@ -24,7 +25,7 @@ import { type LevelSpec, buildBoard } from '../engine/levels';
 import { MECHANIC_IDS } from '../engine/mechanics';
 import { GOAL_IDS } from '../engine/goals';
 import { createRng } from '../engine/rng';
-import { type MeasureOptions, type Metrics, measure } from './metrics';
+import { type MeasureOptions, type Metrics, funChecks, measure } from './metrics';
 import { type KnobId, type Knobs, type LevelPlan, LAYOUTS, clampKnobs, knobRange, planSpec, tierKnobs } from './plan';
 import { type Verdict, validate } from './validate';
 
@@ -54,6 +55,16 @@ export function featureOf(spec: LevelSpec, d: number): Feature {
   const goal = GOAL_IDS.map((g) => (spec.goal === g ? 0.5 : 0));
   const layout = LAYOUTS.map((l) => (spec.stones > 0 && (spec.layout ?? 'spread') === l ? 0.4 : 0));
   return [spec.rows / 8, spec.cols / 7, ...mech, ...goal, ...layout, spec.stones / 6, spec.months / 12, d];
+}
+
+/**
+ * The fun part of the fitness: the fun shape (0–1), a bonus for each mark passed
+ * (crunch, finale), and a large penalty for a board with no easy first read
+ * inside 10 s, so the search only keeps such a board when nothing else is close.
+ */
+export function funScore(m: Pick<Metrics, 'easyOpen' | 'firstSeconds' | 'crunch' | 'finale' | 'fun'>): number {
+  const c = funChecks(m);
+  return m.fun + (c.crunch ? 0.15 : 0) + (c.finale ? 0.15 : 0) - (c.foothold ? 0 : 0.6);
 }
 
 const dist = (a: Feature, b: Feature) => {
@@ -106,7 +117,7 @@ export interface SearchOptions {
   ceil?: number;
   /** bot playouts per candidate */
   measure?: MeasureOptions;
-  /** weights (defaults: target 3, novelty 0.3, fun 0.25) */
+  /** weights (defaults: target 3, novelty 0.3, fun 0.3) */
   weights?: { target?: number; novelty?: number; fun?: number };
   now?: () => number;
 }
@@ -188,7 +199,7 @@ export function searchLevel(plan: LevelPlan, tierOrTarget: number | { target: nu
   const K = plan.fixed ? 1 : Math.max(1, opts.K ?? 6);
   const climb = plan.fixed ? 0 : opts.climb ?? 2;
   const maxAttempts = plan.fixed ? 1 : opts.maxAttempts ?? 4 * K + 2 * climb;
-  const w = { target: 3, novelty: 0.3, fun: 0.25, ...opts.weights };
+  const w = { target: 3, novelty: 0.3, fun: 0.3, ...opts.weights };
   const rng = createRng(`${prefix}-${tag}-knobs`);
   const rejected: Record<string, number> = {};
   let tried = 0;
@@ -197,7 +208,7 @@ export function searchLevel(plan: LevelPlan, tierOrTarget: number | { target: nu
   const pool: Candidate[] = [];
 
   const fitnessOf = (m: Metrics, spec: LevelSpec, feature: Feature): number => {
-    let f = -w.target * Math.abs(m.d - target) + w.novelty * novelty(feature, opts.recent) + w.fun * m.fun;
+    let f = -w.target * Math.abs(m.d - target) + w.novelty * novelty(feature, opts.recent) + w.fun * funScore(m);
     if (opts.floor != null && m.d < opts.floor) f -= 2 + 10 * (opts.floor - m.d);
     if (opts.ceil != null && m.d > opts.ceil) f -= 2 + 10 * (m.d - opts.ceil);
     const b = opts.bias;
