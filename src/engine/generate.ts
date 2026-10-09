@@ -24,6 +24,7 @@ function placePairs(
   pairs: [number, number][],
   rng: Rng,
   maxAttempts = 40,
+  arrange = 0,
 ): Board | null {
   const { rows, cols } = base;
   // Distance from the board edge: deep cells are filled first so the last
@@ -34,6 +35,9 @@ function placePairs(
     return Math.min(r, c, rows - 1 - r, cols - 1 - c);
   };
 
+  // The trickiest arrangements fill the rim first, so the player's first moves
+  // sit inside the board instead of along its easy edge.
+  const rimFirst = arrange > 0.6;
   const hasGates = base.cells.some(isGate);
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const b: Board = base.walls ? { rows, cols, cells: base.cells.slice(), walls: base.walls } : { rows, cols, cells: base.cells.slice() };
@@ -47,6 +51,23 @@ function placePairs(
     let k = 0;
     const passable = hasGates ? (v: number) => v === EMPTY || (isGate(v) && k < lastOf[gateMonth(v)]) : undefined;
 
+    const span = Math.max(1, rows + cols - 2);
+    const trick = (x: number, y: number, card: number): number => {
+      const yr = Math.floor(y / cols);
+      const yc = y % cols;
+      const far = (Math.abs(Math.floor(x / cols) - yr) + Math.abs((x % cols) - yc)) / span;
+      let twin = 0;
+      for (let r = Math.max(0, yr - 1); r <= Math.min(rows - 1, yr + 1) && !twin; r++) {
+        for (let c = Math.max(0, yc - 1); c <= Math.min(cols - 1, yc + 1); c++) {
+          const v = b.cells[r * cols + c];
+          if (isCard(v) && monthOf(v) === monthOf(card)) {
+            twin = 1;
+            break;
+          }
+        }
+      }
+      return 3 * far + 1.5 * twin;
+    };
     const partnersOf = (x: number): number[] => {
       const reach = reachable(b, x, passable);
       const out: number[] = [];
@@ -70,7 +91,7 @@ function placePairs(
         const better =
           x < 0 ||
           p.length < xPartners.length ||
-          (p.length === xPartners.length && depth(f) > depth(x)) ||
+          (p.length === xPartners.length && (rimFirst ? depth(f) < depth(x) : depth(f) > depth(x))) ||
           (p.length === xPartners.length && depth(f) === depth(x) && rng.next() < 0.5);
         if (better) {
           x = f;
@@ -82,8 +103,12 @@ function placePairs(
         break;
       }
       // Prefer deep partners, with noise for variety; keep the rest healthy.
+      // A tricky arrangement (Level Director) also prefers partners far from x
+      // (long, two-bend reads) and cells right beside an earlier card of the same
+      // flower (look-alike pairs: blocked decoys, or tempting wrong matches).
+      const keyOf = arrange > 0 ? (y: number) => (1 - arrange) * depth(y) + arrange * trick(x, y, ca) : depth;
       const candidates = xPartners
-        .map((y) => ({ y, key: depth(y) + rng.next() * 1.5 }))
+        .map((y) => ({ y, key: keyOf(y) + rng.next() * 1.5 }))
         .sort((p, q) => q.key - p.key)
         .map((p) => p.y);
       const [p, q] = rng.next() < 0.5 ? [ca, cb] : [cb, ca];
@@ -123,6 +148,11 @@ export interface GenerateOptions {
   walls?: Uint8Array;
   /** card ids, length must equal playable cells; consecutive entries form pairs */
   cards: number[];
+  /**
+   * 0–1, how tricky the arrangement is (Level Director boards only; 0 = the
+   * classic placement, consuming the random stream exactly as before)
+   */
+  arrange?: number;
 }
 
 export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
@@ -139,7 +169,7 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   const pairs: [number, number][] = [];
   for (let i = 0; i < opts.cards.length; i += 2) pairs.push([opts.cards[i], opts.cards[i + 1]]);
 
-  const b = placePairs(base, slots, pairs, rng);
+  const b = placePairs(base, slots, pairs, rng, 40, opts.arrange ?? 0);
   if (b) return b;
   // Fences and gates are extras: lose the fences first, then turn gates into stones.
   if (opts.walls) return generateBoard({ ...opts, walls: undefined }, rng);
@@ -149,7 +179,7 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   const stones = (opts.stones ?? []).slice();
   if (stones.length === 0) throw new Error('board generation failed');
   const cards = opts.cards.concat(opts.cards[0], opts.cards[1]);
-  return generateBoard({ rows, cols, stones: stones.slice(0, -2), cards }, rng);
+  return generateBoard({ rows, cols, stones: stones.slice(0, -2), cards, arrange: opts.arrange }, rng);
 }
 
 /**

@@ -112,11 +112,12 @@ export const SIZES: [number, number][][] = [
 const SLOT_SIZE = [1, 1, 2, 2, 3, 3, 0, 3, 4, 4, 5, 6];
 
 /**
- * The sawtooth inside a chapter: the open and rest boards dip, the focus and mix
- * boards climb, the peak tops it, and the festival is a celebration a little
- * below the peak.
+ * The sawtooth inside a chapter: tension → peak → breather. The open board and
+ * the rest board are clear dips, the focus and mix boards climb, the peak stands
+ * well clear of everything else (the board a player remembers), and the festival
+ * is a celebration: high, but a step below the peak.
  */
-const SAW = [-0.1, 0, -0.07, 0.03, 0.06, 0.08, -0.12, 0.09, 0.11, 0.13, 0.2, 0.06];
+const SAW = [-0.12, 0, -0.06, 0.03, 0.05, 0.07, -0.15, 0.08, 0.1, 0.11, 0.22, 0.12];
 const TUTORIAL_BASE = [0.03, 0.05, 0.08, 0.1, 0.12, 0.14];
 
 const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x);
@@ -125,15 +126,17 @@ export const parFor = (pairs: number) => Math.ceil((pairs * 4.5 + 10) / 5) * 5;
 
 /**
  * The road under the sawtooth: the smooth rise across the 50 places (no chapter
- * rhythm). The first pass climbs from 0.22 to 0.55, the range the generator can
- * really cover at every tier (calibrated on the bank build); Wanderer years start
- * higher. A steady player's skill follows this line; the sawtooth swings around it.
+ * rhythm). The first pass climbs from 0.2 to 0.68: tier 2 starts near 0.25 and
+ * ends near 0.7, tier 4 near 0.9 late. The generator reaches the top of that
+ * range through the card arrangement (`arrangeOf`), never smaller cards. Wanderer
+ * years carry on from the end of the first pass. A steady player's skill follows
+ * this line; the sawtooth swings around it.
  */
 export function roadBase(n: number): number {
   n = Math.max(1, Math.floor(n));
   const { index, year } = routeOf(n);
   const p = index / (ROUTE_CHAPTERS - 1);
-  return year > 0 ? 0.5 + 0.04 * Math.min(year, 3) + 0.06 * p : 0.22 + 0.33 * p;
+  return year > 0 ? 0.6 + 0.03 * Math.min(year, 3) + 0.06 * p : 0.2 + 0.48 * p;
 }
 
 /** Designed difficulty of level n, 0–1: a sawtooth in each chapter on a road that rises. */
@@ -327,6 +330,19 @@ function identityOf(n: number): Identity {
 /** How far up its legal ranges a tier pushes the knobs, 0–1: the road's progress plus a step per tier. */
 export const intensity = (base: number, tier: number) => clamp(-0.05 + 1.1 * base + 0.16 * (tier - 2), 0, 1);
 
+/**
+ * How tricky the card arrangement is for tier t of a level, 0–1 (0 = the classic
+ * placement): partners placed far apart (long, two-bend reads), look-alike cards
+ * of one flower side by side (decoys and tempting wrong matches), and from 0.6
+ * the rim filled first so the opening moves sit inside the board. It follows the
+ * knobs' intensity, so it rises along the road and with the tier. Teaching boards
+ * keep the classic placement.
+ */
+export function arrangeOf(p: Pick<LevelPlan, 'base' | 'fixed' | 'role'>, tier: number): number {
+  if (p.fixed || p.role === 'tutorial') return 0;
+  return Math.round(clamp((intensity(p.base, tier) - 0.25) / 0.6, 0, 1) * 20) / 20;
+}
+
 /** Gentle tiers use fewer flowers (more partners for every card); the top tiers use all twelve. */
 const MONTH_DROP = [4, 2, 1, 0, 0];
 export const LAYOUTS: StoneLayout[] = ['clusters', 'spread', 'lines'];
@@ -418,6 +434,7 @@ export function clampKnobs(p: LevelPlan, k: Knobs): Knobs {
 
 /** The board spec for an identity with these knobs. */
 export function planSpec(p: LevelPlan, k: Knobs, seed: string, tier?: number): LevelSpec {
+  const arrange = arrangeOf(p, tier ?? 2);
   return {
     mode: 'journey',
     number: p.n,
@@ -438,6 +455,7 @@ export function planSpec(p: LevelPlan, k: Knobs, seed: string, tier?: number): L
     ...(k.stones && k.layout !== 'spread' ? { layout: k.layout } : {}),
     ...(p.goal ? { goal: p.goal } : {}),
     ...(tier != null ? { tier } : {}),
+    ...(arrange ? { arrange } : {}),
   };
 }
 

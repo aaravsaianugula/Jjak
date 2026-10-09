@@ -34,7 +34,8 @@ export const PERSONAS: Record<string, Persona> = {
   strong: { name: 'strong', skill: (n) => roadBase(n) + 0.12 },
   weak: { name: 'weak', skill: (n) => roadBase(n) - 0.12 },
   learner: { name: 'learner', skill: (n, p) => roadBase(n) - 0.15 + 0.27 * Math.min(1, p / 200) },
-  expert: { name: 'expert', skill: (n) => roadBase(n) + 0.35 },
+  // Beyond the top tier everywhere: above a peak's tier-4 target (road + 0.22 sawtooth + 2 tier steps).
+  expert: { name: 'expert', skill: (n) => roadBase(n) + 0.42 },
   novice: { name: 'novice', skill: (n) => roadBase(n) - 0.3 },
 };
 
