@@ -9,25 +9,27 @@
  * nudge); the tailoring from the play-style profile (`playStyle`). The generator core
  * lives in endless-core.ts (pure); this module owns the save, the worker and timing.
  *
- *   endlessSpec(n)     sync: the stored board, or the plan's own board if none yet
+ *   endlessSpec(n)     sync: the stored board, or a proven last resort if none yet
  *   prepareEndless(n)  async: the stored board, generating (and storing) it first if needed
  *
  * Generation runs in a Web Worker with a time budget. If Workers are unavailable,
  * fail or time out, a small main-thread search with a tight budget runs instead,
- * and as a last resort the plan's own board (solvable by construction). It never
- * fails to return a board. After an endless board is cleared, the next one is
- * prepared in the background so Continue is instant.
+ * and as a last resort the bank's solver-proven board for the same place and slot
+ * (endless-fallback.ts).
+ * It never fails to return a board, and never an unproven one. After an endless
+ * board is cleared, the next one is prepared in the background so Continue is instant.
  *
  * Relief mirrors the bank's re-pin: after two failed attempts at an uncleared level,
  * it is generated again a step gentler (target −0.1).
  */
 import { ROUTE_LEVELS } from '../data/route';
 import { GOAL_IDS, type GoalId } from '../engine/goals';
-import { type LevelSpec, type Mechanic, honestSpec } from '../engine/levels';
+import { type LevelSpec, type Mechanic } from '../engine/levels';
 import { on } from '../services/events';
 import { type EndlessEntry, type EndlessSave, ENDLESS_CAP } from '../services/save-journey';
 import { persist, save } from '../services/storage';
 import { DIRECTOR, targetFor } from './director';
+import { provenFallback } from './endless-fallback';
 import { ENDLESS, type EndlessJob, type EndlessResult, type EndlessState, endlessIdentity, identityOf, makeJob, runEndlessJob, tailorFor } from './endless-core';
 import { MODEL } from './model';
 import { PARTNERS, levelPlan } from './plan';
@@ -234,10 +236,9 @@ async function generate(n: number, relief: number): Promise<LevelSpec> {
     spec = result.spec;
     if (!(relief && old)) commitState(es, state);
   } else {
-    src = 'plan';
-    // Last resort: the identity's own board (solvable by construction when nothing slides),
-    // labelled honestly if generation had to drop a gate or a fence.
-    spec = honestSpec({ ...plan.spec, tier: tierFor(plan.base, target) });
+    // Last resort: the bank's solver-proven board for this place and slot.
+    spec = provenFallback(n, tierFor(plan.base, target));
+    src = 'bank';
   }
   const ms = Math.round(clock() - t0);
   // Device QA reads these from the inspector (scripts/device-play.mjs endless).
@@ -258,9 +259,11 @@ async function generate(n: number, relief: number): Promise<LevelSpec> {
   return spec;
 }
 
-/** The stored (or fallback) spec for endless level n. Sync. */
+/** The stored spec for endless level n, or (not made yet) the proven last resort. Sync. */
 export function endlessSpec(n: number): LevelSpec {
-  return endlessEntry(n)?.spec ?? levelPlan(n).spec;
+  const e = endlessEntry(n);
+  if (e) return e.spec;
+  return provenFallback(n, levelPlan(n).spec.tier ?? 2);
 }
 
 /** After two failed attempts at an uncleared level, it is made again a step gentler. */

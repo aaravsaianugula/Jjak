@@ -137,14 +137,16 @@ export const parFor = (pairs: number) => Math.ceil((pairs * 4.5 + 10) / 5) * 5;
  * rhythm). The first pass climbs from 0.2 to 0.68: tier 2 starts near 0.25 and
  * ends near 0.7, tier 4 near 0.9 late. The generator reaches the top of that
  * range through the card arrangement (`arrangeOf`), never smaller cards. Wanderer
- * years carry on from the end of the first pass. A steady player's skill follows
- * this line; the sawtooth swings around it.
+ * years carry on from exactly where the first pass ends (no step down at a year's
+ * start) and level off towards 0.70, half the remaining rise per year, so the
+ * knobs keep room above the road for the endless road's variety. A steady
+ * player's skill follows this line; the sawtooth swings around it.
  */
 export function roadBase(n: number): number {
   n = Math.max(1, Math.floor(n));
   const { index, year } = routeOf(n);
   const p = index / (ROUTE_CHAPTERS - 1);
-  return year > 0 ? 0.6 + 0.03 * Math.min(year, 3) + 0.06 * p : 0.2 + 0.48 * p;
+  return year > 0 ? 0.68 + 0.02 * (1 - 2 ** -(year - 1 + p)) : 0.2 + 0.48 * p;
 }
 
 /** Designed difficulty of level n, 0–1: a sawtooth in each chapter on a road that rises. */

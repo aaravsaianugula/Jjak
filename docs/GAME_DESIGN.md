@@ -92,7 +92,11 @@ plain board, a mix, a smaller breather in the middle, a peak, and the **festival
 tension → peak → breather sawtooth inside each chapter (the open and rest boards are the
 two dips, the peak stands clear of every other board, the festival sits high but below
 it) on a road that climbs from about 0.25 (middle tier, first places) to about 0.7 (last
-places; the top tier near 0.9). Wanderer years carry on from there. Partner ideas and
+places; the top tier near 0.9). Wanderer years carry on from exactly there (the road
+never steps down at a year's start) and level off towards 0.70, leaving the knobs room
+for the endless road's variety. If the endless search ever finds nothing in time, the
+board served is still solver-proven: the bank's board for the same place and slot
+(`src/director/endless-fallback.ts`). Partner ideas and
 goals come from bag randomisers so neighbours don't repeat. Snow, fences, torii and streams
 never share a board with falling leaves or wind (terrain can't move and cards can't slide
 over it).
@@ -103,11 +107,16 @@ over it).
 tempting wrong matches that lead to a dead end), and on the hardest boards the rim filled
 first so the opening moves sit inside the board. Board sizes are unchanged.
 
-**Fun, measured** (`src/director/metrics.ts`, folded into the search's fitness):
-an **early foothold** (a hard gate: at least one easy 0–1 bend pair at the start, and the
-human-like bot finds a first pair inside 10 s), a **mid-board crunch** (legal pairs dip in
-the middle of the game), a **combo finish** (the last third opens up), and **variety**
-against the previous levels. The audit reports how many bank boards pass each mark.
+**Fun, measured** (`src/director/metrics.ts`, folded into the search's fitness), each
+read off the human-like scanner's games at its calibrated pace (1.1 s a pair plus 0.3 s
+per card looked at): an **early foothold** (the scanner makes its first easy 0–1 bend
+pair inside 10 s of play; the validators separately insist on at least one easy pair at
+the start), a **mid-board crunch** (most games hit a tight spot in the middle third: at
+most two legal pairs while five or more are still on the board), a **combo finish** (the
+last six pairs, or the whole board if smaller, each come with a choice of pairs and
+inside the 4 s combo window, so the top combo is reached and held; it weighs most in the
+fitness), and **variety** (a different shape, mechanics or goal from the level before).
+The audit reports each mark's pass rate per tier and the distribution of each measure.
 
 **Show, don't tell.** New players get an animated first minute instead of a rules
 screen: the brush pairs two cards and the 0/1/2-bend rule draws itself, the player

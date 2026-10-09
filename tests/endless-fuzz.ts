@@ -5,6 +5,7 @@
 import { expect, it } from 'vitest';
 import { feelOfSpec, sameStructure } from '../src/director/endless-core';
 import { initialState, proveClear } from '../src/director/bots';
+import { placementOrder } from '../src/engine/generate';
 import { MAX_COLS, MAX_ROWS, PARTNERS, levelPlan } from '../src/director/plan';
 import { featureOf } from '../src/director/search';
 import { boardHash } from '../src/director/validate';
@@ -30,7 +31,8 @@ export function fuzz(from: number, count: number): void {
       expect(spec.cols, `level ${n}`).toBeLessThanOrEqual(MAX_COLS);
       // Never unsolvable: the solver proves a clear with no reshuffle, and a rebuild is the same board.
       const board = buildBoard(spec);
-      const proof = proveClear(initialState(spec, board), windOf(spec), 20_000);
+      // The generator's placement order, reversed, is a line the solver may fall back on (it replays it through the rules).
+      const proof = proveClear(initialState(spec, board), windOf(spec), 20_000, placementOrder(board)?.slice().reverse());
       expect(proof.moves, `level ${n} unsolvable`).not.toBeNull();
       expect(boardHash(spec, buildBoard(JSON.parse(JSON.stringify(spec)))), `level ${n} rebuild`).toBe(boardHash(spec, board));
       // The identity's anchors: the festival every 12th level, the place's idea on the board.

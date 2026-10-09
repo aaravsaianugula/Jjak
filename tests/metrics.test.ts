@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cloneState, initialState, movesOf, proveClear, step } from '../src/director/bots';
-import { FUN, funChecks, funShape, isEasy, measure, pairTrace } from '../src/director/metrics';
+import { FUN, closingRunOf, funChecks, isEasy, measure, pairTrace } from '../src/director/metrics';
 import { levelPlan, planSpec, tierKnobs } from '../src/director/plan';
 import { funScore, searchLevel } from '../src/director/search';
 import { validate } from '../src/director/validate';
@@ -35,34 +35,136 @@ describe('pair traces', () => {
   });
 });
 
-describe('fun shape', () => {
-  it('an easily read opening pair is a foothold; only two-bend reads at the start are not', () => {
+// ---------------------------------------------------------------------------
+// Hand-built boards whose fun shape is known.
+
+/**
+ * Packed 8×7 boards: a ring of stones around the two middle cells, every other cell
+ * a card. Only the named easy pairs connect: no two other cards of a flower share a
+ * side of the rim (they would meet around the outside) or touch.
+ *   BURIED  one easy pair, the two middle cells (behind 44 cards)
+ *   ON_RIM  four easy pairs, one on each side of the rim
+ */
+const BURIED: Board = {
+  rows: 8,
+  cols: 7,
+  cells: [32, 28, 5, 20, 9, 13, 40, 21, 47, 35, 42, 39, 10, 34, 4, 26, S, S, S, 15, 25, 29, 11, S, 44, S, 27, 22, 2, 43, S, 45, S, 38, 0, 14, 7, S, S, S, 17, 12, 8, 16, 6, 23, 3, 31, 36, 41, 30, 37, 24, 33, 1, 46],
+};
+const ON_RIM: Board = {
+  rows: 8,
+  cols: 7,
+  cells: [20, 39, 44, 45, 2, 17, 28, 16, 29, 25, 18, 31, 10, 5, 42, 47, S, S, S, 13, 24, 36, 19, S, 11, S, 26, 32, 37, 35, S, 21, S, 14, 33, 6, 9, S, S, S, 43, 1, 0, 27, 7, 30, 3, 15, 46, 34, 12, 40, 41, 4, 8, 38],
+};
+
+/** Pairs nested along a U-shaped corridor: exactly one pair connects at every step. */
+function corridor(): Board {
+  const rows = 8;
+  const cols = 5;
+  const cells = new Array<number>(rows * cols).fill(S);
+  const path: number[] = [];
+  for (let r = 0; r < rows; r++) path.push(r * cols + 1);
+  path.push((rows - 1) * cols + 2);
+  for (let r = rows - 1; r >= 1; r--) path.push(r * cols + 3);
+  for (let k = 0; k < path.length / 2; k++) {
+    cells[path[k]] = k * 4;
+    cells[path[path.length - 1 - k]] = k * 4 + 1;
+  }
+  return { rows, cols, cells };
+}
+
+/** Twelve flowers, each pair side by side on a 4×6 board: every pair is open all game. */
+function openGrid(): Board {
+  const cells: number[] = [];
+  for (let m = 0; m < 12; m++) cells.push(m * 4, m * 4 + 1);
+  return { rows: 4, cols: 6, cells };
+}
+
+const specFor = (b: Board): LevelSpec => ({ ...spec(b.rows, b.cols, b.cells.filter((v) => v === S).length), months: 12 });
+
+describe('fun shape (hand-built boards)', () => {
+  it('the board fixtures are what they claim', () => {
+    const buried = BURIED;
+    expect(movesOf(initialState(specFor(buried), buried))).toHaveLength(1);
+    const rim = ON_RIM;
+    expect(movesOf(initialState(specFor(rim), rim))).toHaveLength(4);
+    const c = corridor();
+    const st = initialState(specFor(c), c);
+    for (let k = 0; k < 8; k++) {
+      const moves = movesOf(st);
+      expect(moves).toHaveLength(1);
+      step(st, moves[0], null);
+    }
+    expect(st.board.cells.some((v) => v >= 0)).toBe(false);
+  });
+
+  it('an easy pair the scanner finds early is a foothold; one buried in a packed board is not', () => {
+    const buried = BURIED;
+    const rim = ON_RIM;
+    const mb = measure(specFor(buried), buried);
+    const mr = measure(specFor(rim), rim);
+    // Both have an easy read on the board at the start: the old mark passed both.
+    expect(mb.easyOpen).toBe(1);
+    expect(mr.easyOpen).toBe(4);
+    expect(mb.easySeconds).toBeGreaterThan(FUN.footholdSeconds);
+    expect(mr.easySeconds).toBeLessThanOrEqual(FUN.footholdSeconds);
+    expect(funChecks(mb).foothold).toBe(false);
+    expect(funChecks(mr).foothold).toBe(true);
+    expect(mr.foothold).toBeGreaterThan(mb.foothold);
+  });
+
+  it('only two-bend reads at the start: no foothold, and the validators refuse it', () => {
     const easy: Board = { rows: 3, cols: 3, cells: [A, A + 1, S, S, S, S, B, S, B + 1] };
     const hard: Board = { rows: 3, cols: 3, cells: [A, S, A + 1, S, S, S, B, S, B + 1] };
     const me = measure(spec(3, 3, 5), easy);
     const mh = measure(spec(3, 3, 5), hard);
-    expect(me.easyOpen).toBe(1);
-    expect(mh.easyOpen).toBe(0);
     expect(funChecks(me).foothold).toBe(true);
     expect(funChecks(mh).foothold).toBe(false);
-    // The validators refuse a board with no easy first read.
     expect(validate(spec(3, 3, 5), hard, mh, { skipRebuild: true }).reasons).toContain('foothold');
     expect(validate(spec(3, 3, 5), easy, me, { skipRebuild: true }).reasons).not.toContain('foothold');
   });
 
-  it('a mid-board dip in legal pairs is a crunch; a flat game is not', () => {
-    // The tightest point is mid-way through the middle third, not at its edge.
-    const dip = funShape([8, 7, 6, 5, 2, 3, 5, 4, 3, 2, 1]);
-    const flat = funShape([8, 8, 8, 8, 8, 8, 7, 6, 5, 3, 1]);
-    expect(dip.crunch).toBeGreaterThanOrEqual(FUN.crunch);
-    expect(flat.crunch).toBeLessThan(FUN.crunch);
+  it('one pair at a time with the board still full is a crunch; an open board thinning out at the end is not', () => {
+    const c = corridor();
+    const g = openGrid();
+    const mc = measure(specFor(c), c);
+    const mg = measure(specFor(g), g);
+    expect(mc.crunch).toBe(1);
+    expect(mg.crunch).toBe(0);
+    expect(funChecks(mc).crunch).toBe(true);
+    expect(funChecks(mg).crunch).toBe(false);
   });
 
-  it('an ending where nearly every pair left connects is a combo finish; a tight one is not', () => {
-    const open = funShape([6, 5, 3, 2, 2, 4, 5, 4, 3, 2, 1]);
-    const tight = funShape([6, 5, 3, 2, 2, 3, 2, 1, 1, 1, 1]);
-    expect(open.finale).toBeGreaterThanOrEqual(FUN.finale);
-    expect(tight.finale).toBeLessThan(FUN.finale);
+  it('an ending with a choice of pairs, each found inside the combo window, is a combo finish; a one-at-a-time ending is not', () => {
+    const c = corridor();
+    const g = openGrid();
+    const mc = measure(specFor(c), c);
+    const mg = measure(specFor(g), g);
+    expect(mg.closingRun).toBeGreaterThanOrEqual(FUN.closingRun);
+    expect(mc.closingRun).toBeLessThan(2);
+    expect(funChecks(mg).finale).toBe(true);
+    expect(funChecks(mc).finale).toBe(false);
+    expect(mg.finale).toBeGreaterThan(mc.finale);
+  });
+
+  it('a game that ends stuck has no closing run, however quick its last pairs were', () => {
+    const quick = { total: 6, moves: [6, 5, 4, 3, 2], scans: [1, 1, 1, 1, 1], bends: [0, 0, 0, 0, 0] };
+    expect(closingRunOf({ ...quick, cleared: false })).toBe(0);
+    expect(closingRunOf({ ...quick, moves: [...quick.moves, 1], scans: [...quick.scans, 1], bends: [...quick.bends, 0], cleared: true })).toBe(6);
+  });
+
+  it('a board the scanner gets stuck on has no combo finish', () => {
+    const buried = BURIED;
+    const m = measure(specFor(buried), buried);
+    expect(m.humanStuck).toBe(1);
+    expect(m.closingRun).toBe(0);
+    expect(funChecks(m).finale).toBe(false);
+  });
+
+  it('a small board passes the finale when its whole game is one quick run', () => {
+    const b: Board = { rows: 2, cols: 4, cells: [A, A + 1, B, B + 1, 8, 9, 12, 13] };
+    const m = measure({ ...spec(2, 4), months: 4 }, b);
+    expect(m.pairs).toBe(4);
+    expect(funChecks(m).finale).toBe(true);
   });
 
   it('an easy read has at most one bend and a path no longer than the long side of the board', () => {
@@ -70,11 +172,6 @@ describe('fun shape', () => {
     expect(isEasy(b, { bends: 1, length: 4 })).toBe(true);
     expect(isEasy(b, { bends: 1, length: 5 })).toBe(false);
     expect(isEasy(b, { bends: 2, length: 3 })).toBe(false);
-  });
-
-  it('a slow first read (over 10 s) is not a foothold even with an easy pair on the board', () => {
-    expect(funChecks({ easyOpen: 2, firstSeconds: 12, crunch: 0.5, finale: 0.9 }).foothold).toBe(false);
-    expect(funChecks({ easyOpen: 2, firstSeconds: 6, crunch: 0.5, finale: 0.9 }).foothold).toBe(true);
   });
 });
 
@@ -171,14 +268,19 @@ describe('board reading (the tailoring contract)', () => {
 });
 
 describe('fitness prefers fun boards', () => {
-  const base = { easyOpen: 2, firstSeconds: 4, crunch: 0.5, finale: 0.9, fun: 0.7 };
-  it('a board with no easy first read loses to one with a foothold', () => {
-    expect(funScore({ ...base, easyOpen: 0 })).toBeLessThan(funScore(base) - 0.3);
-    expect(funScore({ ...base, firstSeconds: 14 })).toBeLessThan(funScore(base) - 0.3);
+  const base = { pairs: 20, easySeconds: 5, crunch: 0.6, closingRun: 7, fun: 0.7 };
+  it('a board with no early easy read loses to one with a foothold', () => {
+    expect(funScore({ ...base, easySeconds: 14 })).toBeLessThan(funScore(base) - 0.1);
   });
-  it('a mid-board crunch and an ending that opens up each score', () => {
+  it('a mid-board crunch and a combo finish each score', () => {
     expect(funScore({ ...base, crunch: 0.2 })).toBeLessThan(funScore(base));
-    expect(funScore({ ...base, finale: 0.5 })).toBeLessThan(funScore(base));
+    expect(funScore({ ...base, closingRun: 3 })).toBeLessThan(funScore(base));
+  });
+  it('a combo finish outweighs being 0.06 further from the target difficulty', () => {
+    // fitness = -3·|d − target| + 0.3·funScore (+ novelty): the finale mark alone must cover 0.18.
+    const withFinale = { ...base, closingRun: 6, fun: 0.6 };
+    const without = { ...base, closingRun: 5, fun: 0.6 };
+    expect(0.3 * (funScore(withFinale) - funScore(without))).toBeGreaterThan(3 * 0.06);
   });
   it('the search ranks equally close candidates by fun', () => {
     const p = levelPlan(150);

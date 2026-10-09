@@ -67,6 +67,18 @@ export function boardHash(spec: LevelSpec, board: Board): string {
   return (hashSeed(key) % 36 ** 5).toString(36).padStart(5, '0');
 }
 
+/**
+ * The dead-end gate on its own: the naive dead-end rate inside the tier's band
+ * (fixed teaching boards are exempt). The endless search checks it before solving
+ * a board, since a board that fails it is rejected whatever else it measures.
+ */
+export function deadEndsOk(spec: LevelSpec, tier: number, deadEnd: number, plan?: Pick<LevelPlan, 'fixed'>): boolean {
+  if (plan?.fixed) return true;
+  const [lo, hi] = BANDS.deadEnd[Math.max(0, Math.min(4, Math.round(tier)))];
+  const room = windOf(spec) ? BANDS.slideRoom : 0;
+  return deadEnd >= lo && deadEnd <= hi + room;
+}
+
 export function validate(spec: LevelSpec, board: Board, m: Metrics, opts: ValidateOptions = {}): Verdict {
   const reasons: string[] = [];
   const t = Math.max(0, Math.min(4, Math.round(opts.tier ?? spec.tier ?? 2)));
@@ -99,9 +111,7 @@ export function validate(spec: LevelSpec, board: Board, m: Metrics, opts: Valida
   if (!fixed) {
     if (m.opening < Math.min(BANDS.opening[t], Math.max(1, m.pairs - 1)) || m.easyOpen < 1) reasons.push('foothold');
     if (m.pairs >= 14 && m.twoBend < BANDS.twoBend[t]) reasons.push('trivial');
-    const [lo, hi] = BANDS.deadEnd[t];
-    const room = windOf(spec) ? BANDS.slideRoom : 0;
-    if (m.deadEnd < lo || m.deadEnd > hi + room) reasons.push('dead-ends');
+    if (!deadEndsOk(spec, t, m.deadEnd)) reasons.push('dead-ends');
   } else if (m.opening < 1 || m.easyOpen < 1) reasons.push('foothold');
 
   if (!opts.skipRebuild) {
