@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { type ChallengeRequest, DIRECTOR, decide, masteryFloor, targetFor, tierD } from '../src/director/director';
+import { emphasisOf, focusOf, pinnedChallenge } from '../src/director/challenge';
 import { flowState } from '../src/director/flow';
 import { MODEL, expected, habitualAssists, ingest, performance } from '../src/director/model';
 import { designedBase, levelPlan } from '../src/director/plan';
@@ -212,17 +213,20 @@ describe('assisted clears still count as progress (the tier-0 trap)', () => {
   });
 
   it('partial credit: an assisted clear scores between a quit and a clean clear, scaled by assists', () => {
-    const clean = performance(rec());
-    const one = performance(rec({ hints: 1 }));
-    const two = performance(rec({ hints: 2 }));
+    const slow = { ms: 110_000 };
+    const clean = performance(rec(slow));
+    const one = performance(rec({ ...slow, hints: 1 }));
+    const two = performance(rec({ ...slow, hints: 2 }));
     const q = performance(quit());
     expect(clean).toBeGreaterThan(one);
     expect(one).toBeGreaterThan(two);
     expect(two).toBeGreaterThan(q + 0.2);
-    // a habitual hint costs a little; one beyond the habit costs in full
-    expect(performance(rec({ hints: 1 }), 1)).toBeGreaterThan(one + 0.08);
-    expect(performance(rec({ hints: 1 }), 1)).toBeGreaterThan(clean - 0.04);
-    expect(performance(rec({ hints: 2 }), 1)).toBeCloseTo(one - 0.27 * 0.12, 6);
+    // a light assist (one hint on a quick clear) costs a little; on a slow clear, in full
+    const light = performance(rec({ hints: 1 }));
+    expect(light).toBeCloseTo(performance(rec()) - 0.27 * MODEL.lightCost, 6);
+    expect(clean - one).toBeCloseTo(0.27 * 0.5, 6);
+    // two hints are never light, however quick
+    expect(performance(rec({ hints: 2 }))).toBeLessThan(light - 0.2);
   });
 
   it('the floor rises with mastery evidence (rating up, deviation down)', () => {
@@ -353,5 +357,100 @@ describe('ChallengeRequest', () => {
 
   it('expected() is unchanged (the rating scale the bank is tuned to)', () => {
     expect(expected(0.5, 0.5)).toBeCloseTo(MODEL.atRating, 6);
+  });
+});
+
+describe('verifier fixes on the player model', () => {
+  it('a habit is a hint on MOST quick clears: a mean of exactly one in two is no habit', () => {
+    const mixed = (hinted: number, of: number, extra = 0) => {
+      const a = defaultAnalytics();
+      for (let i = 0; i < of; i++) ingest(a, rec({ n: 30 + i, hints: (i < hinted ? 1 : 0) + (i < extra ? 1 : 0), ms: 70_000 }));
+      return habitualAssists(a);
+    };
+    expect(mixed(5, 10)).toBe(0);
+    expect(mixed(6, 10)).toBe(1);
+    expect(mixed(10, 10, 5)).toBe(1);
+    expect(mixed(10, 10, 6)).toBe(2);
+  });
+
+  it('a hint never earns a harder board: no stretch, and a hint on a slow clear is a miss', () => {
+    const n = 150;
+    const clean = history({ ms: 60_000, blocked: 0 }, 14);
+    const hinted = history({ ms: 60_000, blocked: 0, hints: 1, hintAfterMs: 3000 }, 14);
+    expect(habitualAssists(hinted)).toBe(1);
+    // the same quick clears with a hint each: never a stretch, never a higher target
+    expect(targetFor(clean, n).reason).toBe('stretch');
+    expect(targetFor(hinted, n).reason).not.toBe('stretch');
+    expect(targetFor(hinted, n).target).toBeLessThan(targetFor(clean, n).target);
+    // ...and a light assist never reads as a struggle
+    expect(flowState(hinted).state).not.toBe('struggling');
+    // slow clears: clean ones count toward the clean rate, hinted ones against it
+    const slowClean = history({ ms: 100_000 }, 14);
+    const slowHinted = history({ ms: 100_000, hints: 1, hintAfterMs: 3000 }, 14);
+    expect(targetFor(slowHinted, n).flow).toBeLessThan(0);
+    expect(targetFor(slowHinted, n).target).toBeLessThan(targetFor(slowClean, n).target);
+  });
+
+  it('a stop-start pair rhythm (far above their usual) reads as a freeze', () => {
+    const a = history({ firstMs: 3000, gapMs: 2500, gapCv: 0.45, longMs: 7000, ms: 95_000 }, 10);
+    for (let i = 0; i < 3; i++) ingest(a, rec({ gapCv: 1.6, longMs: 9000 }));
+    expect(flowState(a).state).toBe('frozen');
+    const b = history({ firstMs: 3000, gapMs: 2500, gapCv: 1.5, longMs: 7000, ms: 95_000 }, 13);
+    // an uneven rhythm that is their usual is not a freeze
+    expect(flowState(b).state).toBe('flow');
+  });
+
+  it('a rushing player gets decoys first', () => {
+    const a = history({ gapMs: 1200, blocked: 9, quickMisses: 8, ms: 60_000, turnMs: [1800, 2200, 4000] }, 14);
+    expect(flowState(a).state).toBe('rushing');
+    const n = levelWithRole('focus', 150);
+    expect(decide(a, n, false).challenge.focus).toBe('decoys');
+  });
+
+  it('no unearned breather: replaying an old peak and then starting a new level', () => {
+    const peak = levelWithRole('peak', 100);
+    const n = levelWithRole('focus', peak + 30);
+    const a = defaultAnalytics();
+    a.rating = tierD(n, 2);
+    a.dev = MODEL.devMin;
+    a.boards = 60;
+    a.recent = [rec({ n: peak, tier: 2, ms: 95_000 }), rec({ n: n - 1, tier: 2, ms: 95_000 }), rec({ n: n - 2, tier: 2, ms: 60_000 })];
+    expect(targetFor(a, n).reason).not.toBe('breather');
+    a.recent[0] = rec({ n: peak, tier: 2, ms: 95_000 });
+    expect(targetFor(a, peak + 1).reason === 'breather' || levelPlan(peak + 1).role === 'festival').toBe(true);
+  });
+
+  it('a replay long after is the same board: focus and weight are pinned with the tier', () => {
+    const a = history({ turnMs: [1800, 2200, 7000], gapMs: 2300, firstTaps: [[0, 0.4], [1, 0.6], [0.5, 0]] }, 24);
+    const first: ChallengeRequest[] = [];
+    for (let n = 150; n < 150 + 3 * EMPHASES_CAP; n++) {
+      const c = decide(a, n, false);
+      first.push(c.challenge);
+      ingest(a, rec({ n, d: tierD(n, c.tier), tier: c.tier, turnMs: [1800, 2200, 7000], gapMs: 2300, firstTaps: [[0, 0.4], [1, 0.6], [0.5, 0]] }));
+    }
+    expect(first.some((c) => c.focus !== 'none')).toBe(true);
+    // the save goes through a reload, too
+    const b = hydrateAnalytics(JSON.parse(JSON.stringify(a)));
+    for (const c of first) {
+      const again = decide(b, c.n, true).challenge;
+      expect({ n: again.n, tier: again.tier, focus: again.focus, weight: again.weight, rotationKey: again.rotationKey }).toEqual({
+        n: c.n, tier: c.tier, focus: c.focus, weight: c.weight, rotationKey: c.rotationKey,
+      });
+    }
+  });
+
+  it('malformed stored foci never become an emphasis', () => {
+    for (const bad of ['shape:whatever', 'mech:x', 'region:foo', 'decoys:extra', '', 'none', 'shape:', 'mech:snow:2']) {
+      expect(emphasisOf(bad), bad).toEqual({ kind: 'none' });
+    }
+    expect(emphasisOf('mech:snow')).toEqual({ kind: 'mechanic', id: 'snow' });
+    expect(emphasisOf('shape:detour')).toEqual({ kind: 'shape', shape: 'detour' });
+    const a = hydrateAnalytics({ foci: 'zz9!x1a5', emphases: [{ n: 200, focus: 'shape:whatever', w: 0.7 }] });
+    expect(a.emphases).toEqual([]);
+    for (let n = 1; n <= 4; n++) {
+      const ch = pinnedChallenge(a, n, 2);
+      if (ch.focus === 'none') expect(ch.weight).toBe(0);
+      else expect(focusOf(emphasisOf(ch.focus))).toBe(ch.focus);
+    }
   });
 });

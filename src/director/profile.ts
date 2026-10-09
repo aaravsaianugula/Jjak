@@ -268,7 +268,9 @@ export interface PlayerHabits {
     longRatio: number;
     confidence: number;
   };
-  assists: { habitual: number; confidence: number };
+  /** hints/shuffles taken even on quick clears (model.ts `habitualAssists`, 0 with too little data) */
+  assists: { habitual: number };
+  /** where the player is right now (flow.ts); 'rushing' puts decoys first */
   flow: FlowState;
 }
 
@@ -344,14 +346,13 @@ function tempoHabit(rs: BoardRecord[]): PlayerHabits['tempo'] {
 /** The player's habits, from the on-device history ('unknown' with thin evidence). */
 export function playerHabits(a: AnalyticsSave = save.analytics): PlayerHabits {
   const rs = a.recent.filter((r) => r && r.mode !== 'rush');
-  const quickClears = rs.filter((r) => r.cleared && parRatio(r) <= 1.05).length;
   return {
     boards: rs.length,
     scan: scanHabit(rs),
     slowShapes: slowShapes(a, rs),
     weakMechanics: weakMechanics(a),
     tempo: tempoHabit(rs),
-    assists: { habitual: habitualAssists(a), confidence: clamp(quickClears / 10, 0, 1) },
+    assists: { habitual: habitualAssists(a) },
     flow: flowState(a).state,
   };
 }

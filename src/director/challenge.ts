@@ -11,10 +11,11 @@
  *  - rotation: a blind spot leaned on for either of the last two levels is skipped, so
  *    it's never the same trick board after board (`save.analytics.emphases` keeps the
  *    record; detours, rim routes and 2-bend paths count as one blind spot);
- *  - a retry of a pinned level keeps its focus (the same board).
- * Pure apart from `noteChallenge`, which writes the record.
+ *  - a retry or replay of a pinned level keeps its focus and weight, however long after
+ *    (`pinChallenge` stores them beside the tier pin): the same board.
+ * Pure apart from `noteChallenge` and `pinChallenge`, which write the save.
  */
-import { type AnalyticsSave, EMPHASES_CAP, type PathShape } from '../services/save-analytics';
+import { type AnalyticsSave, EMPHASES_CAP, FOCI, type PathShape, isFocus } from '../services/save-analytics';
 import { levelPlan } from './plan';
 import { playerHabits } from './profile';
 
@@ -65,25 +66,31 @@ export function familyOf(focus: string): string {
   return focus.startsWith('region:') ? 'region' : focus;
 }
 
+/** The emphasis a stored focus names; anything not in FOCI is no emphasis. */
 export function emphasisOf(focus: string): Emphasis {
+  if (!isFocus(focus)) return { kind: 'none' };
   const [kind, v] = focus.split(':');
-  if (kind === 'shape' && v) return { kind: 'shape', shape: v as PathShape };
-  if (kind === 'mech' && v) return { kind: 'mechanic', id: v };
-  if (kind === 'region' && (v === 'centre' || v === 'edges' || v === 'top' || v === 'bottom')) return { kind: 'region', region: v };
+  if (kind === 'shape') return { kind: 'shape', shape: v as PathShape };
+  if (kind === 'mech') return { kind: 'mechanic', id: v };
+  if (kind === 'region') return { kind: 'region', region: v as 'centre' | 'edges' | 'top' | 'bottom' };
   if (kind === 'decoys') return { kind: 'decoys' };
   return { kind: 'none' };
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-const request = (n: number, tier: number, emphasis: Emphasis, need: number, why: string): ChallengeRequest => {
+/** Weights are kept in tenths, so the pinned copy (`foci`) is exact. */
+const request = (n: number, tier: number, emphasis: Emphasis, weight: number, why: string): ChallengeRequest => {
   const focus = focusOf(emphasis);
-  const weight = focus === 'none' ? 0 : Math.round(clamp(0.3 + 0.5 * need, 0, CHALLENGE.maxWeight) * 100) / 100;
-  return { n, tier, focus, emphasis, weight, rotationKey: `${n}:${tier}:${focus}`, why };
+  const w = focus === 'none' ? 0 : Math.round(clamp(weight, 0.1, 0.9) * 10) / 10;
+  return { n, tier, focus: w ? focus : 'none', emphasis: w ? emphasis : { kind: 'none' }, weight: w, rotationKey: `${n}:${tier}:${w ? focus : 'none'}`, why };
 };
 
+/** How far to lean for a given need (0–1). */
+const weightFor = (need: number) => clamp(0.3 + 0.5 * need, 0, CHALLENGE.maxWeight);
+
 /** A plain board: the tier as designed, nothing leaned on. */
-export const plainChallenge = (n: number, tier: number, why: string) => request(n, tier, { kind: 'none' }, 0, why);
+export const plainChallenge = (n: number, tier: number, why: string): ChallengeRequest => request(n, tier, { kind: 'none' }, 0, why);
 
 /** Candidate emphases for level n from the player's habits, most needed first. */
 export function candidates(a: AnalyticsSave, n: number): { emphasis: Emphasis; need: number; why: string }[] {
@@ -103,7 +110,11 @@ export function candidates(a: AnalyticsSave, n: number): { emphasis: Emphasis; n
     if (h.scan.vertical === 'top') out.push({ emphasis: { kind: 'region', region: 'bottom' }, need: clamp((h.scan.top - 0.5) * 2, 0, 1) * h.scan.confidence * 0.8, why: 'looks at the top first' });
     else if (h.scan.vertical === 'bottom') out.push({ emphasis: { kind: 'region', region: 'top' }, need: clamp((h.scan.bottom - 0.5) * 2, 0, 1) * h.scan.confidence * 0.8, why: 'looks at the bottom first' });
   }
-  if (h.tempo.style === 'rush' && ok(h.tempo.confidence)) out.push({ emphasis: { kind: 'decoys' }, need: clamp(h.tempo.misreadRate / 0.4, 0, 1) * h.tempo.confidence, why: 'rushes into blocked pairs' });
+  if (h.tempo.style === 'rush' && ok(h.tempo.confidence)) {
+    // Rushing right now (flow.ts): believable decoys are the lesson that fits, so they lead.
+    const now = h.flow === 'rushing' ? 1 : 0;
+    out.push({ emphasis: { kind: 'decoys' }, need: clamp(h.tempo.misreadRate / 0.4, 0, 1) * h.tempo.confidence + now, why: now ? 'rushing into blocked pairs now' : 'rushes into blocked pairs' });
+  }
   return out.sort((x, y) => y.need - x.need);
 }
 
@@ -122,18 +133,27 @@ export function planChallenge(a: AnalyticsSave, n: number, tier: number, calm: s
     recent.add(familyOf(e.focus));
   }
   const pick = candidates(a, n).find((c) => c.need > 0 && !recent.has(familyOf(focusOf(c.emphasis))));
-  return pick ? request(n, tier, pick.emphasis, pick.need, pick.why) : plainChallenge(n, tier, 'nothing due');
+  return pick ? request(n, tier, pick.emphasis, weightFor(Math.min(1, pick.need)), pick.why) : plainChallenge(n, tier, 'nothing due');
 }
 
-/** The challenge a pinned level was given (a retry is the same board), or a plain one. */
+/** The challenge pinned with level n's tier (a retry or replay is the same board), or a plain one. */
 export function pinnedChallenge(a: AnalyticsSave, n: number, tier: number): ChallengeRequest {
-  const e = a.emphases.find((x) => x.n === n);
-  if (!e || e.focus === 'none') return plainChallenge(n, tier, 'pinned');
-  const focus = focusOf(emphasisOf(e.focus));
-  return { n, tier, focus, emphasis: emphasisOf(e.focus), weight: e.w, rotationKey: `${n}:${tier}:${focus}`, why: 'pinned' };
+  const code = a.foci.charCodeAt(2 * (n - 1)) - 97;
+  const tenths = Number(a.foci.charAt(2 * (n - 1) + 1));
+  const focus = code >= 0 && code < FOCI.length ? FOCI[code] : 'none';
+  if (focus === 'none' || !Number.isInteger(tenths) || tenths <= 0) return plainChallenge(n, tier, 'pinned');
+  return request(n, tier, emphasisOf(focus), tenths / 10, 'pinned');
 }
 
-/** Record a level's challenge (a log, most recent first, capped; a level's latest entry is its board's). */
+/** Pin a level's challenge beside its tier (two chars per level in `foci`). */
+export function pinChallenge(a: AnalyticsSave, ch: ChallengeRequest): void {
+  const i = 2 * (ch.n - 1);
+  const code = String.fromCharCode(97 + Math.max(0, (FOCI as readonly string[]).indexOf(ch.focus)));
+  const t = a.foci.padEnd(i + 2, '.');
+  a.foci = t.slice(0, i) + code + String(Math.round(ch.weight * 10)) + t.slice(i + 2);
+}
+
+/** Record a level's challenge for rotation (a log, most recent first, capped). */
 export function noteChallenge(a: AnalyticsSave, ch: ChallengeRequest): void {
   a.emphases = [{ n: ch.n, focus: ch.focus, w: ch.weight }, ...a.emphases].slice(0, EMPHASES_CAP);
 }

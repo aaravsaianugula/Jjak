@@ -25,10 +25,19 @@
  *  4. **Skill ratings per path shape and per mechanic** with their own deviations
  *     (skills.ts), so learning shows up where it happens.
  *
- * Assists are read against the player's **habit** (`habitualAssists`): someone who
- * takes one hint on boards they clear quickly anyway is not struggling when they take
- * it again. Habitual assists cost a little; assists beyond the habit cost in full.
- * This keeps hint-heavy players from sinking to the gentlest tier and staying there.
+ * Assists are read **board by board**: a quick clear (at or under par) with a single
+ * hint or shuffle is a *light assist*, the way some people like to play, not a sign the
+ * board was too hard. It costs the score a little and never reads as a struggle; any
+ * other assist costs in full. This keeps hint-heavy players from sinking to the gentlest
+ * tier and staying there. The leniency only ever softens the struggle reading: any
+ * assist still means "not clean" and "not easy" for everything that could raise
+ * difficulty (hints are never sold).
+ *
+ * Why per board and not against the player's habit: a board's reading must not depend
+ * on how often the player hints elsewhere, or a player who hints on every board would be
+ * read more kindly than one who hints on half of them (and so be served harder boards).
+ * Per board, each hint has the same effect whoever takes it, so served difficulty can
+ * only fall as the hint rate rises (tests/persona-habits.test.ts measures it).
  */
 import { type LevelSpec } from '../engine/levels';
 import { MECHANICS, mechanicsOf } from '../engine/mechanics';
@@ -59,6 +68,10 @@ export const MODEL = {
   mechAlpha: 0.2,
   /** one tier step in d units */
   tierStep: 0.1,
+  /** what a light assist costs the clean part of the score (a full hint costs 0.5, a shuffle 0.6) */
+  lightCost: 0.06,
+  /** a clear at or under this × par counts as quick (light assists, habits) */
+  quickPar: 1.05,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -103,11 +116,14 @@ export const parRatio = (r: Pick<BoardRecord, 'ms' | 'par'>) => (r.par > 0 ? r.m
 /** Cleared with no hint, shuffle or dead-end reshuffle. */
 export const isClean = (r: BoardRecord) => r.cleared && assistsOf(r) === 0;
 
-/** Assists the player chose beyond their habit (dead-end reshuffles always count). */
-export const excessAssists = (r: BoardRecord, habit = 0) => Math.max(0, r.hints + r.shuffles - habit) + r.autoShuffles;
+/** A quick clear (at or under par) with exactly one hint or shuffle and no dead-end reshuffle. */
+export const isLightAssist = (r: BoardRecord) => r.cleared && r.autoShuffles === 0 && r.hints + r.shuffles === 1 && parRatio(r) <= MODEL.quickPar;
 
-/** Cleared with no assist beyond the player's habit (= `isClean` for habit 0). */
-export const isCleanFor = (r: BoardRecord, habit: number) => r.cleared && excessAssists(r, habit) === 0;
+/** Assists that read as need: all of them, unless the board was a light assist. */
+export const excessAssists = (r: BoardRecord) => (isLightAssist(r) ? 0 : assistsOf(r));
+
+/** Clean or a light assist: what keeps the Director from easing off (never a reason to raise it). */
+export const isCleanOrLight = (r: BoardRecord) => isClean(r) || isLightAssist(r);
 
 /** Boards a habit is read from (most recent first) and how many quick clears it needs. */
 const HABIT_WINDOW = 20;
@@ -115,17 +131,17 @@ const HABIT_MIN = 5;
 
 /**
  * The hints and shuffles this player takes even on boards they clear quickly (at or
- * under par): the rounded mean over recent quick clears, 0–2 (so a hint on most quick
- * clears reads as 1); 0 with too little data. A habit is a way of playing, not a sign
- * the board was too hard.
+ * under par), 0–2: k when the mean over recent quick clears is above k − ½ (a hint on
+ * most quick clears, more than half, reads as 1; exactly half is no habit); 0 with too
+ * little data. A habit is a way of playing, not a sign the board was too hard.
  */
 export function habitualAssists(a: AnalyticsSave): number {
   const quick = a.recent
-    .filter((r) => r.mode !== 'rush' && r.cleared && parRatio(r) <= 1.05)
+    .filter((r) => r.mode !== 'rush' && r.cleared && parRatio(r) <= MODEL.quickPar)
     .slice(0, HABIT_WINDOW)
     .map((r) => r.hints + r.shuffles);
   if (quick.length < HABIT_MIN) return 0;
-  return clamp(Math.round(quick.reduce((s, v) => s + v, 0) / quick.length), 0, 2);
+  return clamp(Math.ceil(quick.reduce((s, v) => s + v, 0) / quick.length - 0.5), 0, 2);
 }
 
 /**
@@ -133,16 +149,14 @@ export function habitualAssists(a: AnalyticsSave): number {
  *   abandoned:  0.05 + 0.15 · progress                       (0.05–0.20)
  *   cleared:    0.45 + 0.27 · clean + 0.20 · speed + 0.08 · accuracy
  *     clean    = 1 − 0.5·hints − 0.6·shuffles − 0.35·dead-end reshuffles (≥ 0);
- *                the first `habit` hints/shuffles cost 0.12 each instead (partial credit)
+ *                a light assist (`isLightAssist`) costs `MODEL.lightCost` instead (partial credit)
  *     speed    = (1.75 − time/par), clamped 0–1 (≤ 0.75 par → 1, ≥ 1.75 par → 0)
  *     accuracy = 1 − 3 · blocked taps per pair (≥ 0)
  */
-export function performance(r: BoardRecord, habit = 0): number {
+export function performance(r: BoardRecord): number {
   if (!r.cleared) return 0.05 + 0.15 * clamp(r.pairs > 0 ? r.made / r.pairs : 0, 0, 1);
-  const habitHints = Math.min(habit, r.hints);
-  const habitShuffles = Math.min(habit - habitHints, r.shuffles);
-  const extra = 0.5 * (r.hints - habitHints) + 0.6 * (r.shuffles - habitShuffles) + 0.35 * r.autoShuffles;
-  const clean = clamp(1 - 0.12 * (habitHints + habitShuffles) - extra, 0, 1);
+  const cost = isLightAssist(r) ? MODEL.lightCost : 0.5 * r.hints + 0.6 * r.shuffles + 0.35 * r.autoShuffles;
+  const clean = clamp(1 - cost, 0, 1);
   const speed = clamp(1.75 - parRatio(r), 0, 1);
   const accuracy = clamp(1 - (3 * r.blocked) / Math.max(1, r.pairs), 0, 1);
   return clamp(0.45 + 0.27 * clean + 0.2 * speed + 0.08 * accuracy, 0, 1);
@@ -184,8 +198,7 @@ export function noteDay(a: AnalyticsSave, date: string): void {
  */
 export function ingest(a: AnalyticsSave, r: BoardRecord, opts: IngestOptions = {}): number {
   if (r.mode === 'rush') return 0;
-  // The habit as it stood before this board (a board can't excuse itself).
-  const p = performance(r, habitualAssists(a));
+  const p = performance(r);
   // Days away make the model less sure (Glicko's rating-period growth), every skill too.
   const prev = a.days[0];
   if (prev && r.date && prev !== r.date) {
@@ -269,21 +282,23 @@ export interface Engagement {
 }
 
 /** How much one board looked like a struggle, 0–1. */
-export function struggleOf(r: BoardRecord, habit = 0): number {
+export function struggleOf(r: BoardRecord): number {
   if (!r.cleared) return 1;
   const ratio = parRatio(r);
   const slow = ratio > 2 ? 0.4 : ratio > 1.5 ? 0.2 : 0;
   const misreads = r.blocked / Math.max(1, r.pairs) > 0.35 ? 0.2 : 0;
-  return clamp(0.35 * excessAssists(r, habit) + slow + misreads, 0, 1);
+  return clamp(0.35 * excessAssists(r) + slow + misreads, 0, 1);
 }
 
-/** A fast, clean clear: under par, no assists beyond habit, few misreads. */
-export const isEasy = (r: BoardRecord, habit = 0) => isCleanFor(r, habit) && parRatio(r) <= 1 && r.blocked / Math.max(1, r.pairs) < 0.2;
+/**
+ * A fast, clean clear: under par, no assist at all (a habitual hint still means the
+ * player wanted help, so it never reads as boredom), few misreads.
+ */
+export const isEasy = (r: BoardRecord) => isClean(r) && parRatio(r) <= 1 && r.blocked / Math.max(1, r.pairs) < 0.2;
 
 const RECENCY = [1, 0.7, 0.5, 0.35, 0.25];
 
 export function engagement(a: AnalyticsSave): Engagement {
-  const habit = habitualAssists(a);
   const rs = a.recent.filter((r) => r.mode !== 'rush');
   const last = rs.slice(0, RECENCY.length);
   let wsum = 0;
@@ -291,13 +306,13 @@ export function engagement(a: AnalyticsSave): Engagement {
   let bo = 0;
   last.forEach((r, i) => {
     wsum += RECENCY[i];
-    fr += RECENCY[i] * struggleOf(r, habit);
-    bo += RECENCY[i] * (isEasy(r, habit) ? 1 : 0);
+    fr += RECENCY[i] * struggleOf(r);
+    bo += RECENCY[i] * (isEasy(r) ? 1 : 0);
   });
   let streak = 0;
-  while (streak < rs.length && isEasy(rs[streak], habit)) streak++;
+  while (streak < rs.length && isEasy(rs[streak])) streak++;
   let struggles = 0;
-  while (struggles < rs.length && struggleOf(rs[struggles], habit) >= 0.5) struggles++;
+  while (struggles < rs.length && struggleOf(rs[struggles]) >= 0.5) struggles++;
   const frustration = wsum ? fr / wsum : 0;
   const boredom = wsum ? bo / wsum : 0;
   const mood = frustration >= 0.45 || struggles >= 1 ? 'struggling' : streak >= 3 ? 'cruising' : 'flow';

@@ -77,17 +77,20 @@ function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: n
   const mode = spec.mode;
   if (mode === 'practice') throw new Error('practice boards are never recorded (src/services/events.ts drops them)');
   const ms = ended === 'clear' && s.done ? s.elapsedMs(s.finishedAt) : Math.min(boardTime(s, now), l.lastAt + IDLE_TAIL_MS);
-  // Time spent finding each pair: from the previous pair (or the start) to this one.
-  const finds = l.pairs.map((p, i) => ({ ms: p.t - (i ? l.pairs[i - 1].t : 0), turns: p.turns }));
+  // Time spent finding each pair after the first: from the previous pair to this one.
+  // The first pair's time is the opening think (firstMs), read on its own: counting it
+  // as a find would make a careful starter look slow on that pair's shape, or frozen.
+  const finds = l.pairs.map((p, i) => ({ ms: i ? p.t - l.pairs[i - 1].t : -1, turns: p.turns }));
+  const after = finds.filter((f) => f.ms >= 0);
   const turnMs: [number, number, number] = [0, 1, 2].map((k) =>
-    Math.round(median(finds.filter((f) => f.turns === k).map((f) => f.ms))),
+    Math.round(median(after.filter((f) => f.turns === k).map((f) => f.ms))),
   ) as [number, number, number];
   const route = (pick: (i: number) => boolean): [number, number] => {
-    const ms = finds.filter((_, i) => pick(i)).map((f) => f.ms);
-    return [ms.length, Math.round(median(ms))];
+    const all = finds.filter((_, i) => pick(i));
+    return [all.length, Math.round(median(all.filter((f) => f.ms >= 0).map((f) => f.ms)))];
   };
   // Pair rhythm: how uneven the gaps between pairs are (std / mean), with enough of them.
-  const gaps = finds.slice(1).map((f) => f.ms);
+  const gaps = after.map((f) => f.ms);
   const mean = gaps.length ? gaps.reduce((x, y) => x + y, 0) / gaps.length : 0;
   const gapCv = gaps.length >= 3 && mean > 0 ? Math.sqrt(gaps.reduce((x, g) => x + (g - mean) ** 2, 0) / gaps.length) / mean : -1;
   return {
@@ -105,7 +108,7 @@ function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: n
     ended,
     stars,
     firstMs: l.pairs.length ? Math.round(l.pairs[0].t) : -1,
-    gapMs: Math.round(median(finds.slice(1).map((f) => f.ms))),
+    gapMs: Math.round(median(gaps)),
     blocked: s.blockedTaps,
     reselects: s.reselects,
     hints: s.hintsUsed,
@@ -123,7 +126,7 @@ function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: n
     detour: route((i) => l.pairs[i].detour),
     edgeRoute: route((i) => l.pairs[i].edge),
     gapCv: Math.round(gapCv * 100) / 100,
-    longMs: Math.round(finds.reduce((m, f) => Math.max(m, f.ms), 0)),
+    longMs: Math.round(gaps.reduce((m, g) => Math.max(m, g), 0)),
     quickMisses: l.quickMisses,
   };
 }
