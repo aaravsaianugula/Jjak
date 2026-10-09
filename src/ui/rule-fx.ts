@@ -14,7 +14,7 @@ import { reducedMotion } from './motion';
  */
 export function setSeal(card: HTMLElement | undefined, n: number, waiting: boolean): void {
   if (!card) return;
-  let s = card.querySelector<HTMLElement>('.seal');
+  let s = card.querySelector<HTMLElement>('.rule-seal');
   if (!n) {
     s?.remove();
     card.classList.remove('is-sealed', 'is-waiting');
@@ -22,7 +22,7 @@ export function setSeal(card: HTMLElement | undefined, n: number, waiting: boole
   }
   if (!s || s.dataset.seal !== String(n)) {
     s?.remove();
-    s = h('span', { class: 'seal', 'aria-hidden': 'true', 'data-seal': n, html: sealSvg(n) });
+    s = h('span', { class: 'rule-seal', 'aria-hidden': 'true', 'data-seal': n, html: sealSvg(n) });
     card.append(s);
   }
   card.classList.add('is-sealed');

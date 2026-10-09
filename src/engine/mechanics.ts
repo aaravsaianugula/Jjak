@@ -60,7 +60,7 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   },
   leaves: {
     id: 'leaves', name: 'Falling leaves', native: '낙엽 · 落葉', glyph: '落', rule: 'After each pair, cards drop to fill the gaps.',
-    introChapter: MECHANIC_INTRO.leaves, slides: true, clashes: ['wind', 'snow', 'fences', 'torii', 'streams'], on: (s) => windOf(s) === 'down', weight: 0.1,
+    introChapter: MECHANIC_INTRO.leaves, slides: true, clashes: ['wind', 'snow', 'fences', 'torii', 'streams', 'seals', 'ink'], on: (s) => windOf(s) === 'down', weight: 0.1,
   },
   snow: {
     id: 'snow', name: 'First snow', native: '첫눈 · 初雪', glyph: '雪', rule: 'Snowy cards turn over when a neighbour clears.',
@@ -76,7 +76,7 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   },
   wind: {
     id: 'wind', name: 'Wind', native: '바람 · 風', glyph: '風', rule: 'After each pair, cards drift with the wind.',
-    introChapter: MECHANIC_INTRO.wind, slides: true, clashes: ['leaves', 'snow', 'fences', 'torii', 'streams'], on: (s) => { const w = windOf(s); return !!w && w !== 'down'; }, weight: 0.14,
+    introChapter: MECHANIC_INTRO.wind, slides: true, clashes: ['leaves', 'snow', 'fences', 'torii', 'streams', 'seals', 'ink'], on: (s) => { const w = windOf(s); return !!w && w !== 'down'; }, weight: 0.14,
   },
   gates: {
     id: 'gates', name: 'Gates', native: '문 · 門', glyph: '門', rule: 'A gate opens when you pair its flower.',

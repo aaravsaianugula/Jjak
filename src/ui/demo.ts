@@ -527,7 +527,7 @@ export class DemoPlayer {
       }
     }
     const { dried } = ev.res;
-    if (this.run.state.board.ink || dried.length || this.boardEl.querySelector('.seal')) this.syncMarks();
+    if (this.run.state.board.ink || dried.length || this.boardEl.querySelector('.rule-seal')) this.syncMarks();
     if (opened.length || moved.length || revealed.length || untied.length || dried.length) {
       if (byPlayer) sfx.reveal();
       await this.sleep(rm ? 420 : 500, tok);

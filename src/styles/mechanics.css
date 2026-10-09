@@ -518,7 +518,7 @@
   }
 }
 /* The seal sits in the card's top corner like a stamp pressed on the paper. */
-.seal {
+.rule-seal {
   position: absolute;
   top: 3%;
   right: 4%;
@@ -546,11 +546,11 @@
   stroke: var(--seal-cut);
 }
 /* A seal that must wait reads paler than the one whose turn it is. */
-.is-waiting > .seal {
+.is-waiting > .rule-seal {
   opacity: 0.5;
 }
 /* Tapped too soon: the seal that goes first answers with a small press. */
-.is-first > .seal {
+.is-first > .rule-seal {
   animation: seal-first 640ms var(--ease-settle) both;
 }
 @keyframes seal-first {
@@ -602,7 +602,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .is-first > .seal,
+  .is-first > .rule-seal,
   .torii.is-twin {
     animation: none;
   }

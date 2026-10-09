@@ -224,6 +224,8 @@ export class Session implements PlayState, GoalStats {
     } else if (releaseIfStuck(this, revealed, untied, freed)) {
       // Snow or knots alone never strand you (released above, for free); a true dead end reshuffles.
       this.redeal(revealed, untied);
+      // The re-deal ignores the seals' order and wet ink: let the free net lift them if they alone block.
+      if (this.board.seals || this.board.ink) releaseIfStuck(this, revealed, untied, freed);
       this.autoShuffles++;
       if (wind && wind !== 'down') this.windShuffles++;
       reshuffled = true;

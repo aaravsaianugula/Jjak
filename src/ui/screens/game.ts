@@ -464,8 +464,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         setTimeout(() => c.classList.remove('is-flip'), 440 + d);
       } else swap();
     });
-    // A shuffle's safety net may have dried ink or lifted seals.
-    if (spec.seals || session.board.ink) syncMarks();
+    // A shuffle's safety net may have dried ink or lifted seals; sync once the faces have turned.
+    if (spec.seals || session.board.ink) setTimeout(syncMarks, flip && !rm ? 360 : 0);
   }
 
   // ── Ink path ──────────────────────────────────────────────────────
