@@ -8,7 +8,7 @@ import { mechanicsOf } from '../engine/mechanics';
 import type { LevelSpec } from '../engine/levels';
 import { on } from '../services/events';
 import { save } from '../services/storage';
-import { cleanRate, targetFor } from './director';
+import { DIRECTOR, cleanRate, targetFor } from './director';
 import { engagement, parRatio, performance, specD } from './model';
 import { playStyle } from './profile';
 
@@ -40,7 +40,7 @@ function render(root: HTMLElement): void {
   parts.push(row('rating ± dev', `${f2(a.rating)} ± ${f2(a.dev)}`));
   parts.push(row('boards rated', String(a.boards)));
   parts.push(row('mood', `${eng.mood} · fr ${f2(eng.frustration)} · bo ${f2(eng.boredom)}`));
-  parts.push(row('clean rate (12)', rate == null ? '–' : `${Math.round(rate * 100)}%`));
+  parts.push(row(`clean rate (${DIRECTOR.flowWindow}) strict · lenient`, rate == null ? '–' : `${Math.round(rate.strict * 100)}% · ${Math.round(rate.lenient * 100)}%`));
   parts.push(row('sessions', `${a.sessions.count} · ${Math.round(a.sessions.ms / 60000)} min`));
 
   if (last) {

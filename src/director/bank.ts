@@ -7,10 +7,18 @@
  * (stones, layout, months, snow, knots, gates, fences, torii, streams, seals, ink: 1 each, base 36), the
  * measured difficulty d × 1000 (2, base 36) and a 5-character board hash that a
  * test uses to catch a generator change that would silently stale the bank.
+ *
+ * Bank v2 slots also carry each board's reading features (8 characters, reading.ts)
+ * and up to two **alternates**: other solver-proven boards for the same level and tier,
+ * within `TAILOR.maxDGap` of its d, that read differently (key pairs elsewhere, more
+ * 2-bend paths, more decoys). A slot is `entry + features` repeated, primary first; the
+ * Director's challenge picks among them (tailor.ts). A 16-character slot (v1) is the
+ * primary alone, with no features.
  */
 import data from '../data/level-bank.json';
 import { type LevelSpec } from '../engine/levels';
 import { type Knobs, fallbackSpec, levelPlan, planSpec } from './plan';
+import { FEATURE_KEYS, type ReadingFeatures, decodeFeatures } from './reading';
 
 export const TIERS = 5;
 
@@ -69,22 +77,66 @@ export function decodeEntry(s: string): BankEntry | null {
   };
 }
 
-/** The bank entry for level n at tier t, or null if the bank doesn't have one. */
-export function bankEntry(n: number, tier: number): BankEntry | null {
+/** Characters per board in a v2 slot: the entry and its reading features. */
+export const SLOT_BOARD = 16 + FEATURE_KEYS.length;
+
+export interface BankCandidate {
+  entry: BankEntry;
+  /** reading features (null in a v1 slot) */
+  features: ReadingFeatures | null;
+}
+
+/** A slot's boards, primary first (one 16-character entry in a v1 slot). */
+export function decodeSlot(s: string): BankCandidate[] {
+  if (typeof s !== 'string') return [];
+  if (s.length === 16) {
+    const entry = decodeEntry(s);
+    return entry ? [{ entry, features: null }] : [];
+  }
+  const out: BankCandidate[] = [];
+  if (s.length % SLOT_BOARD !== 0) return out;
+  for (let i = 0; i < s.length; i += SLOT_BOARD) {
+    const entry = decodeEntry(s.slice(i, i + 16));
+    if (!entry) return i ? out : [];
+    out.push({ entry, features: decodeFeatures(s.slice(i + 16, i + SLOT_BOARD)) });
+  }
+  return out;
+}
+
+export const encodeSlot = (boards: { entry: BankEntry; features: string }[]) => boards.map((b) => encodeEntry(b.entry) + b.features).join('');
+
+const slotOf = (n: number, tier: number): string | null => {
   const t = Math.max(0, Math.min(TIERS - 1, Math.round(tier)));
   if (n < 1 || n > bank.levels) return null;
-  return decodeEntry(bank.e[(n - 1) * TIERS + t]);
+  return bank.e[(n - 1) * TIERS + t] ?? null;
+};
+
+/** The bank entry for level n at tier t, or null if the bank doesn't have one. */
+export function bankEntry(n: number, tier: number): BankEntry | null {
+  const s = slotOf(n, tier);
+  return s ? decodeEntry(s.slice(0, 16)) : null;
+}
+
+/** Every board the bank holds for level n at tier t, the tier's own board first. */
+export function bankCandidates(n: number, tier: number): BankCandidate[] {
+  const s = slotOf(n, tier);
+  return s ? decodeSlot(s) : [];
 }
 
 /** The seed of the bank's board for level n at tier t (attempt k). */
 export const bankSeed = (n: number, tier: number, attempt: number) => `journey-${n}-t${tier}-a${attempt}`;
 
+/** The board spec of one bank entry for level n at tier t. */
+export function candidateSpec(n: number, tier: number, e: BankEntry): LevelSpec {
+  const t = Math.max(0, Math.min(TIERS - 1, Math.round(tier)));
+  const p = levelPlan(n);
+  if (p.fixed) return { ...p.spec, tier: t, difficulty: e.d };
+  return { ...planSpec(p, e.knobs, bankSeed(n, t, e.attempt), t), difficulty: e.d };
+}
+
 /** The validated board spec for level n at tier t (0 gentle … 4 hardest). */
 export function bankSpec(n: number, tier: number): LevelSpec {
   const t = Math.max(0, Math.min(TIERS - 1, Math.round(tier)));
   const e = bankEntry(n, t);
-  if (!e) return fallbackSpec(n, t);
-  const p = levelPlan(n);
-  if (p.fixed) return { ...p.spec, tier: t, difficulty: e.d };
-  return { ...planSpec(p, e.knobs, bankSeed(n, t, e.attempt), t), difficulty: e.d };
+  return e ? candidateSpec(n, t, e) : fallbackSpec(n, t);
 }

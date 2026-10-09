@@ -225,15 +225,59 @@ describe('board reading (the tailoring contract)', () => {
     expect(found).toBe(true);
   });
 
-  it('a pair that must be cleared before another becomes possible is critical', () => {
+  it('a forced pair (the only legal one) opens the next but is not critical: there is no order to get wrong', () => {
     // A corridor walled by stones: B B sits between the two A cards.
     const b: Board = { rows: 3, cols: 4, cells: [S, S, S, S, A, B, B + 1, A + 1, S, S, S, S] };
     const r = measure(spec(3, 4, 8), b, { reading: true }).reading!;
     expect(r.pairs.map((t) => [t.a, t.b].sort((x, y) => x - y))).toEqual([[5, 6], [4, 7]]);
-    expect(r.pairs[0]).toMatchObject({ legalBefore: 1, opens: 1, strands: false, critical: true });
+    expect(r.pairs[0]).toMatchObject({ legalBefore: 1, opens: 1, strands: false, critical: false });
     expect(r.pairs[1]).toMatchObject({ legalBefore: 1, opens: 0, critical: false, bends: 0, length: 3 });
     expect(r.decoys).toEqual([{ a: 4, b: 7 }]);
     expect(r.opening.footholds).toEqual([{ a: 5, b: 6, row: 0.5, col: 0.5 }]);
+  });
+
+  it('two independent legal pairs: either order works, so neither is critical (even the one that opens a pair)', () => {
+    const C = 8; // March
+    // Two walled corridors: A B B A (B B opens A A) and C C.
+    const b: Board = { rows: 5, cols: 4, cells: [S, S, S, S, A, B, B + 1, A + 1, S, S, S, S, S, C, C + 1, S, S, S, S, S] };
+    const r = measure({ ...spec(5, 4, 14), months: 3 }, b, { reading: true }).reading!;
+    expect(r.pairs.length).toBe(3);
+    expect(r.pairs[0].legalBefore).toBe(2);
+    for (const t of r.pairs) expect(t.critical).toBe(false);
+  });
+
+  it('a pair is critical exactly when it must come before every other legal pair (each one, played now, proven to strand the board)', () => {
+    const deadAfter = (st: ReturnType<typeof initialState>, m: [number, number], wind: null) => {
+      const x = cloneState(st);
+      if (!step(x, m, wind)) return x.board.cells.some((v) => v >= 0);
+      const proof = proveClear(x, wind, 200000);
+      return !proof.moves && !proof.exhausted;
+    };
+    let critical = 0;
+    let open = 0;
+    for (let k = 0; k < 40 && critical < 3; k++) {
+      const p = levelPlan(200 + k);
+      if (p.fixed || p.wind) continue;
+      const s = planSpec(p, tierKnobs(p, 4), `critical-${k}`, 4);
+      const board = buildBoard(s);
+      const r = measure(s, board, { reading: true }).reading!;
+      const st = initialState(s, board);
+      for (const t of r.pairs) {
+        const others = movesOf(st).filter(([a, b]) => !(a === t.a && b === t.b) && !(a === t.b && b === t.a));
+        if (t.critical) {
+          critical++;
+          expect(others.length).toBeGreaterThan(0);
+          for (const w of others) expect(deadAfter(st, w, null)).toBe(true);
+        } else if (others.length) {
+          // an order that is free: some other pair could come first and the board still clears
+          open++;
+          if (open % 7 === 0) expect(others.some((w) => !deadAfter(st, w, null))).toBe(true);
+        }
+        step(st, [t.a, t.b], null);
+      }
+    }
+    expect(critical).toBeGreaterThan(0);
+    expect(open).toBeGreaterThan(critical);
   });
 
   it('a pair flagged as stranding really has a tempting wrong match that dead-ends', () => {
@@ -258,7 +302,6 @@ describe('board reading (the tailoring contract)', () => {
             return !proof.moves && !proof.exhausted;
           });
           expect(dead).toBe(true);
-          expect(t.critical).toBe(true);
         }
         step(st, [t.a, t.b], null);
       }

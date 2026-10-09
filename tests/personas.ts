@@ -10,13 +10,15 @@
  *   par · exp(N(ln 0.9 − 1.5 (θ − d), 0.2)), with a few misreads on boards near their limit.
  */
 import { createRng, type Rng } from '../src/engine/rng';
-import { bankSpec } from '../src/director/bank';
 import { bendsOf, cardsOnBoard, initialState, movesOf, step } from '../src/director/bots';
-import { decide, recordAttempt, tierD } from '../src/director/director';
-import { habitualAssists, ingest, isClean, isCleanFor, median } from '../src/director/model';
-import { roadBase } from '../src/director/plan';
+import { plainChallenge } from '../src/director/challenge';
+import { DIRECTOR, type TierChoice, decide, recordAttempt, tierD } from '../src/director/director';
+import { habitualAssists, ingest, isClean, isCleanOrLight, median } from '../src/director/model';
+import { designedBase, roadBase } from '../src/director/plan';
 import { shapeOfPath } from '../src/director/skills';
-import { buildBoard, windOf } from '../src/engine/levels';
+import { tailoredSpec } from '../src/director/tailor';
+import { type LevelSpec, buildBoard, windOf } from '../src/engine/levels';
+import { monthOf } from '../src/engine/board';
 import { mechanicsOf } from '../src/engine/mechanics';
 import { findPath } from '../src/engine/path';
 import { cellFraction } from '../src/services/analytics';
@@ -71,6 +73,19 @@ export function playBoard(rng: Rng, theta: number, d: number, n: number, tier: n
   return { ...base, ms: r * PAR * 1000, hints: 1 + Number(rng.next() < 0.4), shuffles: Number(rng.next() < 0.2), blocked: 4, stars: 1 };
 }
 
+/** The Director's choice for a level (the real `decide`, or a control policy in tests). */
+export type Policy = (a: AnalyticsSave, n: number, cleared: boolean) => TierChoice;
+
+export interface SimOptions {
+  /** the policy that picks the tier (default: the real Director) */
+  policy?: Policy;
+  /** share of clean clears on which the player takes a hint anyway (habit, not need) */
+  freeHints?: number;
+}
+
+/** A control with no Director: every level at the designed tier, nothing leaned on. */
+export const fixedTier: Policy = (_a, n) => ({ tier: DIRECTOR.designedTier, target: tierD(n, DIRECTOR.designedTier), reason: 'fixed', challenge: plainChallenge(n, DIRECTOR.designedTier, 'fixed') });
+
 export interface SimStep {
   n: number;
   tier: number;
@@ -87,18 +102,23 @@ export interface SimStep {
  * (`decide`) and model (`ingest`): quits retry the same level (pinned tier, relief
  * re-pin after two failures), clears move on.
  */
-export function simulate(p: Persona, seed: string, boards = 300, a: AnalyticsSave = defaultAnalytics()): SimStep[] {
+export function simulate(p: Persona, seed: string, boards = 300, a: AnalyticsSave = defaultAnalytics(), opts: SimOptions = {}): SimStep[] {
   const rng = createRng(seed);
+  // Free hints draw from their own stream, so every hint rate sees the same boards and luck.
+  const hintRng = createRng(`${seed}:hints`);
+  const policy = opts.policy ?? decide;
   const stars: Record<number, number> = {};
   const log: SimStep[] = [];
   let n = 1;
   for (let played = 0; played < boards; played++) {
     const wasCleared = !!stars[n];
-    const choice = decide(a, n, wasCleared);
+    const choice = policy(a, n, wasCleared);
     const measured = tierD(n, choice.tier);
     const real = measured + 0.03 * gauss(rng);
     const theta = p.skill(n, played);
-    const rec = playBoard(rng, theta, real, n, choice.tier, measured);
+    let rec = playBoard(rng, theta, real, n, choice.tier, measured);
+    // A habitual hinter: takes a hint early on a board it clears cleanly anyway (no time cost).
+    if (opts.freeHints && hintRng.next() < opts.freeHints && isClean(rec)) rec = { ...rec, hints: 1, hintAfterMs: 3000, stars: 2 };
     ingest(a, rec, { replay: wasCleared });
     recordAttempt(a, n, rec.ended, wasCleared);
     log.push({ n, tier: choice.tier, reason: choice.reason, d: measured, theta, rating: a.rating, clean: isClean(rec), cleared: rec.cleared });
@@ -130,13 +150,19 @@ export interface HabitPersona {
   skill(n: number, played: number): number;
 }
 
+/**
+ * Each persona sits off the road by a skill offset the policy must correct: the designed
+ * tier alone (`fixedTier`) gives each of them a clean rate outside the 75–85 % band.
+ */
+export const HABIT_OFFSET: Record<Style, number> = { edge: 0.15, centre: -0.04, bendBlind: 0.18, rusher: 0.18, hinter: 0.12 };
+
 export const HABIT_PERSONAS: Record<Style, HabitPersona> = {
-  edge: { name: 'edge', skill: (n) => roadBase(n) },
-  centre: { name: 'centre', skill: (n) => roadBase(n) + 0.05 },
-  bendBlind: { name: 'bendBlind', skill: (n) => roadBase(n) },
-  rusher: { name: 'rusher', skill: (n) => roadBase(n) + 0.03 },
-  // learns as it goes: from under the road to on it over its first 200 boards
-  hinter: { name: 'hinter', skill: (n, p) => roadBase(n) - 0.08 + 0.1 * Math.min(1, p / 200) },
+  edge: { name: 'edge', skill: (n) => roadBase(n) + HABIT_OFFSET.edge },
+  centre: { name: 'centre', skill: (n) => roadBase(n) + HABIT_OFFSET.centre },
+  bendBlind: { name: 'bendBlind', skill: (n) => roadBase(n) + HABIT_OFFSET.bendBlind },
+  rusher: { name: 'rusher', skill: (n) => roadBase(n) + HABIT_OFFSET.rusher },
+  // learns as it goes: from well under the road to above it over its first 200 boards
+  hinter: { name: 'hinter', skill: (n, p) => roadBase(n) + HABIT_OFFSET.hinter - 0.12 + 0.2 * Math.min(1, p / 200) },
 };
 
 interface TracePair {
@@ -145,6 +171,11 @@ interface TracePair {
   edge: boolean;
   /** both cards on the outer ring */
   rim: boolean;
+  /** a card on the outer ring, and both cards inside it */
+  touchesRim: boolean;
+  inside: boolean;
+  /** legal pairs when it was made (≤ 2: a pair the player has to find) */
+  legal: number;
 }
 
 interface Opening {
@@ -163,6 +194,11 @@ interface Trace {
   mech: string[];
   twoShare: number;
   rimShare: number;
+  /** of the moments with at most two legal pairs: share whose pair sat inside the rim / touched it */
+  keyInside: number;
+  keyRim: number;
+  /** same-flower pairs with no path at the start, per pair */
+  decoyRate: number;
 }
 
 const ring = (rows: number, cols: number, i: number) => {
@@ -173,12 +209,13 @@ const ring = (rows: number, cols: number, i: number) => {
 
 const traces = new Map<string, Trace>();
 
-/** A playout of the real bank board for (n, tier), random legal order: cached. */
-export function traceOf(n: number, tier: number): Trace {
-  const key = `${n}:${tier}`;
+/** A playout of the board served (a bank board or one of its alternates), random legal order: cached. */
+export function traceOf(spec: LevelSpec): Trace {
+  const key = `${spec.seed}:${spec.tier}`;
+  const n = spec.number;
+  const tier = spec.tier;
   const hit = traces.get(key);
   if (hit) return hit;
-  const spec = bankSpec(n, tier);
   const st = initialState(spec, buildBoard(spec));
   const wind = windOf(spec);
   const rng = createRng(key);
@@ -189,6 +226,13 @@ export function traceOf(n: number, tier: number): Trace {
     depth: (ring(rows, cols, m[0]) + ring(rows, cols, m[1])) / 2,
     bends: bendsOf(st.board, m[0], m[1]),
   }));
+  // Decoys at the start: same flower, no path (what a rusher taps into).
+  const legal0 = new Set(movesOf(st).map(([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}`));
+  const cards = st.board.cells.map((v, i) => (v >= 0 ? i : -1)).filter((i) => i >= 0);
+  let decoys = 0;
+  for (let x = 0; x < cards.length; x++)
+    for (let y = x + 1; y < cards.length; y++)
+      if (monthOf(st.board.cells[cards[x]]) === monthOf(st.board.cells[cards[y]]) && !legal0.has(`${cards[x]}-${cards[y]}`)) decoys++;
   const pairs: TracePair[] = [];
   for (let k = 0; k < 200 && cardsOnBoard(st.board) > 0; k++) {
     const moves = movesOf(st);
@@ -196,11 +240,17 @@ export function traceOf(n: number, tier: number): Trace {
     const m = moves[rng.int(moves.length)];
     const path = findPath(st.board, m[0], m[1]);
     if (!path) throw new Error(`legal move without a path at level ${n} tier ${tier}`);
-    pairs.push({ ...shapeOfPath(path, rows, cols), rim: ring(rows, cols, m[0]) === 0 && ring(rows, cols, m[1]) === 0 });
+    const r0 = ring(rows, cols, m[0]) === 0;
+    const r1 = ring(rows, cols, m[1]) === 0;
+    pairs.push({ ...shapeOfPath(path, rows, cols), rim: r0 && r1, touchesRim: r0 || r1, inside: !r0 && !r1, legal: moves.length });
     if (!step(st, m, wind)) break;
   }
-  const share = (f: (p: TracePair) => boolean) => (pairs.length ? pairs.filter(f).length / pairs.length : 0);
-  const t: Trace = { pairs, opening, total, par: spec.par, mech: mechanicsOf(spec), twoShare: share((p) => p.bends === 2), rimShare: share((p) => p.rim) };
+  const share = (f: (p: TracePair) => boolean, of = pairs) => (of.length ? of.filter(f).length / of.length : 0);
+  const keyPairs = pairs.filter((p) => p.legal <= 2);
+  const t: Trace = {
+    pairs, opening, total, par: spec.par, mech: mechanicsOf(spec), twoShare: share((p) => p.bends === 2), rimShare: share((p) => p.rim),
+    keyInside: share((p) => p.inside, keyPairs), keyRim: share((p) => p.touchesRim, keyPairs), decoyRate: total ? decoys / total : 0,
+  };
   traces.set(key, t);
   return t;
 }
@@ -235,19 +285,27 @@ function pairCost(style: Style, p: TracePair): number {
   return f;
 }
 
-/** Extra effective difficulty from the board's content against the persona's blind spot. */
-function weakness(style: Style, t: Trace): number {
+/**
+ * Extra effective difficulty from the board's content against the persona's blind spot,
+ * read from its own playout of the board: 2-bend paths for the bend-blind reader; for the
+ * scanners, pairs away from where they look, and the moments with at most two legal
+ * pairs (the pair has to be found) whose pair sits there; decoys for the rusher.
+ */
+export function weakness(style: Style, t: Trace): number {
   if (style === 'bendBlind') return 0.3 * (t.twoShare - 0.4);
-  if (style === 'edge') return 0.15 * (0.5 - t.rimShare);
-  if (style === 'centre') return 0.15 * (t.rimShare - 0.3);
+  if (style === 'edge') return 0.15 * (0.5 - t.rimShare) + 0.1 * (t.keyInside - 0.4);
+  if (style === 'centre') return 0.15 * (t.rimShare - 0.3) + 0.1 * (t.keyRim - 0.6);
+  if (style === 'rusher') return 0.08 * (t.decoyRate - 2.3);
   return 0;
 }
 
 const sum = (xs: number[]) => xs.reduce((s, v) => s + v, 0);
 
 /** One board by a habit persona of skill θ: the record built from its real play of the board. */
-export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number, n: number, tier: number, measured: number): BoardRecord {
-  const t = traceOf(n, tier);
+export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number, spec: LevelSpec, measured: number): BoardRecord {
+  const t = traceOf(spec);
+  const n = spec.number;
+  const tier = spec.tier ?? 2;
   const gap = theta - (d + weakness(style, t));
   // A typical reader clears a board at their skill in about 0.9 × par (as `playBoard`).
   const meanCost = t.pairs.length ? sum(t.pairs.map(baseCost)) / t.pairs.length : 1;
@@ -270,7 +328,10 @@ export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number,
   const perPair = style === 'rusher' ? 0.3 + 0.15 * rng.next() : Math.max(0, 0.08 - 0.3 * gap) * 2 * rng.next();
   const blocked = Math.round(made * perPair) + (clean ? 0 : 3);
   const quickMisses = style === 'rusher' ? Math.round(blocked * 0.8) : 0;
-  const by = (f: (p: TracePair) => boolean): number[] => played.filter((_, i) => f(t.pairs[i]));
+  // Counts take every pair made; find times skip the first pair (its time is the opening
+  // think, read separately as firstMs), as the analytics service does.
+  const count = (f: (p: TracePair) => boolean) => played.filter((_, i) => f(t.pairs[i])).length;
+  const by = (f: (p: TracePair) => boolean): number[] => played.filter((_, i) => i > 0 && f(t.pairs[i]));
   const med = (xs: number[]) => Math.round(median(xs));
   const gaps = played.slice(1);
   const mean = gaps.length ? sum(gaps) / gaps.length : 0;
@@ -281,46 +342,51 @@ export function playHabitBoard(rng: Rng, style: Style, theta: number, d: number,
     stars: quit ? 0 : 3 - Number(!clean) - Number(ms / 1000 > t.par),
     firstMs: Math.round(think + (played[0] ?? 0)), gapMs: med(gaps), blocked, reselects: 0, hints, shuffles, autoShuffles: 0,
     bestCombo: 3, fever: 0,
-    turns: [0, 1, 2].map((k) => by((p) => p.bends === k).length) as [number, number, number],
+    turns: [0, 1, 2].map((k) => count((p) => p.bends === k)) as [number, number, number],
     turnMs: [0, 1, 2].map((k) => med(by((p) => p.bends === k))) as [number, number, number],
     firstTaps: firstTaps(style, t, rng),
     hintAfterMs: hints ? Math.round(habitHint ? 4000 + 2000 * rng.next() : 20_000 + 20_000 * rng.next()) : -1,
     date: '2026-10-07', hour: 20,
-    detour: [by((p) => p.detour).length, med(by((p) => p.detour))],
-    edgeRoute: [by((p) => p.edge).length, med(by((p) => p.edge))],
+    detour: [count((p) => p.detour), med(by((p) => p.detour))],
+    edgeRoute: [count((p) => p.edge), med(by((p) => p.edge))],
     gapCv: gaps.length >= 3 && mean > 0 ? Math.round((sd / mean) * 100) / 100 : -1,
-    longMs: Math.round(Math.max(0, ...played)),
+    longMs: Math.round(Math.max(0, ...gaps)),
     quickMisses,
   };
 }
 
 export interface HabitStep extends SimStep {
   focus: string;
+  /** the policy's target and the designed curve at this level (target − base = where the policy aims) */
+  target: number;
+  base: number;
   /** the assist habit the model read before this board */
   habit: number;
-  /** cleared with no assist beyond that habit */
-  cleanForHabit: boolean;
+  /** cleared clean or with a light assist (a quick clear with one hint, model.ts) */
+  cleanOrLight: boolean;
 }
 
 /** A habit persona plays `boards` Journey boards from level 1 through the real Director and model. */
-export function simulateHabits(p: HabitPersona, seed: string, boards = 300, a: AnalyticsSave = defaultAnalytics()): HabitStep[] {
+export function simulateHabits(p: HabitPersona, seed: string, boards = 300, a: AnalyticsSave = defaultAnalytics(), policy: Policy = decide): HabitStep[] {
   const rng = createRng(seed);
   const stars: Record<number, number> = {};
   const log: HabitStep[] = [];
   let n = 1;
   for (let played = 0; played < boards; played++) {
     const wasCleared = !!stars[n];
-    const choice = decide(a, n, wasCleared);
-    const measured = tierD(n, choice.tier);
+    const choice = policy(a, n, wasCleared);
+    // The board the game serves: the pinned tier's, tailored by the pinned challenge.
+    const spec = tailoredSpec(n, choice.tier, choice.challenge);
+    const measured = spec.difficulty ?? tierD(n, choice.tier);
     const real = measured + 0.03 * gauss(rng);
     const theta = p.skill(n, played);
     const habit = habitualAssists(a);
-    const rec = playHabitBoard(rng, p.name, theta, real, n, choice.tier, measured);
+    const rec = playHabitBoard(rng, p.name, theta, real, spec, measured);
     ingest(a, rec, { replay: wasCleared });
     recordAttempt(a, n, rec.ended, wasCleared);
     log.push({
       n, tier: choice.tier, reason: choice.reason, d: measured, theta, rating: a.rating, clean: isClean(rec), cleared: rec.cleared,
-      focus: choice.challenge.focus, habit, cleanForHabit: isCleanFor(rec, habit),
+      focus: choice.challenge.focus, habit, cleanOrLight: isCleanOrLight(rec), target: choice.target, base: designedBase(n),
     });
     if (rec.cleared) {
       stars[n] = 1;

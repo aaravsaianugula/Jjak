@@ -10,8 +10,12 @@
  *                                                  frozen     → ease −0.05
  *                                                  after a peak or festival → breather −0.06
  *                                                  bored (3+ quick clean clears) → stretch +0.08
- *          + flow                                  a nudge (±0.06) toward an 80 % clean-clear rate
- *            ("clean" = no assist beyond the player's habit, see model.ts)
+ *                                                  rushing    → none (their quick clears aren't
+ *                                                  boredom; the challenge leans on decoys instead)
+ *          + flow                                  a nudge (±0.1, over the last 20 boards) toward an 80 % clean-clear rate,
+ *            "clean" being clean or a light assist (one hint on a quick clear, model.ts):
+ *            a hint on a slow clear counts as a miss, so hints never earn a harder board;
+ *            stretch boards follow strictly clean streaks only.
  *
  * mapped to the tier (0–4) whose board difficulty is closest, then:
  *  - a **mastery floor** (`masteryFloor`): never below the tier the player has shown,
@@ -27,18 +31,19 @@
  * (challenge.ts) only says what to lean on inside it and never changes it.
  *
  * Pinning: a level's tier is fixed the first time it is started (`save.analytics.tiers`,
- * char n−1), so a retry or replay is the same board. After two failed attempts at an
+ * char n−1), and its challenge beside it (`foci`), so a retry or replay is the same board. After two failed attempts at an
  * uncleared level (quits or restarts, counted in `save.analytics.tries`), it is re-pinned
  * one tier lower. Levels 1–6 (the teaching levels) are always tier 2.
  */
 import { save, persist } from '../services/storage';
 import type { AnalyticsSave } from '../services/save-analytics';
 import { TIERS, bankSpec } from './bank';
-import { type ChallengeRequest, noteChallenge, pinnedChallenge, planChallenge, plainChallenge } from './challenge';
+import { type ChallengeRequest, noteChallenge, pinChallenge, pinnedChallenge, planChallenge, plainChallenge } from './challenge';
 import { flowState } from './flow';
-import { MODEL, engagement, habitualAssists, isCleanFor } from './model';
+import { MODEL, engagement, isClean, isCleanOrLight } from './model';
 import { designedBase, levelPlan } from './plan';
 import { LEVELS_PER_CHAPTER } from '../engine/levels';
+import { ROUTE_LEVELS } from '../data/route';
 
 export type { ChallengeRequest, Emphasis } from './challenge';
 
@@ -73,21 +78,21 @@ export const DIRECTOR = {
   fullConfidenceAt: 6,
   /** clean-clear target and the window/gain of the flow nudge */
   flowTarget: 0.8,
-  flowWindow: 12,
+  flowWindow: 20,
   flowMin: 6,
   /**
    * Aim a touch below skill on average: the sawtooth's peaks cost more clean
    * clears than its rests give back (success is concave above 50 %).
    */
   aim: -0.025,
-  flowGain: 0.8,
-  flowMax: 0.08,
+  flowGain: 1.5,
+  flowMax: 0.1,
   /**
    * Hysteresis: keep the last board's tier unless another sits this much closer to the
    * target. Bank boards' measured d scatter a little from level to level, so without it
    * the nearest tier flips back and forth on noise; pacing moves (≥ 0.05) still act.
    */
-  hold: 0.025,
+  hold: 0.035,
   /** mastery floor: rating − devs · dev − margin */
   floorDevs: 2,
   floorMargin: 0.05,
@@ -161,17 +166,31 @@ export function chapterMean(n: number): number {
   return sum / LEVELS_PER_CHAPTER;
 }
 
-/** Recent clean-clear rate, assists within the player's habit allowed (null with too little data). */
-export function cleanRate(a: AnalyticsSave, window = DIRECTOR.flowWindow): number | null {
-  const habit = habitualAssists(a);
+/**
+ * Recent clean-clear rates (null with too little data): `strict` counts no assist at
+ * all (the dev panel), `lenient` also counts light assists (a quick clear with one hint).
+ */
+export function cleanRate(a: AnalyticsSave, window = DIRECTOR.flowWindow): { strict: number; lenient: number } | null {
   const rs = a.recent.filter((r) => r.mode !== 'rush').slice(0, window);
-  return rs.length >= DIRECTOR.flowMin ? rs.filter((r) => isCleanFor(r, habit)).length / rs.length : null;
+  if (rs.length < DIRECTOR.flowMin) return null;
+  return { strict: rs.filter(isClean).length / rs.length, lenient: rs.filter(isCleanOrLight).length / rs.length };
 }
 
-/** The last board was a peak or festival and level n is not one: time to breathe. */
+/**
+ * The flow nudge toward the clean-clear target, read on the lenient rate. A light assist
+ * counts as it would have without the hint (a quick clear); a hint on a slow clear counts
+ * as a miss. So a hint can only ever take board difficulty down, never up.
+ */
+export function flowNudge(rate: { strict: number; lenient: number } | null): number {
+  if (!rate) return 0;
+  return clamp((rate.lenient - DIRECTOR.flowTarget) * DIRECTOR.flowGain, -DIRECTOR.flowMax, DIRECTOR.flowMax);
+}
+
+/** Level n follows a peak or festival the player just played (n − 1), and is not one: breathe. */
 export function breatherDue(a: AnalyticsSave, n: number): boolean {
+  if (n > ROUTE_LEVELS) return false;
   const prev = a.recent.find((r) => r.mode === 'journey' && r.n > 0);
-  return !!prev && prev.n !== n && PEAKS.has(levelPlan(prev.n).role) && !PEAKS.has(levelPlan(n).role);
+  return !!prev && prev.n === n - 1 && PEAKS.has(levelPlan(prev.n).role) && !PEAKS.has(levelPlan(n).role);
 }
 
 /** The Director's target difficulty for level n, with its parts (pure; for tests and the dev panel). */
@@ -195,8 +214,7 @@ export function targetFor(a: AnalyticsSave, n: number): TargetParts {
     pacing = DIRECTOR.stretch;
     reason = 'stretch';
   }
-  const rate = cleanRate(a);
-  const flow = rate == null ? 0 : clamp((rate - DIRECTOR.flowTarget) * DIRECTOR.flowGain, -DIRECTOR.flowMax, DIRECTOR.flowMax);
+  const flow = flowNudge(cleanRate(a));
   return { base, skill, pacing, flow, target: clamp(base + skill + pacing + flow + DIRECTOR.aim * confidence, 0, 1), reason };
 }
 
@@ -224,6 +242,7 @@ export function decide(a: AnalyticsSave, n: number, cleared: boolean): TierChoic
       pinTier(a, n, tier);
       a.tries = { n, count: 0 };
       const challenge = plainChallenge(n, tier, 'relief-repin');
+      pinChallenge(a, challenge);
       noteChallenge(a, challenge);
       return { tier, target: tierD(n, tier), reason: 'relief-repin', challenge };
     }
@@ -242,6 +261,7 @@ export function decide(a: AnalyticsSave, n: number, cleared: boolean): TierChoic
   const role = levelPlan(n).role;
   const quiet = calm || t.reason === 'breather' ? t.reason : role === 'rest' || role === 'tutorial' ? role : null;
   const challenge = planChallenge(a, n, tier, quiet);
+  pinChallenge(a, challenge);
   noteChallenge(a, challenge);
   return { tier, target: t.target, reason: t.reason, challenge };
 }

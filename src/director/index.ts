@@ -14,21 +14,24 @@
  *   director.ts  adjustment policy: target difficulty → tier, pacing, pinning
  *   search.ts    candidates + bots + fitness (offline bank builder and endless)
  *   validate.ts  hard gates
- *   bank.ts      the shipped level bank (1–600 × 5 tiers)
+ *   bank.ts      the shipped level bank (1–600 × 5 tiers, with tailoring alternates)
+ *   tailor.ts    picks the alternate that leans on the player's blind spot
  *   endless.ts   levels past 600 (C5)
  */
 import { ROUTE_LEVELS, routeOf } from '../data/route';
 import { type LevelSpec } from '../engine/levels';
-import { bankSpec } from './bank';
 import { chooseTier } from './director';
 import { endlessEntry, endlessSpec, prepareEndless } from './endless';
 import { levelPlan } from './plan';
+import { tailoredSpec } from './tailor';
 
 export { type LevelPlan, designedBase, levelPlan } from './plan';
 
 export function playLevel(n: number): LevelSpec {
   if (n > ROUTE_LEVELS) return endlessSpec(n);
-  return bankSpec(n, chooseTier(n).tier);
+  const choice = chooseTier(n);
+  // The pinned tier's board, or the pinned challenge's pick among its alternates (tailor.ts).
+  return tailoredSpec(n, choice.tier, choice.challenge);
 }
 
 /**

@@ -42,7 +42,7 @@ const blank = (): PlayerHabits => ({
   slowShapes: [],
   weakMechanics: [],
   tempo: { style: 'unknown', misreadRate: 0, thinkMs: 0, longRatio: 0, confidence: 0 },
-  assists: { habitual: 0, confidence: 0 },
+  assists: { habitual: 0 },
   flow: 'flow',
 });
 const habits = (o: { [K in keyof PlayerHabits]?: Partial<PlayerHabits[K]> | PlayerHabits[K] }): PlayerHabits => {

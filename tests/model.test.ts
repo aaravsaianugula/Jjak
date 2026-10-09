@@ -477,8 +477,14 @@ describe('analytics service (events → records)', () => {
     expect(r.edgeRoute![0]).toBeLessThanOrEqual(r.turns[2]);
     expect(r.edgeRoute![0]).toBeGreaterThan(0);
     expect(r.gapCv).toBeGreaterThanOrEqual(0);
-    expect(r.longMs).toBeGreaterThanOrEqual(r.gapMs);
-    expect(r.longMs).toBeGreaterThanOrEqual(r.firstMs);
+    // every pair after the first came 1.4 s apart; the first (after a 5 s look) is the
+    // opening think, read as firstMs, never as a long find or a slow shape
+    expect(r.firstMs).toBe(6400);
+    expect(r.longMs).toBe(1400);
+    expect(r.gapMs).toBe(1400);
+    for (const ms of r.turnMs) expect([0, 1400]).toContain(ms);
+    expect([0, 1400]).toContain(r.detour![1]);
+    expect([0, 1400]).toContain(r.edgeRoute![1]);
   });
 
   it('records quits and restarts, counts failed tries and replays', () => {

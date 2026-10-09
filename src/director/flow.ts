@@ -2,9 +2,10 @@
  * Flow detection (EXPANSION_PLAN §C1, player model): where the player is right now,
  * read from the last few boards against their own norms.
  *
- *   struggling  quits, restarts, assists beyond their habit, far over par
+ *   struggling  quits, restarts, assists beyond a light one (model.ts), far over par
  *   frozen      long silences: the think time before the first pair is far above
- *               their usual, or one pair took many times their usual gap
+ *               their usual, one pair took many times their usual gap, or the pair
+ *               rhythm went stop-start (gaps far more uneven than their usual)
  *   rushing     quick taps with many fast misreads (blocked taps right after a select)
  *   bored       quick, clean clears in a row
  *   flow        none of these
@@ -36,6 +37,9 @@ export const FLOW = {
   thinkFreeze: 2.5,
   /** one pair taking this many times their usual gap is a freeze */
   longFreeze: 8,
+  /** a pair rhythm this uneven (gap std / mean) and this many times their usual is stop-start */
+  stallCv: 1.2,
+  stallRatio: 1.5,
   /** fast misreads (quick misses + half the other blocked taps) per pair that read as rushing */
   rushRate: 0.25,
   /** share of recent boards that must show a sign */
@@ -45,15 +49,18 @@ export const FLOW = {
   /** norms with no history */
   firstMs: 4000,
   gapMs: 2500,
+  gapCv: 0.6,
 };
 
 const positive = (xs: number[]) => xs.filter((v) => v > 0);
 
-/** A board showed a freeze, against the player's norms. */
-export function frozeOn(r: BoardRecord, normFirstMs: number): boolean {
+/** A board showed a freeze, against the player's norms (think time, one long find, a stop-start rhythm). */
+export function frozeOn(r: BoardRecord, normFirstMs: number, normCv = FLOW.gapCv): boolean {
   const think = r.firstMs > 0 && r.firstMs / normFirstMs >= FLOW.thinkFreeze;
   const long = (r.longMs ?? 0) > 0 && r.gapMs > 0 && (r.longMs ?? 0) / r.gapMs >= FLOW.longFreeze;
-  return think || long;
+  const cv = r.gapCv ?? -1;
+  const stall = cv >= FLOW.stallCv && cv >= normCv * FLOW.stallRatio;
+  return think || long || stall;
 }
 
 /** A board showed rushing: many fast misreads at (or above) the player's usual pace. */
@@ -66,13 +73,14 @@ export function flowState(a: AnalyticsSave): FlowReading {
   const rs = a.recent.filter((r) => r.mode !== 'rush');
   const normFirstMs = median(positive(rs.map((r) => r.firstMs))) || FLOW.firstMs;
   const normGapMs = median(positive(rs.map((r) => r.gapMs))) || FLOW.gapMs;
+  const normCv = median(rs.map((r) => r.gapCv ?? -1).filter((v) => v >= 0)) || FLOW.gapCv;
   const last = rs.slice(0, FLOW.recency.length);
   let w = 0;
   let freeze = 0;
   let rush = 0;
   last.forEach((r, i) => {
     w += FLOW.recency[i];
-    if (frozeOn(r, normFirstMs)) freeze += FLOW.recency[i];
+    if (frozeOn(r, normFirstMs, normCv)) freeze += FLOW.recency[i];
     if (rushedOn(r, normGapMs)) rush += FLOW.recency[i];
   });
   freeze = w ? freeze / w : 0;

@@ -132,7 +132,13 @@ rules, then the player does it once (`src/ui/demo.ts`, scripts in `src/ui/demos.
 par of a level are the same for everyone; the board inside it comes from one of five
 skill tiers, chosen on the device from how this player plays (time vs par, think time,
 first taps, misreads, hints and quits) with relief boards after a struggle and stretch
-boards after an easy streak. A level's tier is pinned so a retry is the same board.
+boards after an easy streak. Inside the tier, the bank keeps up to two other measured,
+solver-proven boards per level that read differently; the Director picks the one that
+leans on the player's blind spot (key pairs where they look last, the path shape they
+read slowest, believable decoys for a player who rushes, more of a weaker mechanic the
+level already has), rotating so no blind spot is leaned on more than three levels in
+eight, and never on teaching, rest or relief boards. A hint never earns a harder board.
+A level's tier and its pick are pinned so a retry or replay is the same board.
 See `docs/EXPANSION_PLAN.md` §C1.
 
 **Mechanic safety nets** (never the player's fault, never a penalty): if snow or knots are

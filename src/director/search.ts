@@ -295,6 +295,8 @@ export function searchEndless(plan: LevelPlan, target: number, opts: SearchOptio
 export interface TierSearch {
   /** the chosen candidate per tier 0–4, d non-decreasing */
   picks: Candidate[];
+  /** every valid candidate per tier (the bank keeps a few as tailoring alternates) */
+  pools: Candidate[][];
   /** boards built across all tiers */
   tried: number;
   rejected: Record<string, number>;
@@ -359,7 +361,7 @@ export function searchTiers(plan: LevelPlan, opts: SearchOptions & { recentByTie
     const c = pools[0][0];
     if (!c) return null;
     // One teaching board for every tier.
-    return { picks: [0, 1, 2, 3, 4].map((t) => ({ ...c, spec: { ...c.spec, tier: t } })), tried, rejected, repaired: false };
+    return { picks: [0, 1, 2, 3, 4].map((t) => ({ ...c, spec: { ...c.spec, tier: t } })), pools: [[], [], [], [], []], tried, rejected, repaired: false };
   }
   let picks = chooseMonotone(pools);
   let repaired = false;
@@ -388,5 +390,5 @@ export function searchTiers(plan: LevelPlan, opts: SearchOptions & { recentByTie
   // Last resorts, so a level never goes missing: a hair of slack, then the best board per tier.
   if (!picks) picks = chooseMonotone(pools, 0.03);
   if (!picks && pools.every((p) => p.length)) picks = pools.map((p) => p.reduce((a, b) => (b.fitness > a.fitness ? b : a)));
-  return picks ? { picks, tried, rejected, repaired } : null;
+  return picks ? { picks, pools, tried, rejected, repaired } : null;
 }

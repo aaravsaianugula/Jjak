@@ -123,13 +123,37 @@ export interface AnalyticsSave {
   last?: { n: number; tier: number; target: number; d: number; reason: string };
   /** a rating per path shape (only shapes seen so far) */
   shapes: Partial<Record<PathShape, SkillRating>>;
-  /** the Director's recent challenge emphases, most recent first, capped: rotation and pin stability */
+  /** the Director's recent challenge emphases, most recent first, capped: the rotation record */
   emphases: { n: number; focus: string; w: number }[];
   /** the rating after each rated board, oldest first, capped: the play-style trend line */
   trail: number[];
+  /**
+   * The challenge pinned with each level's tier, so a retry or replay builds the same
+   * board however long after: two chars per level (chars 2n−2 and 2n−1), the focus as a
+   * letter (index into FOCI, 'a' = 'none') and its weight in tenths as a digit; '..' unset.
+   */
+  foci: string;
 }
 
+/**
+ * Every challenge focus the Director can lean on (src/director/challenge.ts), in a
+ * stable order: a focus is saved as its index (see `foci`), so this list only ever
+ * grows at the end. A focus that isn't here is not a focus.
+ */
+export const FOCI = [
+  'none',
+  'shape:straight', 'shape:oneBend', 'shape:twoBend', 'shape:detour', 'shape:edge',
+  'decoys',
+  'region:centre', 'region:edges', 'region:top', 'region:bottom',
+  'mech:stones', 'mech:leaves', 'mech:snow', 'mech:lucky', 'mech:knots', 'mech:wind', 'mech:gates', 'mech:fences',
+  'mech:torii', 'mech:streams', 'mech:seals', 'mech:ink',
+] as const;
+
+export const isFocus = (f: unknown): f is string => typeof f === 'string' && (FOCI as readonly string[]).includes(f);
+
 export const RECENT_CAP = 40;
+/** two characters for each of the 600 Journey levels (the Director only pins those) */
+export const FOCI_CAP = 1200;
 export const DAYS_CAP = 60;
 export const EMPHASES_CAP = 8;
 export const TRAIL_CAP = 120;
@@ -148,6 +172,7 @@ export const defaultAnalytics = (): AnalyticsSave => ({
   shapes: {},
   emphases: [],
   trail: [],
+  foci: '',
 });
 
 const num = (v: unknown, d: number, lo = -Infinity, hi = Infinity) =>
@@ -239,7 +264,7 @@ export function hydrateAnalytics(raw: unknown): AnalyticsSave {
   }
   const emphases = Array.isArray(r.emphases)
     ? r.emphases
-        .filter((e): e is { n: number; focus: string; w: number } => !!e && typeof e === 'object' && typeof e.focus === 'string' && Number.isFinite(e.n))
+        .filter((e): e is { n: number; focus: string; w: number } => !!e && typeof e === 'object' && isFocus(e.focus) && Number.isFinite(e.n))
         .map((e) => ({ n: num(e.n, 0, 0), focus: e.focus, w: num(e.w, 0, 0, 1) }))
         .slice(0, EMPHASES_CAP)
     : [];
@@ -271,5 +296,6 @@ export function hydrateAnalytics(raw: unknown): AnalyticsSave {
     trail: Array.isArray(r.trail)
       ? r.trail.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)).map((v) => num(v, 0, 0, 1.5)).slice(-TRAIL_CAP)
       : [],
+    foci: typeof r.foci === 'string' ? r.foci.slice(0, FOCI_CAP).replace(/[^a-z0-9.]/g, '.') : '',
   };
 }
