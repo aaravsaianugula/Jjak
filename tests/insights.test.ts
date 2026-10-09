@@ -244,8 +244,10 @@ describe('skill trend', () => {
       expect(nums[i + 1]).toBeGreaterThanOrEqual(0);
       expect(nums[i + 1]).toBeLessThanOrEqual(100);
     }
-    const flat = trendLine([0.4, 0.4, 0.4], 300, 100, 6).match(/-?\d+(\.\d+)?/g)!.map(Number);
-    expect(new Set(flat.filter((_, i) => i % 2 === 1)).size).toBe(1);
+    const flatLine = trendLine([0.4, 0.4, 0.4], 300, 100, 6);
+    expect(flatLine).not.toMatch(/NaN|Infinity/);
+    // a steady rating draws a level line across the middle
+    expect(flatLine).toBe('M6 50 L150 50 L294 50');
     expect(trendLine([], 300, 100, 6)).toBe('');
   });
 
