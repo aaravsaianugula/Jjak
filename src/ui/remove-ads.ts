@@ -155,7 +155,7 @@ export async function askRemoveAdsIfDue(home: HTMLElement): Promise<boolean> {
   const now = new Date();
   const due = offerDue(now, { adFree: save.adFree, ...save.adOffer });
   if (!due || seenThisSession) return save.adFree;
-  save.adOffer = recordOffer(save.adOffer, now);
+  save.adOffer = recordOffer(save.adOffer, now, due);
   persist();
   return openRemoveAds({ prompted: true, festival: due.festival ?? null });
 }

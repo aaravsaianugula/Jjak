@@ -69,12 +69,12 @@ describe('reset progress', () => {
 
   it('keeps the Remove ads asks as they were: "Don’t ask again" is a preference, and a reset is not a first start', async () => {
     Object.assign(save, defaultSave());
-    save.adOffer = { never: true, firstShown: true, lastMonth: '2026-10' };
+    save.adOffer = { never: true, firstShown: true, lastMonth: '2026-10', lastAsk: '2026-10-09' };
     await resetSave();
-    expect(save.adOffer).toEqual({ never: true, firstShown: true, lastMonth: '2026-10' });
-    save.adOffer = { never: false, firstShown: true, lastMonth: '2026-09' };
+    expect(save.adOffer).toEqual({ never: true, firstShown: true, lastMonth: '2026-10', lastAsk: '2026-10-09' });
+    save.adOffer = { never: false, firstShown: true, lastMonth: '2026-09', lastAsk: '2026-09-25' };
     await resetSave();
-    expect(save.adOffer).toEqual({ never: false, firstShown: true, lastMonth: '2026-09' });
+    expect(save.adOffer).toEqual({ never: false, firstShown: true, lastMonth: '2026-09', lastAsk: '2026-09-25' });
   });
 
   it('a stale saved equip (item no longer owned) loads as the default', async () => {
