@@ -20,7 +20,7 @@ import { levelPlan } from '../src/director/plan';
 import { TAILOR, tailoredSpec } from '../src/director/tailor';
 import { type Style, traceOf, weakness } from './personas';
 
-type Habit = Exclude<Style, 'hinter'>;
+type Habit = Exclude<Style, 'hinter' | 'lateHinter'>;
 /** the habits tailoring serves, and the scanners whose requests stay plain */
 const SERVED: Habit[] = ['bendBlind', 'rusher'];
 const TARGET: Record<Habit, Emphasis> = {

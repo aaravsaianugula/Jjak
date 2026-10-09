@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { playerHabits } from '../src/director/profile';
 import { levelPlan, roadBase } from '../src/director/plan';
 import { type AnalyticsSave, defaultAnalytics } from '../src/services/save-analytics';
-import { HABIT_PERSONAS, type HabitStep, PERSONAS, type Style, fixedTier, simulate, simulateHabits } from './personas';
+import { HABIT_PERSONAS, type HabitStep, PERSONAS, type Style, fixedTier, isHinter, simulate, simulateHabits } from './personas';
 
 const SEEDS = ['h1', 'h2', 'h3'];
 const BOARDS = 320;
@@ -63,7 +63,7 @@ function runs(style: Style, control = false): Run[] {
 
 function stats(rs: Run[], hinter: boolean) {
   const late = rs.flatMap((r) => r.log.slice(WARMUP));
-  const clean = mean(late.map((s) => Number(hinter ? s.cleanOrLight : s.clean)));
+  const clean = mean(late.map((s) => (hinter ? s.credit : Number(s.clean))));
   const strict = mean(late.map((s) => Number(s.clean)));
   const changes: number[] = [];
   const paced: number[] = [];
@@ -99,8 +99,9 @@ function stats(rs: Run[], hinter: boolean) {
 
 const STYLES: Style[] = ['edge', 'centre', 'bendBlind', 'rusher', 'hinter'];
 const RUNS = Object.fromEntries(STYLES.map((s) => [s, runs(s)])) as Record<Style, Run[]>;
-const STATS = Object.fromEntries(STYLES.map((s) => [s, stats(RUNS[s], s === 'hinter')])) as Record<Style, ReturnType<typeof stats>>;
-const CONTROL = Object.fromEntries(STYLES.map((s) => [s, stats(runs(s, true), s === 'hinter')])) as Record<Style, ReturnType<typeof stats>>;
+const STATS = Object.fromEntries(STYLES.map((s) => [s, stats(RUNS[s], isHinter(s))])) as Record<Style, ReturnType<typeof stats>>;
+const CONTROL = Object.fromEntries(STYLES.map((s) => [s, stats(runs(s, true), isHinter(s))])) as Record<Style, ReturnType<typeof stats>>;
+const LATE = runs('lateHinter');
 
 const inBand = (v: number) => v >= 0.75 && v <= 0.85;
 
@@ -154,7 +155,6 @@ describe('habit personas on real boards', () => {
     }
     for (const r of RUNS.bendBlind) expect(r.a.shapes.twoBend!.r).toBeLessThan(r.a.shapes.straight!.r - 0.05);
     for (const x of h('rusher')) expect(x.tempo.style).toBe('rush');
-    for (const x of h('hinter')) expect(x.assists.habitual).toBeGreaterThanOrEqual(1);
     for (const s of ['edge', 'centre', 'bendBlind', 'hinter'] as Style[]) for (const x of h(s)) expect(x.tempo.style, s).not.toBe('rush');
   });
 
@@ -166,6 +166,30 @@ describe('habit personas on real boards', () => {
         for (let i = 1; i < foci.length; i++) if (foci[i] !== 'none') expect(foci[i]).not.toBe(foci[i - 1]);
         expect(foci.filter((f) => f !== 'none').length, s).toBeGreaterThan(fresh.length * 0.2);
       }
+    }
+  });
+
+  it('a stretch board only ever follows three clears with no assist at all (a hint never reads as boredom)', () => {
+    for (const s of STYLES)
+      for (const { log } of RUNS[s])
+        log.forEach((x, i) => {
+          if (x.reason === 'stretch') expect(log.slice(Math.max(0, i - 3), i).filter((p) => p.clean).length, `${s} board ${i}`).toBe(3);
+        });
+    // the hinter's clean streaks are rare but real: it still gets the odd stretch board
+    expect(RUNS.hinter.some(({ log }) => log.some((x) => x.reason === 'stretch'))).toBe(true);
+  });
+
+  it('a strong player who hints late (15–25 s in) is eased, not pinned to the gentlest tier', () => {
+    const tail = LATE.flatMap(({ log }) => log.slice(-LAST));
+    const settled = RUNS.edge.flatMap(({ log }) => log.slice(-LAST));
+    console.log(
+      `[habits] lateHinter clean credit ${(stats(LATE, true).clean * 100).toFixed(1)}%  tier-0 share ${mean(tail.map((s) => Number(s.tier === 0))).toFixed(2)}  ` +
+        `served d − road ${mean(tail.map((s) => s.d - roadBase(s.n))).toFixed(3)} (edge, same skill, no hints: ${mean(settled.map((s) => s.d - roadBase(s.n))).toFixed(3)})  ` +
+        `rating − road ${mean(LATE.map(({ log }) => log[log.length - 1].rating - roadBase(log[log.length - 1].n))).toFixed(3)}`,
+    );
+    for (const { log } of LATE) {
+      const t = log.slice(-LAST);
+      expect(t.filter((s) => s.tier === 0).length / t.length).toBeLessThan(0.1);
     }
   });
 
@@ -184,14 +208,16 @@ describe('habit personas on real boards', () => {
 describe('hints never buy harder boards', () => {
   // The same player and the same luck (hints draw from their own stream), taking a hint
   // on none, half or every one of the boards it clears cleanly anyway.
-  const HINT_SEEDS = Array.from({ length: 10 }, (_, i) => `hint-${i}`);
-  const served = (rate: number) =>
-    mean(HINT_SEEDS.flatMap((seed) => simulate(PERSONAS.steady, seed, 260, defaultAnalytics(), { freeHints: rate }).slice(WARMUP).map((s) => s.d)));
-  const D = [0, 0.5, 1].map(served);
+  const HINT_SEEDS = Array.from({ length: 40 }, (_, i) => `hint-${i}`);
+  const served = (who: string, rate: number) =>
+    mean(HINT_SEEDS.flatMap((seed) => simulate(PERSONAS[who], seed, 260, defaultAnalytics(), { freeHints: rate }).slice(WARMUP).map((s) => s.d)));
 
-  it('served difficulty is non-increasing in the hint rate', () => {
-    console.log(`[hints] served d at hint rate 0 / 0.5 / 1: ${D.map((d) => d.toFixed(4)).join(' / ')}`);
-    expect(D[1]).toBeLessThanOrEqual(D[0]);
-    expect(D[2]).toBeLessThanOrEqual(D[1]);
-  });
+  for (const who of ['steady', 'strong', 'weak']) {
+    it(`${who}: served difficulty is non-increasing in the hint rate`, () => {
+      const D = [0, 0.5, 1].map((rate) => served(who, rate));
+      console.log(`[hints] ${who} served d at hint rate 0 / 0.5 / 1: ${D.map((d) => d.toFixed(4)).join(' / ')}`);
+      expect(D[1]).toBeLessThanOrEqual(D[0]);
+      expect(D[2]).toBeLessThanOrEqual(D[1]);
+    });
+  }
 });

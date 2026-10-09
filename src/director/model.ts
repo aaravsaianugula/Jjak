@@ -25,14 +25,19 @@
  *  4. **Skill ratings per path shape and per mechanic** with their own deviations
  *     (skills.ts), so learning shows up where it happens.
  *
- * Assists are read **board by board**: a quick clear (at or under par) with a single
- * hint taken early, before any real search (`MODEL.earlyHintMs`), is a *light assist*:
- * the way some people like to play, not a sign the board was too hard. A hint after a
- * long search is need, whatever the clear time. It costs the score a little and never reads as a struggle; any
- * other assist costs in full. This keeps hint-heavy players from sinking to the gentlest
- * tier and staying there. The leniency only ever softens the struggle reading: any
- * assist still means "not clean" and "not easy" for everything that could raise
- * difficulty (hints are never sold).
+ * Assists are read **board by board**, by how much they look like need (`assistNeed`,
+ * 0–1): a quick clear (at or under 1.05 × par) with one hint taken early, before any real
+ * search, is the way some people like to play (need 0, a *light assist* costing
+ * `MODEL.lightCost`); need then rises smoothly with a slower clear (full at 1.5 × par), a
+ * later first hint (up to `lateNeed` by 40 s) and each further assist. The score's
+ * assist cost, the clean credit the Director's flow nudge reads and the struggle signal
+ * all follow that one number, so there is no step anywhere: a hint one second later or a
+ * clear a hair slower moves the reading a hair. This keeps hint-heavy players from
+ * sinking to the gentlest tier: on a quick clear the cost stays small enough that a
+ * player who hints on every board still rates above what they are served, so the rating
+ * cannot ratchet down with the boards (persona-assists.test.ts). Any assist still means
+ * "not clean" and "not easy" for everything that could raise difficulty (hints are
+ * never sold).
  *
  * Why per board and not against the player's habit: a board's reading must not depend
  * on how often the player hints elsewhere, or a player who hints on every board would be
@@ -71,10 +76,15 @@ export const MODEL = {
   tierStep: 0.1,
   /** what a light assist costs the clean part of the score (a full hint costs 0.5, a shuffle 0.6) */
   lightCost: 0.06,
-  /** a clear at or under this × par counts as quick (light assists, habits) */
+  /** assist need from pace: none at or under quickPar × par, full at slowPar × par, linear between */
   quickPar: 1.05,
-  /** a hint this soon after the first tap is a habit, not need (later ones always count in full) */
+  slowPar: 1.5,
+  /** assist need from a late first hint: none up to earlyHintMs, `lateNeed` from lateHintMs on, linear between */
   earlyHintMs: 10_000,
+  lateHintMs: 40_000,
+  lateNeed: 0.2,
+  /** assist need added by each assist beyond the first */
+  extraNeed: 0.15,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -119,50 +129,49 @@ export const parRatio = (r: Pick<BoardRecord, 'ms' | 'par'>) => (r.par > 0 ? r.m
 /** Cleared with no hint, shuffle or dead-end reshuffle. */
 export const isClean = (r: BoardRecord) => r.cleared && assistsOf(r) === 0;
 
-/**
- * A quick clear (at or under par) with exactly one hint, taken early, and no shuffle or
- * dead-end reshuffle. A hint with no recorded time (an older save) is not light.
- */
-export const isLightAssist = (r: BoardRecord) =>
-  r.cleared && r.hints === 1 && r.shuffles === 0 && r.autoShuffles === 0 && r.hintAfterMs >= 0 && r.hintAfterMs <= MODEL.earlyHintMs && parRatio(r) <= MODEL.quickPar;
-
-/** Assists that read as need: all of them, unless the board was a light assist. */
-export const excessAssists = (r: BoardRecord) => (isLightAssist(r) ? 0 : assistsOf(r));
-
-/** Clean or a light assist: what keeps the Director from easing off (never a reason to raise it). */
-export const isCleanOrLight = (r: BoardRecord) => isClean(r) || isLightAssist(r);
-
-/** Boards a habit is read from (most recent first) and how many quick clears it needs. */
-const HABIT_WINDOW = 20;
-const HABIT_MIN = 5;
+/** 0 at or below lo, 1 at or above hi, linear between. */
+const ramp = (v: number, lo: number, hi: number) => clamp((v - lo) / (hi - lo), 0, 1);
 
 /**
- * The hints and shuffles this player takes even on boards they clear quickly (at or
- * under par), 0–2: k when the mean over recent quick clears is above k − ½ (a hint on
- * most quick clears, more than half, reads as 1; exactly half is no habit); 0 with too
- * little data. A habit is a way of playing, not a sign the board was too hard.
+ * How much a cleared board's assists read as need, 0–1 (0 with no assist; 1 for an
+ * unfinished board): the pace ramp (quickPar → slowPar × par) plus, for a hint, up to
+ * `lateNeed` as the first hint comes later (earlyHintMs → lateHintMs; a hint with no
+ * recorded time, from an older save, counts as late), plus `extraNeed` per assist beyond
+ * the first. Shuffles carry no time, so pace and count grade them. Continuous in hint
+ * time and pace, and non-decreasing in every input: a later hint, a slower clear or
+ * one more assist never reads as less need.
  */
-export function habitualAssists(a: AnalyticsSave): number {
-  const quick = a.recent
-    .filter((r) => r.mode !== 'rush' && r.cleared && parRatio(r) <= MODEL.quickPar)
-    .slice(0, HABIT_WINDOW)
-    .map((r) => r.hints + r.shuffles);
-  if (quick.length < HABIT_MIN) return 0;
-  return clamp(Math.ceil(quick.reduce((s, v) => s + v, 0) / quick.length - 0.5), 0, 2);
+export function assistNeed(r: BoardRecord): number {
+  if (!r.cleared) return 1;
+  const n = assistsOf(r);
+  if (n === 0) return 0;
+  const pace = ramp(parRatio(r), MODEL.quickPar, MODEL.slowPar);
+  const late = r.hints > 0 ? (r.hintAfterMs < 0 ? 1 : ramp(r.hintAfterMs, MODEL.earlyHintMs, MODEL.lateHintMs)) : 0;
+  return clamp(pace + MODEL.lateNeed * late + MODEL.extraNeed * (n - 1), 0, 1);
 }
+
+/**
+ * What a board counts toward the Director's clean rate, 0–1: 1 for a clean clear, 0 for
+ * an unfinished board, 1 − need for an assisted clear (an early hint on a quick clear
+ * counts as it would have without the hint). Never more than the same board unassisted,
+ * so a hint can only ever take board difficulty down.
+ */
+export const cleanCredit = (r: BoardRecord) => (r.cleared ? 1 - assistNeed(r) : 0);
 
 /**
  * Performance on one board, 0–1.
  *   abandoned:  0.05 + 0.15 · progress                       (0.05–0.20)
  *   cleared:    0.45 + 0.27 · clean + 0.20 · speed + 0.08 · accuracy
- *     clean    = 1 − 0.5·hints − 0.6·shuffles − 0.35·dead-end reshuffles (≥ 0);
- *                a light assist (`isLightAssist`) costs `MODEL.lightCost` instead (partial credit)
+ *     clean    = 1 − cost, with load = 0.5·hints + 0.6·shuffles + 0.35·dead-end reshuffles
+ *                (capped at 1) and cost = lightCost + (load − lightCost) · need (`assistNeed`):
+ *                an early hint on a quick clear costs `MODEL.lightCost`, a slow assisted clear its load
  *     speed    = (1.75 − time/par), clamped 0–1 (≤ 0.75 par → 1, ≥ 1.75 par → 0)
  *     accuracy = 1 − 3 · blocked taps per pair (≥ 0)
  */
 export function performance(r: BoardRecord): number {
   if (!r.cleared) return 0.05 + 0.15 * clamp(r.pairs > 0 ? r.made / r.pairs : 0, 0, 1);
-  const cost = isLightAssist(r) ? MODEL.lightCost : 0.5 * r.hints + 0.6 * r.shuffles + 0.35 * r.autoShuffles;
+  const load = Math.min(1, 0.5 * r.hints + 0.6 * r.shuffles + 0.35 * r.autoShuffles);
+  const cost = load > 0 ? MODEL.lightCost + (load - MODEL.lightCost) * assistNeed(r) : 0;
   const clean = clamp(1 - cost, 0, 1);
   const speed = clamp(1.75 - parRatio(r), 0, 1);
   const accuracy = clamp(1 - (3 * r.blocked) / Math.max(1, r.pairs), 0, 1);
@@ -294,11 +303,11 @@ export function struggleOf(r: BoardRecord): number {
   const ratio = parRatio(r);
   const slow = ratio > 2 ? 0.4 : ratio > 1.5 ? 0.2 : 0;
   const misreads = r.blocked / Math.max(1, r.pairs) > 0.35 ? 0.2 : 0;
-  return clamp(0.35 * excessAssists(r) + slow + misreads, 0, 1);
+  return clamp(0.35 * assistsOf(r) * assistNeed(r) + slow + misreads, 0, 1);
 }
 
 /**
- * A fast, clean clear: under par, no assist at all (a habitual hint still means the
+ * A fast, clean clear: under par, no assist at all (even a light assist means the
  * player wanted help, so it never reads as boredom), few misreads.
  */
 export const isEasy = (r: BoardRecord) => isClean(r) && parRatio(r) <= 1 && r.blocked / Math.max(1, r.pairs) < 0.2;
