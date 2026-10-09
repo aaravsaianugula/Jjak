@@ -40,6 +40,18 @@ const SLIDERS: Mechanic[] = ['leaves', 'wind'];
  * generator and solver respect every one).
  */
 const TERRAIN_CLASHES: Mechanic[] = SLIDERS;
+/**
+ * Seals are a rule about order, proven by the construction order, which sliding
+ * scrambles; and a card already covered by snow or tied by a knot carries one
+ * lock already, so seals keep to their own cards. Gates, fences and terrain mix.
+ */
+const SEAL_CLASHES: Mechanic[] = [...SLIDERS, 'snow', 'knots'];
+/**
+ * Wet ink sits on a cell like terrain until it dries (cards can't slide into
+ * it), so it never meets sliding. It mixes with everything else: drying only
+ * ever opens space.
+ */
+const INK_CLASHES: Mechanic[] = SLIDERS;
 
 export const MECHANICS: Record<Mechanic, MechanicDef> = {
   stones: {
@@ -48,7 +60,7 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   },
   leaves: {
     id: 'leaves', name: 'Falling leaves', native: '낙엽 · 落葉', glyph: '落', rule: 'After each pair, cards drop to fill the gaps.',
-    introChapter: MECHANIC_INTRO.leaves, slides: true, clashes: ['wind', 'snow', 'fences', 'torii', 'streams'], on: (s) => windOf(s) === 'down', weight: 0.1,
+    introChapter: MECHANIC_INTRO.leaves, slides: true, clashes: ['wind', 'snow', 'fences', 'torii', 'streams', 'seals', 'ink'], on: (s) => windOf(s) === 'down', weight: 0.1,
   },
   snow: {
     id: 'snow', name: 'First snow', native: '첫눈 · 初雪', glyph: '雪', rule: 'Snowy cards turn over when a neighbour clears.',
@@ -64,7 +76,7 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   },
   wind: {
     id: 'wind', name: 'Wind', native: '바람 · 風', glyph: '風', rule: 'After each pair, cards drift with the wind.',
-    introChapter: MECHANIC_INTRO.wind, slides: true, clashes: ['leaves', 'snow', 'fences', 'torii', 'streams'], on: (s) => { const w = windOf(s); return !!w && w !== 'down'; }, weight: 0.14,
+    introChapter: MECHANIC_INTRO.wind, slides: true, clashes: ['leaves', 'snow', 'fences', 'torii', 'streams', 'seals', 'ink'], on: (s) => { const w = windOf(s); return !!w && w !== 'down'; }, weight: 0.14,
   },
   gates: {
     id: 'gates', name: 'Gates', native: '문 · 門', glyph: '門', rule: 'A gate opens when you pair its flower.',
@@ -81,6 +93,14 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   streams: {
     id: 'streams', name: 'Streams', native: '개울 · 小川', glyph: '川', rule: 'Paths cross water straight. No turning on it.',
     introChapter: MECHANIC_INTRO.streams, clashes: TERRAIN_CLASHES, on: (s) => (s.streams ?? 0) > 0, weight: 0.1,
+  },
+  seals: {
+    id: 'seals', name: 'Seals', native: '도장 · 印', glyph: '印', rule: 'Sealed pairs go in order: 1, then 2, then 3.',
+    introChapter: MECHANIC_INTRO.seals, clashes: SEAL_CLASHES, on: (s) => (s.seals ?? 0) > 0, weight: 0.1,
+  },
+  ink: {
+    id: 'ink', name: 'Wet ink', native: '먹 · 墨', glyph: '墨', rule: 'Wet ink blocks paths. It dries as you pair.',
+    introChapter: MECHANIC_INTRO.ink, clashes: INK_CLASHES, on: (s) => (s.ink ?? 0) > 0, weight: 0.08,
   },
 };
 

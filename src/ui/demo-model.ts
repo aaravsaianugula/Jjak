@@ -5,11 +5,11 @@
  * player in demo.ts animates what this reports; tests/demos.test.ts checks
  * every script is legal and ends where it should.
  */
-import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, STONE, WATER, gateMonth, gateOf, isCard, isGate, isTorii, monthOf, toriiOf, toriiPair } from '../engine/board';
+import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, INK, STONE, WATER, gateMonth, gateOf, isCard, isGate, isTorii, monthOf, toriiOf, toriiPair } from '../engine/board';
 import { type GoalId, type GoalStats } from '../engine/goals';
 import { type Wind, legalMoves } from '../engine/moves';
 import { findPath, pathBends } from '../engine/path';
-import { type PlayState, type StepResult, applyPair, lockedOf } from '../engine/rules';
+import { type PlayState, type StepResult, applyPair, currentSeal, lockedOf } from '../engine/rules';
 import { MAX_COMBO } from '../engine/session';
 
 // ── Script format ───────────────────────────────────────────────────────
@@ -34,8 +34,9 @@ export interface DemoScript {
   id: string;
   /**
    * Rows of space-separated tokens: a card id (0–49), `.` empty, `#` stone,
-   * `G<m>` a gate of month m. Suffixes: `s` under snow, `k` tied with a knot,
-   * `|` a fence on the cell's right edge, `_` a fence on its bottom edge.
+   * `G<m>` a gate of month m, `i<n>` wet ink with n pairs to dry. Suffixes:
+   * `@<n>` seal n, `s` under snow, `k` tied with a knot, `|` a fence on the
+   * cell's right edge, `_` a fence on its bottom edge.
    */
   grid: string[];
   wind?: Wind;
@@ -68,7 +69,7 @@ export interface DemoBoard extends PlayState {
   wind: Wind | null;
 }
 
-const TOKEN = /^(#|\.|~|T[01]|G\d{1,2}|\d{1,2})([sk|_]*)$/;
+const TOKEN = /^(#|\.|~|T[01]|G\d{1,2}|i\d|\d{1,2})(?:@(\d))?([sk|_]*)$/;
 
 export function parseGrid(grid: string[], wind: Wind | null = null): DemoBoard {
   const rows = grid.map((r) => r.trim().split(/\s+/));
@@ -77,6 +78,8 @@ export function parseGrid(grid: string[], wind: Wind | null = null): DemoBoard {
   const walls = new Uint8Array(rows.length * cols);
   const hidden = new Set<number>();
   const knots = new Set<number>();
+  const seals: number[] = [];
+  const ink: number[] = [];
   let fenced = false;
   rows.forEach((row, r) => {
     if (row.length !== cols) throw new Error(`demo grid row ${r} has ${row.length} cells, expected ${cols}`);
@@ -84,8 +87,12 @@ export function parseGrid(grid: string[], wind: Wind | null = null): DemoBoard {
       const m = TOKEN.exec(tok);
       if (!m) throw new Error(`bad demo token "${tok}"`);
       const i = r * cols + c;
-      const [, v, mods] = m;
-      cells.push(v === '.' ? EMPTY : v === '#' ? STONE : v === '~' ? WATER : v[0] === 'T' ? toriiOf(Number(v.slice(1))) : v[0] === 'G' ? gateOf(Number(v.slice(1))) : Number(v));
+      const [, v, seal, mods] = m;
+      seals.push(seal ? Number(seal) : 0);
+      ink.push(v[0] === 'i' ? Number(v.slice(1)) : 0);
+      cells.push(
+        v === '.' ? EMPTY : v === '#' ? STONE : v === '~' ? WATER : v[0] === 'i' ? INK : v[0] === 'T' ? toriiOf(Number(v.slice(1))) : v[0] === 'G' ? gateOf(Number(v.slice(1))) : Number(v),
+      );
       if (mods.includes('s')) hidden.add(i);
       if (mods.includes('k')) knots.add(i);
       if (mods.includes('|')) (walls[i] |= FENCE_RIGHT), (fenced = true);
@@ -93,6 +100,8 @@ export function parseGrid(grid: string[], wind: Wind | null = null): DemoBoard {
     });
   });
   const board: Board = { rows: rows.length, cols, cells, ...(fenced ? { walls } : {}) };
+  if (seals.some((x) => x > 0)) board.seals = seals;
+  if (ink.some((x) => x > 0)) board.ink = ink;
   return { board, hidden, knots, wind };
 }
 
@@ -105,7 +114,8 @@ export function gridOf(st: PlayState): string[] {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
       const v = cells[i];
-      let t = v === EMPTY ? '.' : v === STONE ? '#' : v === WATER ? '~' : isTorii(v) ? `T${toriiPair(v)}` : isGate(v) ? `G${gateMonth(v)}` : String(v);
+      let t = v === EMPTY ? '.' : v === STONE ? '#' : v === WATER ? '~' : v === INK ? `i${st.board.ink![i]}` : isTorii(v) ? `T${toriiPair(v)}` : isGate(v) ? `G${gateMonth(v)}` : String(v);
+      if (st.board.seals?.[i]) t += `@${st.board.seals[i]}`;
       if (st.hidden.has(i)) t += 's';
       if (st.knots.has(i)) t += 'k';
       if (walls && walls[i] & FENCE_RIGHT) t += '|';
@@ -191,17 +201,21 @@ function route(b: Board, from: number, to: number, maxTurns: number, ignoreBlock
 // ── Running a script ────────────────────────────────────────────────────
 export type DemoEvent =
   | { kind: 'pair'; a: number; b: number; cards: [number, number]; path: Point[]; turns: number; combo: number; lucky: boolean; fever: boolean; res: StepResult }
-  | { kind: 'tap'; cell: number; locked: 'snow' | 'knot' | null }
+  | { kind: 'tap'; cell: number; locked: 'snow' | 'knot' | 'seal' | null }
   | { kind: 'blocked'; a: number; b: number; ghost: Ghost | null }
   | { kind: 'wait'; ms: number }
   | { kind: 'caption'; text: string }
   | { kind: 'mark'; cells: number[] };
 
+/** This card's seal must wait for a lower one. */
+export const sealWaits = (b: Board, i: number): boolean => (b.seals?.[i] ?? 0) > currentSeal(b);
+
 /** Why a pair can't be made right now (null: it can). */
 export function pairProblem(st: PlayState, a: number, b: number): 'locked' | 'month' | 'path' | null {
   const { cells } = st.board;
   if (a === b || !isCard(cells[a]) || !isCard(cells[b])) return 'month';
-  if (st.hidden.has(a) || st.hidden.has(b) || st.knots.has(a) || st.knots.has(b)) return 'locked';
+  const locked = lockedOf(st);
+  if (locked.has(a) || locked.has(b)) return 'locked';
   if (monthOf(cells[a]) !== monthOf(cells[b])) return 'month';
   return findPath(st.board, a, b) ? null : 'path';
 }
@@ -234,7 +248,7 @@ export class DemoRun implements GoalStats {
       case 'pair':
         return this.pairUp(s.a, s.b);
       case 'tap': {
-        const locked = st.hidden.has(s.cell) ? 'snow' : st.knots.has(s.cell) ? 'knot' : null;
+        const locked = st.hidden.has(s.cell) ? 'snow' : st.knots.has(s.cell) ? 'knot' : sealWaits(st.board, s.cell) ? 'seal' : null;
         if (!isCard(st.board.cells[s.cell])) throw new Error(`${this.script.id}: tap on an empty cell ${s.cell}`);
         return { kind: 'tap', cell: s.cell, locked };
       }

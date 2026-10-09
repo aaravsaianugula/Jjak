@@ -1,4 +1,4 @@
-import { type Board, EMPTY, STONE, gateMonth, gateOf, isBlock, isCard, isGate, isTerrain, monthOf } from './board';
+import { type Board, EMPTY, INK, STONE, gateMonth, gateOf, isBlock, isCard, isGate, isInk, isTerrain, monthOf } from './board';
 import { reachable } from './path';
 import { type Rng } from './rng';
 
@@ -22,6 +22,12 @@ import { type Rng } from './rng';
  * Wind and falling leaves move cards, and snow and knots lock some, so on those
  * boards the reverse order is only a guess: a solver that uses it (see
  * `placementOrder`) must replay it through the rules before trusting it.
+ *
+ * Wet ink (`base.ink`) dries after its count of pairs. Of P pairs, placement k
+ * is the (P − k)-th pair cleared, so a blot that lasts L pairs is still wet
+ * there when P − k ≤ L: it blocks the last L placements and is open before.
+ * Seals are numbered afterwards from the placement order, which is written to
+ * `placed` (cell pairs, first placed first) when given.
  */
 const ORDERS = new WeakMap<Board, [number, number][]>();
 
@@ -35,6 +41,7 @@ function placePairs(
   rng: Rng,
   maxAttempts = 40,
   arrange = 0,
+  placed?: [number, number][],
 ): Board | null {
   const { rows, cols } = base;
   // Distance from the board edge: deep cells are filled first so the last
@@ -49,18 +56,24 @@ function placePairs(
   // sit inside the board instead of along its easy edge.
   const rimFirst = arrange > 0.6;
   const hasGates = base.cells.some(isGate);
+  const life = base.ink && base.cells.some(isInk) ? base.ink : null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const b: Board = base.walls ? { rows, cols, cells: base.cells.slice(), walls: base.walls } : { rows, cols, cells: base.cells.slice() };
+    if (base.ink) b.ink = base.ink.slice();
     for (const s of slots) b.cells[s] = EMPTY;
     const order = rng.shuffle(pairs.slice());
     const free = new Set(slots);
-    const placedCells: [number, number][] = [];
     let ok = true;
+    const cellsOf: [number, number][] = [];
     // Gates: index of the last pair of each month in `order` (the first one cleared in reverse).
     const lastOf = new Array(13).fill(-1);
     if (hasGates) order.forEach(([ca], k) => (lastOf[monthOf(ca)] = k));
     let k = 0;
-    const passable = hasGates ? (v: number) => v === EMPTY || (isGate(v) && k < lastOf[gateMonth(v)]) : undefined;
+    const P = order.length;
+    const passable =
+      hasGates || life
+        ? (v: number, i: number) => v === EMPTY || (isGate(v) && k < lastOf[gateMonth(v)]) || (v === INK && k < P - life![i])
+        : undefined;
 
     const span = Math.max(1, rows + cols - 2);
     const trick = (x: number, y: number, card: number): number => {
@@ -123,15 +136,15 @@ function placePairs(
         .sort((p, q) => q.key - p.key)
         .map((p) => p.y);
       const [p, q] = rng.next() < 0.5 ? [ca, cb] : [cb, ca];
-      let placed = false;
+      let done = false;
       for (const y of candidates) {
         b.cells[x] = p;
         b.cells[y] = q;
         free.delete(x);
         free.delete(y);
         if (free.size === 0 || healthy()) {
-          placed = true;
-          placedCells.push([x, y]);
+          done = true;
+          cellsOf.push([x, y]);
           break;
         }
         b.cells[x] = EMPTY;
@@ -139,13 +152,14 @@ function placePairs(
         free.add(x);
         free.add(y);
       }
-      if (!placed) {
+      if (!done) {
         ok = false;
         break;
       }
     }
     if (ok) {
-      ORDERS.set(b, placedCells);
+      ORDERS.set(b, cellsOf);
+      if (placed) placed.push(...cellsOf);
       return b;
     }
   }
@@ -163,6 +177,10 @@ export interface GenerateOptions {
   walls?: Uint8Array;
   /** fixed terrain: water and torii cells (see board.ts), as cell index and value */
   terrain?: { cell: number; value: number }[];
+  /** wet ink: cells that start without a card, and how many pairs each stays wet */
+  ink?: { cell: number; life: number }[];
+  /** this many sealed pairs (numbered in an order the construction clears them in) */
+  seals?: number;
   /** card ids, length must equal playable cells; consecutive entries form pairs */
   cards: number[];
   /**
@@ -179,6 +197,13 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   for (const s of opts.stones ?? []) base.cells[s] = STONE;
   for (const g of opts.gates ?? []) base.cells[g.cell] = gateOf(g.month);
   for (const t of opts.terrain ?? []) base.cells[t.cell] = t.value;
+  if (opts.ink?.length) {
+    base.ink = new Array(rows * cols).fill(0);
+    for (const { cell, life } of opts.ink) {
+      base.cells[cell] = INK;
+      base.ink[cell] = life;
+    }
+  }
   const slots: number[] = [];
   base.cells.forEach((v, i) => v === EMPTY && slots.push(i));
   if (slots.length !== opts.cards.length) {
@@ -187,11 +212,16 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   const pairs: [number, number][] = [];
   for (let i = 0; i < opts.cards.length; i += 2) pairs.push([opts.cards[i], opts.cards[i + 1]]);
 
-  const b = placePairs(base, slots, pairs, rng, 40, opts.arrange ?? 0);
-  if (b) return b;
-  // Fences, terrain and gates are extras: lose the fences first, then turn
-  // terrain and then gates into stones.
+  const placed: [number, number][] = [];
+  const b = placePairs(base, slots, pairs, rng, 40, opts.arrange ?? 0, placed);
+  if (b) {
+    if (opts.seals) sealPairs(b, placed, opts.seals, rng);
+    return b;
+  }
+  // Fences, ink, terrain and gates are extras: lose the fences first, then turn
+  // ink, terrain and then gates into stones.
   if (opts.walls) return generateBoard({ ...opts, walls: undefined }, rng);
+  if (opts.ink?.length) return generateBoard({ ...opts, ink: undefined, stones: (opts.stones ?? []).concat(opts.ink.map((x) => x.cell)) }, rng);
   if (opts.terrain?.length) return generateBoard({ ...opts, terrain: [], stones: (opts.stones ?? []).concat(opts.terrain.map((t) => t.cell)) }, rng);
   if (opts.gates?.length) return generateBoard({ ...opts, gates: [], stones: (opts.stones ?? []).concat(opts.gates.map((g) => g.cell)) }, rng);
   // Stones can occasionally wall a region off: drop two at a time and fill the
@@ -199,7 +229,55 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   const stones = (opts.stones ?? []).slice();
   if (stones.length === 0) throw new Error('board generation failed');
   const cards = opts.cards.concat(opts.cards[0], opts.cards[1]);
-  return generateBoard({ rows, cols, stones: stones.slice(0, -2), cards, arrange: opts.arrange }, rng);
+  return generateBoard({ rows, cols, stones: stones.slice(0, -2), cards, arrange: opts.arrange, seals: opts.seals }, rng);
+}
+
+/**
+ * Seals (도장 · 印): number `count` placed pairs 1…count, one per flower (never
+ * the lucky pair), drawn from across the placement order. The pair placed last
+ * is cleared first in the construction, so the latest placed of the chosen
+ * pairs gets seal 1: the construction's own order clears them 1, 2, 3…
+ */
+function sealPairs(b: Board, placed: [number, number][], count: number, rng: Rng): void {
+  const months = new Set<number>();
+  const chosen: number[] = [];
+  for (const k of rng.shuffle(placed.map((_, k) => k))) {
+    if (chosen.length >= count) break;
+    const m = monthOf(b.cells[placed[k][0]]);
+    if (m >= 12 || months.has(m)) continue;
+    months.add(m);
+    chosen.push(k);
+  }
+  if (!chosen.length) return;
+  chosen.sort((x, y) => y - x);
+  b.seals = new Array(b.cells.length).fill(0);
+  chosen.forEach((k, n) => {
+    b.seals![placed[k][0]] = n + 1;
+    b.seals![placed[k][1]] = n + 1;
+  });
+}
+
+/**
+ * After a reshuffle, give each seal back to its own card (by card id; a copy
+ * of the same card is the same face). Ink stays where it is, with its time left.
+ */
+function carryMarks(from: Board, to: Board): Board {
+  if (from.ink) to.ink = from.ink.slice();
+  if (from.seals) {
+    const sealOf = new Map<number, number[]>();
+    from.seals.forEach((x, i) => {
+      if (!x) return;
+      const id = from.cells[i];
+      if (!sealOf.has(id)) sealOf.set(id, []);
+      sealOf.get(id)!.push(x);
+    });
+    to.seals = new Array(to.cells.length).fill(0);
+    to.cells.forEach((v, i) => {
+      const list = sealOf.get(v);
+      if (list?.length) to.seals![i] = list.shift()!;
+    });
+  }
+  return to;
 }
 
 /**
@@ -222,17 +300,20 @@ export function reshuffle(b: Board, rng: Rng): Board {
     for (let i = 0; i + 1 < list.length; i += 2) pairs.push([list[i], list[i + 1]]);
   }
   const base: Board = b.walls ? { rows: b.rows, cols: b.cols, cells: b.cells.slice(), walls: b.walls } : { rows: b.rows, cols: b.cols, cells: b.cells.slice() };
+  if (b.ink) base.ink = b.ink;
   const out = placePairs(base, slots, pairs, rng, 200);
-  if (out) return out;
+  if (out) return carryMarks(b, out);
   // The cells themselves can be a dead end (say, a card in a stone pocket with
   // its partner walled off behind it). Re-deal onto open cells, rim first. A
   // few cells on the rim can still be a dead end of their own (two far corners
   // need three bends; fences can part neighbours), so each try draws the cells
   // again, looser each time.
   const open: number[] = [];
-  b.cells.forEach((v, i) => !isBlock(v) && !isTerrain(v) && open.push(i));
-  const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (isBlock(v) || isTerrain(v) ? v : EMPTY)) };
+  const fixedCell = (v: number) => isBlock(v) || isTerrain(v) || isInk(v);
+  b.cells.forEach((v, i) => !fixedCell(v) && open.push(i));
+  const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (fixedCell(v) ? v : EMPTY)) };
   if (b.walls) cleared.walls = b.walls;
+  if (b.ink) cleared.ink = b.ink;
   for (let tries = 0; tries < 12; tries++) {
     const noise = 0.5 + tries;
     const rim = (i: number) => {
@@ -246,11 +327,11 @@ export function reshuffle(b: Board, rng: Rng): Board {
       .slice(0, slots.length)
       .map((p) => p.i);
     const moved = placePairs(cleared, target, pairs, rng, tries === 0 ? 200 : 40);
-    if (moved) return moved;
+    if (moved) return carryMarks(b, moved);
   }
   // Extremely unlikely; a plain shuffle at least changes the position.
   const vals = rng.shuffle(slots.map((s) => b.cells[s]));
   const cells = b.cells.slice();
   slots.forEach((s, k) => (cells[s] = vals[k]));
-  return b.walls ? { rows: b.rows, cols: b.cols, cells, walls: b.walls } : { rows: b.rows, cols: b.cols, cells };
+  return carryMarks(b, b.walls ? { rows: b.rows, cols: b.cols, cells, walls: b.walls } : { rows: b.rows, cols: b.cols, cells });
 }

@@ -5,7 +5,7 @@ import { GOALS, type GoalStats } from './goals';
 import { type LevelSpec, buildBoard, pickKnots, pickSnow, windOf } from './levels';
 import { findMove } from './moves';
 import { findPath, pathBends } from './path';
-import { type PlayState, applyPair, lockedOf, releaseIfStuck } from './rules';
+import { type Freed, type PlayState, applyPair, currentSeal, lockedOf, releaseIfStuck } from './rules';
 import { createRng, type Rng } from './rng';
 import { type Yaku, newYaku } from './yaku';
 
@@ -43,6 +43,10 @@ export type TapResult =
       untied: number[];
       /** gate cells opened by this pair (now empty) */
       opened: number[];
+      /** ink blots that dried with this pair, or were dried early by the safety net (now empty) */
+      dried: number[];
+      /** cells whose seal the safety net broke so play could go on */
+      unsealed: number[];
       /** bends in the path (0, 1 or 2) */
       turns: number;
       /** this was the lucky bonus pair (LUCKY_SCORE already added to `gained`) */
@@ -57,6 +61,8 @@ export type TapResult =
   | { kind: 'hidden'; cell: number }
   /** the card is tied with a cord (매듭): visible, but can't be picked yet */
   | { kind: 'knotted'; cell: number }
+  /** the card's seal (도장) must wait: seal `first` goes before it. No penalty. */
+  | { kind: 'sealed'; cell: number; first: number }
   | { kind: 'ignore' };
 
 export interface Stars {
@@ -156,6 +162,7 @@ export class Session implements PlayState, GoalStats {
     if (this.board.cells[cell] < 0) return { kind: 'ignore' };
     if (this.hidden.has(cell)) return { kind: 'hidden', cell };
     if (this.knots.has(cell)) return { kind: 'knotted', cell };
+    if (this.board.seals?.[cell] && this.board.seals[cell] > currentSeal(this.board)) return { kind: 'sealed', cell, first: currentSeal(this.board) };
     if (this.selected < 0) {
       this.selected = cell;
       return { kind: 'select', cell };
@@ -207,20 +214,24 @@ export class Session implements PlayState, GoalStats {
     const turns = Math.min(2, pathBends(path));
     this.turns[turns]++;
     const wind = windOf(this.spec);
-    const { moved, opened, revealed, untied } = applyPair(this, a, b, wind);
+    const { moved, opened, revealed, untied, dried } = applyPair(this, a, b, wind);
 
     const cleared = cardsLeft(this.board) === 0;
     let reshuffled = false;
+    const freed: Freed = { dried, unsealed: [] };
     if (cleared) {
       this.finishedAt = now;
-    } else if (releaseIfStuck(this, revealed, untied)) {
+    } else if (releaseIfStuck(this, revealed, untied, freed)) {
       // Snow or knots alone never strand you (released above, for free); a true dead end reshuffles.
       this.redeal(revealed, untied);
+      // The re-deal ignores the seals' order and wet ink: let the free net lift them if they alone block.
+      if (this.board.seals || this.board.ink) releaseIfStuck(this, revealed, untied, freed);
       this.autoShuffles++;
       if (wind && wind !== 'down') this.windShuffles++;
       reshuffled = true;
     }
-    return { kind: 'match', a, b, cards, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, untied, opened, turns, lucky, fever, feverStarted, yaku };
+    const { unsealed } = freed;
+    return { kind: 'match', a, b, cards, path, combo: this.combo, gained, cleared, reshuffled, moved, revealed, untied, opened, dried, unsealed, turns, lucky, fever, feverStarted, yaku };
   }
 
   /** Returns a legal pair to highlight (does not play it). */
@@ -240,7 +251,8 @@ export class Session implements PlayState, GoalStats {
     const melted: number[] = [];
     this.lastUntied = [];
     this.redeal(melted, this.lastUntied);
-    if (this.hidden.size || this.knots.size) releaseIfStuck(this, melted, this.lastUntied);
+    this.lastFreed = { dried: [], unsealed: [] };
+    if (this.hidden.size || this.knots.size || this.board.seals || this.board.ink) releaseIfStuck(this, melted, this.lastUntied, this.lastFreed);
     return melted;
   }
 
@@ -268,6 +280,8 @@ export class Session implements PlayState, GoalStats {
   }
   /** knots untied by the last shuffle() */
   lastUntied: number[] = [];
+  /** seals broken and ink dried by the last shuffle()'s safety net */
+  lastFreed: Freed = { dried: [], unsealed: [] };
 
   stars(): Stars {
     const secs = this.elapsedMs(this.finishedAt || Date.now()) / 1000;

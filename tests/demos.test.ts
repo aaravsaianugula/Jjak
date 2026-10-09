@@ -106,6 +106,30 @@ describe('each demo shows its idea', () => {
     expect(turned.turns).toBe(1);
   });
 
+  it('seals: the card sealed 2 waits (a tap shakes it), seal 1 goes first, then 2', () => {
+    const { run, ev } = events(MECHANIC_DEMOS.seals);
+    const t = ev.find((e) => e.kind === 'tap');
+    expect(t && t.kind === 'tap' && t.locked).toBe('seal');
+    const [first, second] = pairs(ev);
+    const seal = (i: number) => parseGrid(MECHANIC_DEMOS.seals.grid).board.seals![i];
+    expect([seal(first.a), seal(first.b)]).toEqual([1, 1]);
+    expect([seal(second.a), seal(second.b)]).toEqual([2, 2]);
+    expect(run.state.board.seals).toBeUndefined();
+    // In "your turn", seal 2 can't be taken before seal 1.
+    const turn = new DemoRun(MECHANIC_DEMOS.seals);
+    expect(() => turn.pairUp(second.a, second.b)).toThrow(/locked/);
+  });
+
+  it('ink: wet ink blocks the straight line, dries after its pairs, then the line goes through', () => {
+    const { ev } = events(MECHANIC_DEMOS.ink);
+    const b = ev.find((e) => e.kind === 'blocked');
+    expect(b && b.kind === 'blocked' && b.ghost!.why).toBe('block');
+    const [p1, p2, through] = pairs(ev);
+    expect(p1.res.dried).toEqual([]);
+    expect(p2.res.dried).toEqual([4]);
+    expect(through.turns).toBe(0);
+  });
+
   it('variants: different pictures of one flower pair', () => {
     const p = pairs(events(VARIANTS_DEMO).ev);
     expect(p.every((x) => x.cards[0] !== x.cards[1])).toBe(true);

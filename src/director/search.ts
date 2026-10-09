@@ -52,6 +52,8 @@ export function featureOf(spec: LevelSpec, d: number): Feature {
       case 'fences': return (spec.fences ?? 0) > 0;
       case 'torii': return (spec.torii ?? 0) > 0;
       case 'streams': return (spec.streams ?? 0) > 0;
+      case 'seals': return (spec.seals ?? 0) > 0;
+      case 'ink': return (spec.ink ?? 0) > 0;
     }
   }).map((on) => (on ? 0.5 : 0));
   const goal = GOAL_IDS.map((g) => (spec.goal === g ? 0.5 : 0));
@@ -166,6 +168,8 @@ const STEPS: [NumKnob, number][] = [
   ['fences', 2],
   ['torii', 1],
   ['streams', 2],
+  ['seals', 1],
+  ['ink', 2],
 ];
 
 /** One knob one step harder (dir +1) or easier (dir -1), inside the identity's ranges; null if nothing can move. */
@@ -272,7 +276,7 @@ export function searchLevel(plan: LevelPlan, tierOrTarget: number | { target: nu
   for (let t = tier - 1; t >= 0; t--) ladder.push(tierKnobs(plan, t));
   const r0 = knobRange(plan);
   const low = ladder.length ? ladder[ladder.length - 1] : centre;
-  ladder.push(clampKnobs(plan, { ...low, stones: r0.stones[0], snow: r0.snow[0], knots: r0.knots[0], gates: r0.gates[0], fences: r0.fences[0], torii: r0.torii[0], streams: r0.streams[0] }));
+  ladder.push(clampKnobs(plan, { ...low, stones: r0.stones[0], snow: r0.snow[0], knots: r0.knots[0], gates: r0.gates[0], fences: r0.fences[0], torii: r0.torii[0], streams: r0.streams[0], seals: r0.seals[0], ink: r0.ink[0] }));
   for (let i = 0; !best && tried < maxAttempts + 2 * ladder.length && !(opts.timeBudgetMs != null && now() - start > 4 * opts.timeBudgetMs); i++) {
     run(ladder[Math.min(ladder.length - 1, Math.floor(i / 2))]);
   }

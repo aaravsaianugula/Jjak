@@ -1,4 +1,4 @@
-import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, TORII, WATER, isTerrain, isTorii, pointOf } from './board';
+import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, TORII, WATER, isInk, isTerrain, isTorii, pointOf } from './board';
 
 /**
  * Shisen-sho connection rule: a path of at most 3 straight segments (≤ 2 turns)
@@ -95,8 +95,8 @@ export function findPath(
   to: number,
   passable: (cellValue: number, index: number) => boolean = (v) => v === EMPTY,
 ): Point[] | null {
-  // Only cards are ever joined: a path never starts or ends on terrain.
-  if (from === to || isTerrain(b.cells[from]) || isTerrain(b.cells[to])) return null;
+  // Only cards are ever joined: a path never starts or ends on terrain or ink.
+  if (from === to || isTerrain(b.cells[from]) || isTerrain(b.cells[to]) || isInk(b.cells[from]) || isInk(b.cells[to])) return null;
   const H = b.rows + 2;
   const W = b.cols + 2;
   const a = pointOf(b, from);

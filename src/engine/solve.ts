@@ -5,9 +5,11 @@
  * sequence. Visited positions are remembered, and the search gives up after a
  * node budget (callers treat that as "not proven").
  */
-import { type Board, cloneBoard, isCard, monthOf } from './board';
+import { type Board, isCard, monthOf } from './board';
 import { type Wind, legalMoves } from './moves';
-import { type PlayState, applyPair, lockedOf, releaseIfStuck } from './rules';
+import { type Freed, type PlayState, applyPair, cloneState, lockedOf, releaseIfStuck } from './rules';
+
+export { cloneState };
 
 export interface SolveResult {
   /** a clearing sequence, or null if none was found inside the budget */
@@ -18,17 +20,25 @@ export interface SolveResult {
   exhausted: boolean;
 }
 
-export function cloneState(st: PlayState): PlayState {
-  return { board: cloneBoard(st.board), hidden: new Set(st.hidden), knots: new Set(st.knots) };
-}
+const keyOf = (st: PlayState) =>
+  `${st.board.cells.join(',')}|${[...st.hidden].sort().join(',')}|${[...st.knots].sort().join(',')}` +
+  (st.board.seals ? `|s${st.board.seals.join('')}` : '') +
+  (st.board.ink ? `|i${st.board.ink.join('')}` : '');
 
-const keyOf = (st: PlayState) => `${st.board.cells.join(',')}|${[...st.hidden].sort().join(',')}|${[...st.knots].sort().join(',')}`;
+export interface SolveOptions {
+  /**
+   * Never lean on the free release of seals and ink: a position that would need
+   * a seal broken or a blot dried early counts as a dead end. Proves a board
+   * clears in the seals' order with the ink drying only by itself.
+   */
+  strict?: boolean;
+}
 
 /**
  * Search for a full clear. Moves are tried in an order that finishes most boards
  * on the first dive: pairs that leave the most moves behind come first.
  */
-export function solve(start: PlayState, wind: Wind | null, budget = 20000): SolveResult {
+export function solve(start: PlayState, wind: Wind | null, budget = 20000, opts: SolveOptions = {}): SolveResult {
   const seen = new Set<string>();
   let nodes = 0;
   let exhausted = false;
@@ -41,7 +51,10 @@ export function solve(start: PlayState, wind: Wind | null, budget = 20000): Solv
     let st = from;
     if (!wind) {
       st = cloneState(from);
-      forced(st, path);
+      if (!forced(st, path, opts.strict === true)) {
+        path.length = mark;
+        return false;
+      }
     }
     if (search(st)) return true;
     path.length = mark;
@@ -65,7 +78,7 @@ export function solve(start: PlayState, wind: Wind | null, budget = 20000): Solv
     const scored = moves.map((m) => {
       const next = cloneState(st);
       applyPair(next, m[0], m[1], wind);
-      const stuck = cardsLeft(next.board) > 0 && releaseIfStuck(next);
+      const stuck = cardsLeft(next.board) > 0 && release(next, opts.strict === true) !== 'moving';
       return { m, next, score: stuck ? -1 : legalMoves(next.board, lockedOf(next)).length };
     });
     scored.sort((a, b) => b.score - a.score);
@@ -88,9 +101,10 @@ export function solve(start: PlayState, wind: Wind | null, budget = 20000): Solv
  * never closes a path there: gates only open, snow and knots only let go. So a
  * flower with just two cards left, or with four that split into two pairs that
  * are both legal now, has no choice worth keeping open: clear them. Pushes the
- * moves onto `path` and mutates `st`.
+ * moves onto `path` and mutates `st`. Returns false only for a strict search
+ * that had to lean on the seals' or the ink's safety net (a dead end there).
  */
-function forced(st: PlayState, path: [number, number][]): void {
+function forced(st: PlayState, path: [number, number][], strict: boolean): boolean {
   for (let guard = 0; guard < 64; guard++) {
     const count = new Array(13).fill(0);
     for (const v of st.board.cells) if (isCard(v)) count[monthOf(v)]++;
@@ -111,14 +125,29 @@ function forced(st: PlayState, path: [number, number][]): void {
       }
       if (take) break;
     }
-    if (!take) return;
+    if (!take) return true;
     for (const m of take) {
       // The second pair of four stays legal: clearing the first only opens space.
       applyPair(st, m[0], m[1], null);
       path.push(m);
     }
-    if (cardsLeft(st.board) > 0 && releaseIfStuck(st)) return;
+    if (cardsLeft(st.board) > 0) {
+      const r = release(st, strict);
+      if (r === 'lifted') return false;
+      if (r === 'stuck') return true;
+    }
   }
+  return true;
+}
+
+/**
+ * The safety net: 'stuck' when no pair is left even after it, 'lifted' when a
+ * strict search needed seals or ink lifted to go on, else 'moving'.
+ */
+function release(st: PlayState, strict: boolean): 'moving' | 'stuck' | 'lifted' {
+  const freed: Freed = { dried: [], unsealed: [] };
+  if (releaseIfStuck(st, [], [], freed)) return 'stuck';
+  return strict && (freed.dried.length > 0 || freed.unsealed.length > 0) ? 'lifted' : 'moving';
 }
 
 function cardsLeft(b: Board): number {

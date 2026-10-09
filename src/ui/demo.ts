@@ -12,14 +12,16 @@ import { cardSvg } from '../art/cards';
 import { gateSvg } from '../art/mechanics';
 import { toriiSvg, waterMarkup } from '../art/terrain';
 import { MONTHS } from '../data/deck';
-import { FENCE_DOWN, FENCE_RIGHT, STONE, gateMonth, isCard, isGate, isTorii, monthOf, toriiPair } from '../engine/board';
+import { FENCE_DOWN, FENCE_RIGHT, STONE, gateMonth, isCard, isGate, isInk, isTorii, monthOf, toriiPair } from '../engine/board';
+import { currentSeal } from '../engine/rules';
+import { dryBlot, inkBlot, setSeal, setWet } from './rule-fx';
 import { pathStrokes } from '../engine/path';
 import { GOALS } from '../engine/goals';
 import { findMove } from '../engine/moves';
 import { lockedOf } from '../engine/rules';
 import { unlockAudio, sfx } from '../services/audio';
 import { haptic } from '../services/haptics';
-import { type DemoEvent, type DemoScript, type Ghost, DemoRun, ghostPath, pairProblem, turnPairs } from './demo-model';
+import { type DemoEvent, type DemoScript, type Ghost, DemoRun, ghostPath, pairProblem, sealWaits, turnPairs } from './demo-model';
 import { h } from './dom';
 import { reducedMotion, restartAnimations, retrigger } from './motion';
 import { ICONS } from './icons';
@@ -134,6 +136,7 @@ export class DemoPlayer {
       else if (v === STONE) node = h('div', { class: 'demo__stone', 'aria-hidden': 'true' });
       else if (isGate(v)) node = h('div', { class: 'demo__gate', 'aria-hidden': 'true', html: gateSvg(gateMonth(v)) });
       else if (isTorii(v)) node = h('div', { class: 'demo__torii', 'aria-hidden': 'true', html: toriiSvg(toriiPair(v)) });
+      else if (isInk(v)) node = inkBlot(this.run.state.board.ink![i], 'demo__blot');
       if (!node) return;
       this.place(node, i);
       this.nodes.set(i, node);
@@ -162,7 +165,33 @@ export class DemoPlayer {
       c.classList.add('is-knot');
       c.append(h('span', { class: 'knot', 'aria-hidden': 'true', html: KNOT_SVG }));
     }
+    const n = st.board.seals?.[i] ?? 0;
+    if (n) setSeal(c, n, sealWaits(st.board, i));
     return c;
+  }
+
+  /** Seals and ink as the rules left them: the next seal brightens, blots dry a shade or go. */
+  private syncMarks() {
+    const b = this.run.state.board;
+    for (const [i, n] of this.nodes) {
+      if (n.classList.contains('demo__card')) setSeal(n, b.seals?.[i] ?? 0, sealWaits(b, i));
+      else if (n.classList.contains('demo__blot')) {
+        if (isInk(b.cells[i])) setWet(n, b.ink![i]);
+        else {
+          this.nodes.delete(i);
+          dryBlot(n);
+        }
+      }
+    }
+  }
+
+  /** A sealed card tapped too soon: it shakes, and the seal that goes first answers. */
+  private sealNudge(card: HTMLElement | undefined) {
+    retrigger(card, 'is-shake');
+    const b = this.run.state.board;
+    const first = currentSeal(b);
+    for (const [i, n] of this.nodes) if (b.seals?.[i] === first) retrigger(n, 'is-first');
+    return first;
   }
 
   private place(node: HTMLElement, i: number) {
@@ -339,7 +368,8 @@ export class DemoPlayer {
       case 'tap': {
         await this.brushTo(ev.cell, tok);
         const card = this.nodes.get(ev.cell);
-        if (ev.locked) {
+        if (ev.locked === 'seal') this.sealNudge(card);
+        else if (ev.locked) {
           retrigger(card, 'is-shake');
           if (ev.locked === 'knot') retrigger(card?.querySelector('.knot'), 'is-tug');
         }
@@ -496,7 +526,9 @@ export class DemoPlayer {
         setTimeout(() => k?.remove(), 620);
       }
     }
-    if (opened.length || moved.length || revealed.length || untied.length) {
+    const { dried } = ev.res;
+    if (this.run.state.board.ink || dried.length || this.boardEl.querySelector('.rule-seal')) this.syncMarks();
+    if (opened.length || moved.length || revealed.length || untied.length || dried.length) {
       if (byPlayer) sfx.reveal();
       await this.sleep(rm ? 420 : 500, tok);
     } else await this.sleep(rm ? 260 : 120, tok);
@@ -769,6 +801,13 @@ export class DemoPlayer {
     const st = this.run.state;
     const card = this.nodes.get(cell)!;
     if (!card.classList.contains('demo__card')) return;
+    if (sealWaits(st.board, cell)) {
+      const first = this.sealNudge(card);
+      sfx.deselect();
+      this.setCaption(`Seal ${first} first`);
+      this.armHint(true);
+      return;
+    }
     if (st.hidden.has(cell) || st.knots.has(cell)) {
       retrigger(card, 'is-shake');
       retrigger(card.querySelector('.knot'), 'is-tug');

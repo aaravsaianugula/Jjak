@@ -1,7 +1,10 @@
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
-import { type Point, FENCE_DOWN, FENCE_RIGHT, STONE, cardsLeft, gateMonth, isCard, isGate, isTorii, isWater, monthOf, toriiPair } from '../../engine/board';
+import { type Point, FENCE_DOWN, FENCE_RIGHT, STONE, cardsLeft, gateMonth, isCard, isGate, isInk, isTorii, isWater, monthOf, toriiPair } from '../../engine/board';
+import { currentSeal } from '../../engine/rules';
+import { sealLabel } from '../../art/rule-marks';
+import { dryBlot, inkBlot, setSeal, setWet } from '../rule-fx';
 import { GOALS, type GoalId, straightNeed } from '../../engine/goals';
 import { legalMoves } from '../../engine/moves';
 import { findPath, pathStrokes } from '../../engine/path';
@@ -289,10 +292,17 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     return `${m.en}, month ${m.index + 1}${d.kind === 'plain' ? '' : `, ${d.en}`}`;
   }
 
-  /** A card's label on the board: its face, plus any bamboo fence on its sides. */
+  /** A card's label on the board: its face, its seal if it has one, plus any bamboo fence on its sides. */
   function cellLabel(i: number, id: number) {
+    const n = session.board.seals?.[i] ?? 0;
+    const now = currentSeal(session.board);
+    const face = n ? `${faceLabel(id)}, ${sealLabel(n, n > now, now)}` : faceLabel(id);
+    return fenceLabel(i, face);
+  }
+
+  function fenceLabel(i: number, face: string) {
     const w = session.board.walls;
-    if (!w) return faceLabel(id);
+    if (!w) return face;
     const c = i % spec.cols;
     const sides = [
       w[i] & FENCE_RIGHT ? 'right' : '',
@@ -300,7 +310,39 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
       w[i] & FENCE_DOWN ? 'below' : '',
       i >= spec.cols && w[i - spec.cols] & FENCE_DOWN ? 'above' : '',
     ].filter(Boolean);
-    return sides.length ? `${faceLabel(id)}, fence ${sides.join(' and ')}` : faceLabel(id);
+    return sides.length ? `${face}, fence ${sides.join(' and ')}` : face;
+  }
+
+  /**
+   * Seals and wet ink as the board has them now: the seal that may go is drawn
+   * full, later ones paler; each blot shows how wet it still is; dried blots go.
+   */
+  function syncMarks() {
+    const b = session.board;
+    const now = currentSeal(b);
+    for (const [i, el] of cardEls) {
+      if (el.classList.contains('card')) {
+        if (!spec.seals || el.classList.contains('is-gone')) continue;
+        const n = b.seals?.[i] ?? 0;
+        setSeal(el, n, n > now);
+        const v = b.cells[i];
+        if (isCard(v) && !session.hidden.has(i)) el.setAttribute('aria-label', cellLabel(i, v));
+      } else if (el.classList.contains('ink')) {
+        if (isInk(b.cells[i])) setWet(el, b.ink![i]);
+        else {
+          cardEls.delete(i);
+          dryBlot(el);
+        }
+      }
+    }
+  }
+
+  /** Torii twins answer together for a moment, one pair after the other, so the twins read at a glance. */
+  function flashTwins() {
+    for (const t of board.querySelectorAll<HTMLElement>('.torii')) {
+      t.style.setProperty('--twin-d', `${Number(t.dataset.torii) * 260}ms`);
+      retrigger(t, 'is-twin');
+    }
   }
 
   function renderBoard() {
@@ -325,6 +367,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         const g = h('div', { class: 'gate', role: 'img', 'aria-label': gateLabel(gateMonth(v)), 'data-gate': gateMonth(v), html: gateInner(gateMonth(v)) });
         cardEls.set(i, g);
         board.append(g);
+      } else if (isInk(v)) {
+        const k = inkBlot(session.board.ink![i]);
+        cardEls.set(i, k);
+        board.append(k);
       } else if (isCard(v)) {
         const snowy = session.hidden.has(i);
         const c = h('button', {
@@ -335,6 +381,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
           html: cardSvg(snowy ? 'snow' : v),
         });
         if (session.knots.has(i)) setKnot(c, true);
+        const n = session.board.seals?.[i] ?? 0;
+        if (n) setSeal(c, n, n > currentSeal(session.board));
         cardEls.set(i, c);
         board.append(c);
       }
@@ -403,6 +451,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         c.setAttribute('aria-label', snowy ? 'Card under snow' : cellLabel(i, v));
         c.classList.toggle('is-lucky', isBonus(v));
         setKnot(c, session.knots.has(i));
+        const n = session.board.seals?.[i] ?? 0;
+        setSeal(c, n, n > currentSeal(session.board));
       };
       if (flip && !rm) {
         // A quick riffle: each card turns a beat after its neighbour.
@@ -414,6 +464,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         setTimeout(() => c.classList.remove('is-flip'), 440 + d);
       } else swap();
     });
+    // A shuffle's safety net may have dried ink or lifted seals; sync once the faces have turned.
+    if (spec.seals || session.board.ink) setTimeout(syncMarks, flip && !rm ? 360 : 0);
   }
 
   // ── Ink path ──────────────────────────────────────────────────────
@@ -795,6 +847,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         select(target, true);
         sfx.tap();
         haptic.light();
+        flashTwins();
         break;
       case 'deselect':
         select(target, false);
@@ -805,6 +858,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         select(target, true);
         sfx.tap();
         haptic.light();
+        flashTwins();
         break;
       case 'mismatch':
         select(cardEls.get(res.a), false);
@@ -829,6 +883,14 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         sfx.deselect();
         live('This card is tied with a cord. Clear a card next to it first.');
         setCoach('Clear a neighbour');
+        break;
+      case 'sealed':
+        // Not yet: a calm shake here, and the seal that goes first answers.
+        retrigger(target, 'is-shake');
+        for (const [i, c] of cardEls) if (session.board.seals?.[i] === res.first) retrigger(c, 'is-first');
+        sfx.deselect();
+        live(`Not yet. Seal ${res.first} comes first.`);
+        setCoach(`Seal ${res.first} first`);
         break;
     }
   }
@@ -926,6 +988,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
         setTimeout(() => cardEls.forEach((c) => c.classList.remove('is-sliding')), 520);
       }, 200 + gateMs);
     }
+    // Seals and ink: the next seal brightens and the blots dry a shade as the pair lands.
+    if (spec.seals || res.dried.length || session.board.ink) setTimeout(syncMarks, 160 + gateMs);
     // Knots: a freed card's cord slips off once it has settled.
     if (res.untied.length) {
       setTimeout(() => {
@@ -978,7 +1042,9 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     updateHud();
     const left = cardsLeft(session.board) / 2;
     const opened = res.opened.length ? ` ${res.opened.length === 1 ? 'A gate' : `${res.opened.length} gates`} opened.` : '';
-    live(`Pair${res.combo >= 2 ? `, combo ${res.combo}` : ''}. ${left} ${left === 1 ? 'pair' : 'pairs'} left.${opened}`);
+    const dried = res.dried.length ? ` ${res.dried.length === 1 ? 'A blot of ink' : `${res.dried.length} blots of ink`} dried.` : '';
+    const unsealed = res.unsealed.length ? ' The seals lifted so you can go on.' : '';
+    live(`Pair${res.combo >= 2 ? `, combo ${res.combo}` : ''}. ${left} ${left === 1 ? 'pair' : 'pairs'} left.${opened}${dried}${unsealed}`);
     markGates();
     updateGoal(true);
     tutorialStep();
