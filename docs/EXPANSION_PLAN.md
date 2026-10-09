@@ -148,13 +148,15 @@ challenging; each player gets boards near their flow zone; nothing is ever unsol
      grows with time away). A shape's score is the board's score shifted by how long that
      shape took against the player's own pace on the same board;
    - an **engagement signal** and a **flow state** (`flow.ts`): *struggling* (quits, restarts,
-     assists beyond habit, far over par), *frozen* (think time or one find far above their
+     assists on a slow clear, far over par), *frozen* (think time or one find far above their
      norm), *rushing* (many fast misreads), *bored* (quick clean clears in a row), else *flow*;
    - **habits** (`PlayerHabits` in `profile.ts`): scan region (edges vs centre, top vs
-     bottom), slow path shapes, weak mechanics, rush vs freeze, the assist habit; each with a
+     bottom), slow path shapes, weak mechanics, rush vs freeze; each with a
      confidence, "unknown" while thin.
-   Assists are read against the player's **habit** (hints taken even on quick clears): a
-   habitual hint costs a little, assists beyond it in full. Hinted clears count as progress
+   Assists are read **board by board** on a smooth **need** scale (`assistNeed`, 0–1): an
+   early hint on a quick clear is a way of playing (need 0, a small cost); need rises with a
+   slower clear (full at 1.5 × par) and, capped low, with a later first hint and more
+   assists, with no step anywhere. Hinted clears count as progress
    (partial credit), so hint-heavy players are not trapped on the gentlest tier.
 3. **Director** (`src/director/director.ts`, the adjustment policy). Target difficulty for level n =
    designed curve (sawtooth inside a chapter, rising across the road) + skill offset (±0.2) +
@@ -163,7 +165,8 @@ challenging; each player gets boards near their flow zone; nothing is ever unsol
    Mapped to one of **5 tiers**, with hysteresis (keep the last tier unless another is clearly
    closer), a **mastery floor** (rating − 2·dev − 0.05, rising with evidence; skipped while
    struggling) and **at most one tier per board**.
-   Aim: **75–85 % of boards cleared without assists** (beyond habit), with real peaks. A
+   Aim: **75–85 % of boards cleared without assists** (counting each assisted clear's clean
+   credit, 1 − need), with real peaks. A
    level's tier is **pinned** when first started, so a retry or replay is the same board;
    after two failed attempts the Director may re-pin one tier lower (relief).
    It also returns a **`ChallengeRequest`** (`challenge.ts`): the tier plus an emphasis inside

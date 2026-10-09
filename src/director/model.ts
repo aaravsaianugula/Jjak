@@ -28,13 +28,14 @@
  * Assists are read **board by board**, by how much they look like need (`assistNeed`,
  * 0–1): a quick clear (at or under 1.05 × par) with one hint taken early, before any real
  * search, is the way some people like to play (need 0, a *light assist* costing
- * `MODEL.lightCost`); need then rises smoothly with a slower clear (full at 1.5 × par), a
- * later first hint (up to `lateNeed` by 40 s) and each further assist. The score's
+ * `MODEL.lightCost`); need then rises smoothly with a slower clear (full at 1.5 × par),
+ * and, bounded by `quickNeedMax`, with a later first hint and each further assist. The score's
  * assist cost, the clean credit the Director's flow nudge reads and the struggle signal
  * all follow that one number, so there is no step anywhere: a hint one second later or a
  * clear a hair slower moves the reading a hair. This keeps hint-heavy players from
- * sinking to the gentlest tier: on a quick clear the cost stays small enough that a
- * player who hints on every board still rates above what they are served, so the rating
+ * sinking to the gentlest tier: on a quick clear the cost stays small enough, however
+ * late or many the hints, that a player who hints on every board still rates above what
+ * they are served, so the rating
  * cannot ratchet down with the boards (persona-assists.test.ts). Any assist still means
  * "not clean" and "not easy" for everything that could raise difficulty (hints are
  * never sold).
@@ -83,8 +84,17 @@ export const MODEL = {
   earlyHintMs: 10_000,
   lateHintMs: 40_000,
   lateNeed: 0.2,
-  /** assist need added by each assist beyond the first */
+  /** assist need added by each assist beyond the first (before the cap below) */
   extraNeed: 0.15,
+  /**
+   * The most need hint timing and assist count can add on their own (a quick clear): they
+   * approach it smoothly (1 − e^(−x/cap)). Above about 0.2 the assist cost on a quick clear
+   * keeps the score under what the rating expects on every board, whatever its difficulty,
+   * and the rating would ratchet down with the boards it is served to the gentlest tier.
+   */
+  quickNeedMax: 0.15,
+  /** assist need from misreads beside the help (a hint while tapping blocked pairs is need): none to 0.2 blocked taps per pair, this much from 0.4 */
+  misreadNeed: 0.3,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -134,12 +144,16 @@ const ramp = (v: number, lo: number, hi: number) => clamp((v - lo) / (hi - lo), 
 
 /**
  * How much a cleared board's assists read as need, 0–1 (0 with no assist; 1 for an
- * unfinished board): the pace ramp (quickPar → slowPar × par) plus, for a hint, up to
- * `lateNeed` as the first hint comes later (earlyHintMs → lateHintMs; a hint with no
- * recorded time, from an older save, counts as late), plus `extraNeed` per assist beyond
- * the first. Shuffles carry no time, so pace and count grade them. Continuous in hint
- * time and pace, and non-decreasing in every input: a later hint, a slower clear or
- * one more assist never reads as less need.
+ * unfinished board): the pace ramp (quickPar → slowPar × par) plus how the help was
+ * taken: for a hint, up to `lateNeed` as the first hint comes later (earlyHintMs →
+ * lateHintMs; a hint with no recorded time, from an older save, counts as late), and
+ * `extraNeed` per assist beyond the first, that sum eased onto the `quickNeedMax` cap;
+ * plus up to `misreadNeed` when the player also tapped many blocked pairs (help taken
+ * while flailing is need, and it is what a genuinely stuck quick clear looks like).
+ * Shuffles carry no time, so pace and count grade them. Continuous in hint time and
+ * pace, smooth and bounded in assist count, and non-decreasing in every input: a later
+ * hint, a slower clear or one more assist never reads as less need. Only a slow clear
+ * reads as full need, however many hints a quick one took.
  */
 export function assistNeed(r: BoardRecord): number {
   if (!r.cleared) return 1;
@@ -147,7 +161,10 @@ export function assistNeed(r: BoardRecord): number {
   if (n === 0) return 0;
   const pace = ramp(parRatio(r), MODEL.quickPar, MODEL.slowPar);
   const late = r.hints > 0 ? (r.hintAfterMs < 0 ? 1 : ramp(r.hintAfterMs, MODEL.earlyHintMs, MODEL.lateHintMs)) : 0;
-  return clamp(pace + MODEL.lateNeed * late + MODEL.extraNeed * (n - 1), 0, 1);
+  const how = MODEL.lateNeed * late + MODEL.extraNeed * (n - 1);
+  const misreads = MODEL.misreadNeed * ramp(r.blocked / Math.max(1, r.pairs), 0.2, 0.4);
+  const cap = MODEL.quickNeedMax;
+  return clamp(pace + misreads + cap * (1 - Math.exp(-how / cap)), 0, 1);
 }
 
 /**
@@ -297,13 +314,21 @@ export interface Engagement {
   seen: number;
 }
 
-/** How much one board looked like a struggle, 0–1. */
+/**
+ * How much one board looked like a struggle, 0–1 (0.5 and up is a struggle, which brings
+ * a relief board): 1 for an unfinished board; for a clear,
+ *   0.35 · min(assists, 2) · need     two assists on a slow clear are a struggle on their
+ *                                     own; on a quick clear (need ≤ quickNeedMax) never
+ *   + 0.4 · ramp(time/par, 1.25, 2.25) slowness, the straight line through the old steps
+ *                                     (0.2 over 1.5 × par, 0.4 over 2 ×), so one hint turns
+ *                                     a clear into a struggle from about 1.6 × par
+ *   + 0.2 if blocked taps > 0.35 per pair (a misread-heavy board; a count, not a scale)
+ */
 export function struggleOf(r: BoardRecord): number {
   if (!r.cleared) return 1;
-  const ratio = parRatio(r);
-  const slow = ratio > 2 ? 0.4 : ratio > 1.5 ? 0.2 : 0;
+  const slow = 0.4 * ramp(parRatio(r), 1.25, 2.25);
   const misreads = r.blocked / Math.max(1, r.pairs) > 0.35 ? 0.2 : 0;
-  return clamp(0.35 * assistsOf(r) * assistNeed(r) + slow + misreads, 0, 1);
+  return clamp(0.35 * Math.min(assistsOf(r), 2) * assistNeed(r) + slow + misreads, 0, 1);
 }
 
 /**

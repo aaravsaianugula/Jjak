@@ -85,6 +85,8 @@ export interface SimOptions {
   hintMs?: number;
   /** the habitual assist is a shuffle instead of a hint */
   shuffle?: boolean;
+  /** how many of them it takes on such a board (default 1) */
+  count?: number;
   /**
    * The pace of an assisted clean clear (the par-ratio sweep): this × par on a board at the
    * player's skill instead of 0.9 × par, quicker on easier boards as every clear is
@@ -132,7 +134,8 @@ export function simulate(p: Persona, seed: string, boards = 300, a: AnalyticsSav
     let rec = playBoard(rng, theta, real, n, choice.tier, measured);
     // A habitual assist on a board it clears cleanly anyway: a hint (early unless `hintMs`) or a shuffle.
     if (opts.freeHints && hintRng.next() < opts.freeHints && isClean(rec)) {
-      const assist = opts.shuffle ? { shuffles: 1 } : { hints: 1, hintAfterMs: opts.hintMs ?? 3000 };
+      const k = opts.count ?? 1;
+      const assist = opts.shuffle ? { shuffles: k } : { hints: k, hintAfterMs: opts.hintMs ?? 3000 };
       rec = { ...rec, ...assist, ...(opts.parRatio != null ? { ms: (rec.ms * opts.parRatio) / 0.9 } : {}), stars: 2 };
     }
     ingest(a, rec, { replay: wasCleared });

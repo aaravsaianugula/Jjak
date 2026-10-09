@@ -13,9 +13,10 @@
  *                                                  rushing    → none (their quick clears aren't
  *                                                  boredom; the challenge leans on decoys instead)
  *          + flow                                  a nudge (±0.1, over the last 20 boards) toward an 80 % clean-clear rate,
- *            "clean" being clean or a light assist (one hint on a quick clear, model.ts):
- *            a hint on a slow clear counts as a miss, so hints never earn a harder board;
- *            stretch boards follow strictly clean streaks only.
+ *            each board counting its clean credit (model.ts `cleanCredit`): 1 clean, 1 − need
+ *            when assisted (an early hint on a quick clear counts in full, a hint on a clear
+ *            at 1.5 × par or slower not at all, smoothly between), so hints never earn a
+ *            harder board; stretch boards follow strictly clean streaks only.
  *
  * mapped to the tier (0–4) whose board difficulty is closest, then:
  *  - a **mastery floor** (`masteryFloor`): never below the tier the player has shown,

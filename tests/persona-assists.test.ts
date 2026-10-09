@@ -24,8 +24,17 @@ const mean = (xs: number[]) => xs.reduce((s, v) => s + v, 0) / Math.max(1, xs.le
 
 function point(who: string, opts: SimOptions) {
   const runs = SEEDS.map((seed) => simulate(PERSONAS[who], seed, BOARDS, defaultAnalytics(), { freeHints: 1, ...opts }));
-  return { d: mean(runs.flatMap((r) => r.slice(WARMUP).map((s) => s.d))), rating: mean(runs.map((r) => r[r.length - 1].rating)) };
+  const settled = runs.flatMap((r) => r.slice(WARMUP));
+  return {
+    d: mean(settled.map((s) => s.d)),
+    rating: mean(runs.map((r) => r[r.length - 1].rating)),
+    tier0: mean(settled.map((s) => Number(s.tier === 0))),
+    // the road still rises under it: the last 60 boards against the first 60 settled ones
+    climb: mean(runs.map((r) => mean(r.slice(-60).map((s) => s.d)) - mean(r.slice(WARMUP, WARMUP + 60).map((s) => s.d)))),
+  };
 }
+
+const show = (pts: { d: number; tier0: number }[]) => `d ${pts.map((p) => p.d.toFixed(3)).join(' ')}  tier-0 ${pts.map((p) => p.tier0.toFixed(2)).join(' ')}`;
 
 function largestSteps(points: { d: number; rating: number }[]) {
   let d = 0;
@@ -40,8 +49,10 @@ function largestSteps(points: { d: number; rating: number }[]) {
 const HINT_MS = Array.from({ length: 11 }, (_, i) => 5000 + 2500 * i);
 const PAR_RATIOS = Array.from({ length: 15 }, (_, i) => Math.round((0.9 + 0.05 * i) * 100) / 100);
 
+const SWEPT = ['expert', 'strong', 'steady', 'weak'];
+
 describe('assists are read without a cliff', () => {
-  for (const who of ['expert', 'strong', 'steady']) {
+  for (const who of SWEPT) {
     it(`${who}: served d and rating change smoothly with hint time (5 → 30 s) and pace (0.9 → 1.6 × par)`, () => {
       const sweeps = {
         'hint time': HINT_MS.map((hintMs) => point(who, { hintMs })),
@@ -80,4 +91,49 @@ describe('the mastery floor holds a player who leans on help', () => {
     // the floor is doing work here, not standing idle under every board
     expect(held).toBeGreaterThan(20);
   });
+});
+
+/**
+ * How many assists, and hints long after the start: a skilled player who leans on several
+ * hints (or shuffles) on every board, or hints only after a long look, is eased (served d
+ * never rises with the count) but is not pinned to the gentlest tier and still climbs
+ * with the road. Neighbouring counts give neighbouring served d.
+ */
+describe('assist count and late hints are read without a cliff', () => {
+  const HINTS = [1, 2, 3, 4, 5, 6];
+  const SHUFFLES = [1, 2, 3];
+  const LATE_MS = [30_000, 45_000, 60_000, 90_000, 120_000];
+  /**
+   * The tier-0 share that reads as pinned. The expert and strong players never sit there
+   * unassisted. The steady player sits on the boundary between tiers 0 and 1 (tier-0 share
+   * about 0.3 unassisted), so easing it by half a tier step moves most of its boards onto
+   * tier 0; pinned is nearly all of them (it was 0.86–1.00 with the count cliff).
+   */
+  const PINNED: Record<string, number> = { expert: 0.25, strong: 0.25, steady: 0.8 };
+  /** a little room for run-to-run scatter when checking that more assists never serve harder boards */
+  const SCATTER = 0.006;
+
+  for (const who of SWEPT) {
+    it(`${who}: 1–6 hints, 1–3 shuffles and a first hint at 30–120 s ease smoothly and never pin`, () => {
+      const sweeps = {
+        'early hints 1–6': HINTS.map((count) => point(who, { hintMs: 5000, count })),
+        'hints 1–6 at 30 s': HINTS.map((count) => point(who, { hintMs: 30_000, count })),
+        'shuffles 1–3': SHUFFLES.map((count) => point(who, { shuffle: true, count })),
+        'one hint 30–120 s': LATE_MS.map((hintMs) => point(who, { hintMs })),
+        'two hints 30–120 s': LATE_MS.map((hintMs) => point(who, { hintMs, count: 2 })),
+      };
+      for (const [name, pts] of Object.entries(sweeps))
+        console.log(`[assists] ${who.padEnd(6)} ${name.padEnd(18)} ${show(pts)}  climb ${pts.map((p) => p.climb.toFixed(2)).join(' ')}  largest step d ${largestSteps(pts).d.toFixed(3)}`);
+      for (const [name, pts] of Object.entries(sweeps)) {
+        const step = largestSteps(pts);
+        expect(step.d, `${who} ${name}: served d`).toBeLessThanOrEqual(MAX_STEP_D);
+        for (let i = 1; i < pts.length; i++) expect(pts[i].d, `${who} ${name}: more help, harder boards`).toBeLessThanOrEqual(pts[i - 1].d + SCATTER);
+        if (who !== 'weak') {
+          // the weak player lives on the gentlest tier with no help at all (model.test.ts)
+          for (const p of pts) expect(p.tier0, `${who} ${name}: pinned to tier 0`).toBeLessThan(PINNED[who]);
+          for (const p of pts) expect(p.climb, `${who} ${name}: stopped climbing`).toBeGreaterThan(0.05);
+        }
+      }
+    });
+  }
 });
