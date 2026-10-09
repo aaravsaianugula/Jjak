@@ -11,7 +11,7 @@
  * evidence for the per-mechanic proficiency either (the model stays about real play).
  */
 import { type LevelSpec, type Mechanic, journeyLevel } from '../engine/levels';
-import { MECHANICS, MECHANIC_IDS, mechanicsOf } from '../engine/mechanics';
+import { MECHANICS, MECHANIC_IDS } from '../engine/mechanics';
 import { BANK_LEVELS, bankSpec } from './bank';
 
 /** Boards offered per mechanic. */
@@ -50,18 +50,17 @@ const boards = new Map<Mechanic, LevelSpec[]>();
 
 /**
  * A few gentle boards for this mechanic, in road order: the bank's tier-0 boards of
- * the first levels that feature it and nothing the player meets later. No goal and no
+ * the first levels that feature it (the road brings ideas in order, so nothing on them
+ * is newer than this one: tests/practice.test.ts checks it). No goal and no
  * festival dressing (practice has no blossoms); numbered 1…PRACTICE_BOARDS.
  */
 export function practiceBoards(m: Mechanic): LevelSpec[] {
   const cached = boards.get(m);
   if (cached) return cached.map((s) => ({ ...s }));
-  const chapter = MECHANICS[m].introChapter;
   const out: LevelSpec[] = [];
   for (let n = 1; n <= BANK_LEVELS && out.length < PRACTICE_BOARDS; n++) {
     const spec = bankSpec(n, PRACTICE_TIER);
     if (!MECHANICS[m].on(spec)) continue;
-    if (mechanicsOf(spec).some((x) => MECHANICS[x].introChapter > chapter)) continue;
     const board: LevelSpec = { ...spec, mode: 'practice', number: out.length + 1, practice: m };
     delete board.goal;
     delete board.festival;
