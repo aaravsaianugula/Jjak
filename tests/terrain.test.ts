@@ -298,7 +298,7 @@ describe('pickTorii and pickStreams', () => {
       const rows = 6 + rng.int(3);
       const cols = 5 + rng.int(3);
       const blocked = new Set<number>([cols + 1, 3 * cols + 2]);
-      const count = 2 + 2 * rng.int(3);
+      const count = 2 + rng.int(5); // odd asks too: the result is always even
       const w = pickStreams(rows, cols, count, rng, blocked);
       expect(w.length % 2).toBe(0);
       expect(w.length).toBeLessThanOrEqual(count);
