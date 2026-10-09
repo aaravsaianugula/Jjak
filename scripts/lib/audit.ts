@@ -43,6 +43,8 @@ export interface CurveLevel {
   fun?: string[];
   /** per tier, the fun shape: [easySeconds, crunch, closingRun] */
   funShape?: number[][];
+  /** per tier, how many tailoring alternates the bank slot holds */
+  alts?: number[];
   /** feature distance to the previous level's tier-2 board (small = alike) */
   sim: number;
   /** the pre-Director journeyLevel board, measured the same way */
@@ -61,6 +63,17 @@ const f2 = (x: number) => (Number.isFinite(x) ? x.toFixed(2) : '–');
 const ROLES = ['open', 'focus', 'plain', 'focus', 'focus', 'mix', 'rest', 'focus', 'mix', 'focus', 'peak', 'festival'];
 /** Too alike: tier-2 feature distance to the previous level under this. */
 export const SIMILAR = 0.12;
+
+/** Everything from this line down in docs/level-audit.md is hand-written and kept by every re-render. */
+export const KEPT_MARKER = '<!-- Kept: everything below this line is written by hand and survives `npm run bank` and `npm run bank:audit`. -->';
+
+/** A fresh render with the previous file's hand-written part (from KEPT_MARKER down) appended unchanged. */
+export function withKept(rendered: string, previous: string | null): string {
+  const at = previous ? previous.indexOf(KEPT_MARKER) : -1;
+  return at < 0 ? rendered : `${rendered.trimEnd()}
+
+${previous!.slice(at)}`;
+}
 
 export function renderAudit(c: CurveFile): string {
   const L = c.levels.filter((l) => l.after && l.after.length === 5);
@@ -224,6 +237,38 @@ export function renderAudit(c: CurveFile): string {
       out.push(`| Feature distance to the previous level (tier 2) | ${dist(varied.map((l) => l.sim))} | |`);
       out.push('');
     }
+  }
+
+  // 5b. Tailoring alternates: how many slots have something to choose from.
+  const alted = L.filter((l) => l.alts && l.alts.length === 5 && l.n > 6);
+  if (alted.length) {
+    const tally = (ls: CurveLevel[], tiers = [0, 1, 2, 3, 4]) => {
+      const xs = ls.flatMap((l) => tiers.map((t) => l.alts![t]));
+      return { held: xs.reduce((s, x) => s + x, 0), share: `${((100 * xs.filter((x) => x > 0).length) / Math.max(1, xs.length)).toFixed(0)} %` };
+    };
+    const cov = (ls: CurveLevel[], tiers?: number[]) => {
+      const t = tally(ls, tiers);
+      return `${t.held} · ${t.share}`;
+    };
+    const mechsOf = (l: CurveLevel) => (l.mech ? l.mech.split('+') : ['plain']);
+    out.push('## Tailoring alternates');
+    out.push('');
+    out.push("Each level-tier past the teaching levels keeps up to two alternates: valid, solver-proven boards with a foothold, within 0.04 d of the tier's board, about as fun, each leaning clearly more on something (a reading feature or a mechanic count). Cells: alternates held · share of slots with at least one.");
+    out.push('');
+    out.push('| Levels | All tiers | T0 | T1 | T2 | T3 | T4 |');
+    out.push('|---|---|---|---|---|---|---|');
+    for (let a = 1; a <= 600; a += 100) {
+      const band = alted.filter((l) => l.n >= a && l.n < a + 100);
+      if (band.length) out.push(`| ${a}–${a + 99} | ${cov(band)} | ${[0, 1, 2, 3, 4].map((t) => cov(band, [t])).join(' | ')} |`);
+    }
+    out.push(`| **all** | **${cov(alted)}** | ${[0, 1, 2, 3, 4].map((t) => cov(alted, [t])).join(' | ')} |`);
+    out.push('');
+    const mechs = [...new Set(alted.flatMap(mechsOf))];
+    out.push(`Slots with at least one alternate, by mechanic: ${mechs.map((m) => `${m} ${tally(alted.filter((l) => mechsOf(l).includes(m))).share}`).join(', ')}.`);
+    out.push('');
+    const lacking = alted.flatMap((l) => [0, 1, 2, 3, 4].filter((t) => l.alts![t] === 0).map((t) => `${l.n}/${t}`));
+    out.push(`Level/tier slots with no alternate (${lacking.length}): ${lacking.slice(0, 60).join(', ')}${lacking.length > 60 ? ', …' : ''}.`);
+    out.push('');
   }
 
   // 6. Too similar to neighbours.

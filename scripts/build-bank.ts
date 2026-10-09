@@ -24,12 +24,12 @@ import { bankSeed, encodeSlot } from '../src/director/bank';
 import { type Metrics, funChecks, measure } from '../src/director/metrics';
 import { type LevelPlan, knobRange, levelPlan } from '../src/director/plan';
 import { FEATURE_KEYS, type ReadingFeatures, encodeFeatures, featuresOf } from '../src/director/reading';
-import { type Candidate, type Feature, featureOf, funScore, searchTiers, tierTarget, tryCandidate } from '../src/director/search';
+import { type Candidate, type Feature, featureOf, funScore, neighbour, searchTiers, tierTarget, tryCandidate } from '../src/director/search';
 import { TAILOR } from '../src/director/tailor';
 import { boardHash } from '../src/director/validate';
 import { buildBoard, windOf } from '../src/engine/levels';
 import { legacyJourneyLevel } from './lib/legacy-journey';
-import { type CurveFile, type CurveLevel, renderAudit } from './lib/audit';
+import { type CurveFile, type CurveLevel, renderAudit, withKept } from './lib/audit';
 
 const LEVELS = 600;
 const TIERS = 5;
@@ -72,7 +72,7 @@ const funCode = (m: Metrics) => {
 
 /** Tailoring alternates per (level, tier), and how many pool boards are read to choose them. */
 const ALTERNATES = 2;
-const READ_AT_MOST = 5;
+const READ_AT_MOST = 8;
 /** an alternate must add at least this much lean (summed over what it leans on more) */
 const MIN_LEAN = 0.08;
 
@@ -83,6 +83,14 @@ const MECH_KNOBS = ['stones', 'snow', 'knots', 'gates', 'fences'] as const;
 /** fresh deals of the chosen knobs tried per tier, numbered from FRESH_FROM (clear of the search's attempts) */
 const FRESH = 5;
 const FRESH_FROM = 900;
+/**
+ * More deals for a tier that still has no alternate after the first FRESH: a deal's d
+ * scatters widely around its knobs' typical d (often ±0.15 on the hard tiers), so the
+ * search's pick tends to sit off-centre. When the first deals land mostly to one side of
+ * it, these deals step one knob towards it (inside the level's ranges, as the search's
+ * own neighbours do), so more of them land within the d tolerance.
+ */
+const MORE = 20;
 
 /** What a board leans on, as one vector: its reading features and its mechanic counts within the level's range. */
 function leanVector(plan: LevelPlan, c: Candidate, f: ReadingFeatures): number[] {
@@ -94,52 +102,84 @@ function leanVector(plan: LevelPlan, c: Candidate, f: ReadingFeatures): number[]
   return [...FEATURE_KEYS.map((k) => f[k]), ...mech];
 }
 
+const median = (xs: number[]) => {
+  const s = xs.slice().sort((a, b) => a - b);
+  return s.length ? s[Math.floor(s.length / 2)] : 0;
+};
+
 /**
  * The bank slot for one tier: its board and its features, then up to ALTERNATES other
- * valid boards from the same search (within the d tolerance, as fun, with a foothold)
- * that each lean clearly more on something the boards before them don't (greedy).
+ * valid boards from the same search or fresh deals (within the d tolerance, as fun, with
+ * a foothold) that each lean clearly more on something the boards before them don't
+ * (greedy). Also returns how many alternates the slot holds.
  */
-function slotFor(plan: LevelPlan, tier: number, pick: Candidate, searched: readonly Candidate[]): string {
+function slotFor(plan: LevelPlan, tier: number, pick: Candidate, searched: readonly Candidate[]): { slot: string; alts: number } {
   const hash = (c: Candidate) => boardHash(c.spec, c.board);
-  // The search's own pool, plus a few fresh seeds of the chosen knobs (same identity and
-  // counts, a different deal): these usually land within the d tolerance.
-  const fresh: Candidate[] = [];
-  if (!plan.fixed) {
-    for (let k = 0; k < FRESH; k++) {
-      const attempt = FRESH_FROM + k;
-      const c = tryCandidate(plan, pick.knobs, bankSeed(plan.n, tier, attempt), tier);
-      if (c.verdict.ok) fresh.push({ ...c, attempt, fitness: 0, feature: [] });
-    }
-  }
-  const pool = [...searched, ...fresh];
   const f0 = readingOf(pick);
-  const boards = [{ entry: { attempt: pick.attempt, knobs: pick.knobs, d: pick.metrics.d, hash: hash(pick) }, features: encodeFeatures(f0) }];
-  if (plan.fixed) return encodeSlot(boards);
-  const seen = new Set([boards[0].entry.hash]);
-  const near = pool
-    .filter((c) => c !== pick && Math.abs(c.metrics.d - pick.metrics.d) <= TAILOR.maxDGap && c.metrics.easyOpen >= 1 && funScore(c.metrics) >= funScore(pick.metrics) - 0.1)
-    .filter((c) => {
-      const h = hash(c);
-      if (seen.has(h)) return false;
-      seen.add(h);
-      return true;
-    })
-    .sort((a, b) => Math.abs(a.metrics.d - pick.metrics.d) - Math.abs(b.metrics.d - pick.metrics.d))
-    .slice(0, READ_AT_MOST)
-    .map((c) => {
+  const primary = { entry: { attempt: pick.attempt, knobs: pick.knobs, d: pick.metrics.d, hash: hash(pick) }, features: encodeFeatures(f0) };
+  if (plan.fixed) return { slot: encodeSlot([primary]), alts: 0 };
+  const pickHash = primary.entry.hash;
+  const near = (c: Candidate) => Math.abs(c.metrics.d - pick.metrics.d) <= TAILOR.maxDGap && c.metrics.easyOpen >= 1 && funScore(c.metrics) >= funScore(pick.metrics) - 0.1;
+  const read = new Map<string, { c: Candidate; f: ReadingFeatures; v: number[] }>();
+  const readOf = (c: Candidate, h: string) => {
+    let r = read.get(h);
+    if (!r) {
       const f = readingOf(c);
-      return { c, f, v: leanVector(plan, c, f) };
-    });
-  let top = leanVector(plan, pick, f0);
-  for (let k = 0; k < ALTERNATES && near.length; k++) {
-    const gain = (v: number[]) => v.reduce((s, x, i) => s + Math.max(0, x - top[i]), 0);
-    near.sort((a, b) => gain(b.v) - gain(a.v));
-    const best = near.shift()!;
-    if (gain(best.v) < MIN_LEAN) break;
-    boards.push({ entry: { attempt: best.c.attempt, knobs: best.c.knobs, d: best.c.metrics.d, hash: hash(best.c) }, features: encodeFeatures(best.f) });
-    top = top.map((x, i) => Math.max(x, best.v[i]));
+      r = { c, f, v: leanVector(plan, c, f) };
+      read.set(h, r);
+    }
+    return r;
+  };
+  // The search's own pool, plus fresh deals (same identity and counts, a different deal).
+  const pool = [...searched];
+  const deal = (attempt: number, knobs: Candidate['knobs']): Candidate | null => {
+    const c = tryCandidate(plan, knobs, bankSeed(plan.n, tier, attempt), tier);
+    if (!c.verdict.ok) return null;
+    const v = { ...c, attempt, fitness: 0, feature: [] };
+    pool.push(v);
+    return v;
+  };
+  const choose = () => {
+    const seen = new Set([pickHash]);
+    const cands = pool
+      .filter((c) => c !== pick && near(c))
+      .map((c) => ({ c, h: hash(c) }))
+      .filter(({ h }) => {
+        if (seen.has(h)) return false;
+        seen.add(h);
+        return true;
+      })
+      .sort((a, b) => Math.abs(a.c.metrics.d - pick.metrics.d) - Math.abs(b.c.metrics.d - pick.metrics.d))
+      .slice(0, READ_AT_MOST)
+      .map(({ c, h }) => readOf(c, h));
+    const boards = [primary];
+    let top = leanVector(plan, pick, f0);
+    for (let k = 0; k < ALTERNATES && cands.length; k++) {
+      const gain = (v: number[]) => v.reduce((s, x, i) => s + Math.max(0, x - top[i]), 0);
+      cands.sort((a, b) => gain(b.v) - gain(a.v));
+      const best = cands.shift()!;
+      if (gain(best.v) < MIN_LEAN) break;
+      boards.push({ entry: { attempt: best.c.attempt, knobs: best.c.knobs, d: best.c.metrics.d, hash: hash(best.c) }, features: encodeFeatures(best.f) });
+      top = top.map((x, i) => Math.max(x, best.v[i]));
+    }
+    return boards;
+  };
+  const gaps: number[] = [];
+  for (let k = 0; k < FRESH; k++) {
+    const c = deal(FRESH_FROM + k, pick.knobs);
+    if (c) gaps.push(c.metrics.d - pick.metrics.d);
   }
-  return encodeSlot(boards);
+  let boards = choose();
+  // Still nothing to choose from: deal more, stepping a knob towards the pick when the
+  // first deals mostly missed it on one side.
+  const lean = median(gaps);
+  const dir: 0 | 1 | -1 = lean > TAILOR.maxDGap ? -1 : lean < -TAILOR.maxDGap ? 1 : 0;
+  for (let k = 0; boards.length < 2 && k < MORE; k++) {
+    const knobs = dir ? neighbour(plan, pick.knobs, dir, k) ?? pick.knobs : pick.knobs;
+    const c = deal(FRESH_FROM + FRESH + k, knobs);
+    if (c && near(c)) boards = choose();
+  }
+  return { slot: encodeSlot(boards), alts: boards.length - 1 };
 }
 
 function runChapter(ch: number, K: number): LevelResult[] {
@@ -166,7 +206,8 @@ function runChapter(ch: number, K: number): LevelResult[] {
       out.push({ n, entries: [], curve: { ...curveBase, after: [], t2: null, sim: 0 }, tried: 0, rejected: {}, repaired: false, failed: true });
       continue;
     }
-    const entries = r.picks.map((c, t) => slotFor(plan, t, c, r.pools[t]));
+    const slots = r.picks.map((c, t) => slotFor(plan, t, c, r.pools[t]));
+    const entries = slots.map((s) => s.slot);
     r.picks.forEach((c, t) => {
       recentByTier[t].push(c.feature);
       if (recentByTier[t].length > 3) recentByTier[t].shift();
@@ -185,6 +226,7 @@ function runChapter(ch: number, K: number): LevelResult[] {
         fun: r.picks.map((c) => funCode(c.metrics)),
         funShape: r.picks.map((c) => [+c.metrics.easySeconds.toFixed(1), +c.metrics.crunch.toFixed(2), +c.metrics.closingRun.toFixed(1)]),
         sim,
+        alts: slots.map((s) => s.alts),
       },
       tried: r.tried,
       rejected: r.rejected,
@@ -284,7 +326,7 @@ function main() {
       bankBytes: Buffer.byteLength(json),
     };
     writeFileSync(curvePath, JSON.stringify(curve) + '\n');
-    writeFileSync(auditPath, renderAudit(curve));
+    writeFileSync(auditPath, withKept(renderAudit(curve), existsSync(auditPath) ? readFileSync(auditPath, 'utf8') : null));
     console.log(`bank: ${LEVELS * TIERS - missing}/${LEVELS * TIERS} entries, ${Buffer.byteLength(json)} bytes, ${stats.tried} boards tried, ${stats.repaired} levels repaired, failed: [${stats.failed.join(', ')}], ${curve.build.seconds}s`);
     if (stats.failed.length || missing) process.exitCode = 1;
   };

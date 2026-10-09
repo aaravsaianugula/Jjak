@@ -16,7 +16,9 @@
     "screens": "node scripts/screenshots.mjs",
     "brand": "node scripts/render-brand.mjs",
     "bank": "rolldown ./scripts/build-bank.ts --file dist/bank/build-bank.mjs --platform node --format esm --log-level warn && node dist/bank/build-bank.mjs",
-    "bank:audit": "rolldown ./scripts/audit-bank.ts --file dist/bank/audit-bank.mjs --platform node --format esm --log-level warn && node dist/bank/audit-bank.mjs"
+    "bank:audit": "rolldown ./scripts/audit-bank.ts --file dist/bank/audit-bank.mjs --platform node --format esm --log-level warn && node dist/bank/audit-bank.mjs",
+    "bank:compare": "rolldown ./scripts/compare-curves.ts --file dist/bank/compare-curves.mjs --platform node --format esm --log-level warn && node dist/bank/compare-curves.mjs",
+    "endless:timing": "rolldown ./scripts/endless-timing-node.ts --file dist/bank/endless-timing-node.mjs --platform node --format esm --log-level warn && node dist/bank/endless-timing-node.mjs"
   },
   "engines": {
     "node": ">=22"
