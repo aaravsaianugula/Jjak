@@ -149,6 +149,8 @@ export const FOCI = [
 export const isFocus = (f: unknown): f is string => typeof f === 'string' && (FOCI as readonly string[]).includes(f);
 
 export const RECENT_CAP = 40;
+/** two characters for each of the 600 Journey levels (the Director only pins those) */
+export const FOCI_CAP = 1200;
 export const DAYS_CAP = 60;
 export const EMPHASES_CAP = 8;
 
@@ -286,6 +288,6 @@ export function hydrateAnalytics(raw: unknown): AnalyticsSave {
         : undefined,
     shapes,
     emphases,
-    foci: typeof r.foci === 'string' ? r.foci.replace(/[^a-z0-9.]/g, '.') : '',
+    foci: typeof r.foci === 'string' ? r.foci.slice(0, FOCI_CAP).replace(/[^a-z0-9.]/g, '.') : '',
   };
 }

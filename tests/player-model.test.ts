@@ -67,6 +67,7 @@ describe('save shape', () => {
     const a = hydrateAnalytics({ rating: 0.4, mech: { wind: { n: 3, score: 0.6, quits: 1, replays: 0 } } });
     expect(a.shapes).toEqual({});
     expect(a.emphases).toEqual([]);
+    expect(hydrateAnalytics({ foci: 'a5'.repeat(5000) }).foci.length).toBe(1200);
     expect(a.mech.wind.r).toBeCloseTo(0.4);
     expect(a.mech.wind.dev).toBe(SKILL.devStart);
     const b = hydrateAnalytics({
