@@ -172,6 +172,8 @@ const mechOfSpec = (s: LevelSpec): string[] => {
   if (s.fences) out.push('fences');
   if (s.torii) out.push('torii');
   if (s.streams) out.push('streams');
+  if (s.seals) out.push('seals');
+  if (s.ink) out.push('ink');
   return out;
 };
 export const feelOfSpec = (s: LevelSpec) => feelOf({ rows: s.rows, cols: s.cols, goal: s.goal, mech: mechOfSpec(s) });
@@ -206,6 +208,8 @@ export function identityOf(n: number, spec: LevelSpec): LevelPlan {
     fences: (spec.fences ?? 0) > 0,
     torii: (spec.torii ?? 0) > 0,
     streams: (spec.streams ?? 0) > 0,
+    seals: (spec.seals ?? 0) > 0,
+    ink: (spec.ink ?? 0) > 0,
   };
   const mechanics = MECHANIC_IDS.filter((m) => has[m]);
   const wind = has.leaves ? 'down' : has.wind ? (spec.gravity as LevelPlan['wind']) : null;
@@ -286,7 +290,7 @@ export function endlessIdentity(n: number, t: Tailoring, state: EndlessState, pr
   if (goal) plan.goal = goal;
   else delete plan.goal;
   const k2 = tierKnobs(plan, 2);
-  plan.par = parOf(plan, (rows * cols - k2.stones - k2.gates - 2 * k2.torii - k2.streams) / 2);
+  plan.par = parOf(plan, (rows * cols - k2.stones - k2.gates - 2 * k2.torii - k2.streams - k2.ink) / 2);
   plan.spec = planSpec(plan, k2, `endless-${n}`);
   return plan;
 }
@@ -533,7 +537,7 @@ export function runEndlessJob(job: EndlessJob, now: () => number = () => Date.no
   for (let t = tier - 1; t >= 0; t--) ladder.push(tierKnobs(plan, t));
   const r0 = knobRange(plan);
   const low = ladder.length ? ladder[ladder.length - 1] : centre;
-  ladder.push(clampKnobs(plan, { ...low, stones: r0.stones[0], snow: r0.snow[0], knots: r0.knots[0], gates: r0.gates[0], fences: r0.fences[0], torii: r0.torii[0], streams: r0.streams[0] }));
+  ladder.push(clampKnobs(plan, { ...low, stones: r0.stones[0], snow: r0.snow[0], knots: r0.knots[0], gates: r0.gates[0], fences: r0.fences[0], torii: r0.torii[0], streams: r0.streams[0], seals: r0.seals[0], ink: r0.ink[0] }));
   for (let i = 0; !pool.length && tried < job.maxAttempts + 2 * ladder.length && (i === 0 || elapsed() < hardMs); i++) {
     tryKnobs(ladder[Math.min(ladder.length - 1, Math.floor(i / 2))], 0);
   }

@@ -22,7 +22,7 @@ export function calendarSeason(d: Date): Season {
 }
 
 /** The idea a chapter features. 'basics' = chapter 1, 'mix' = several at once. */
-export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams' | 'mix';
+export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams' | 'seals' | 'ink' | 'mix';
 
 export interface RouteChapter {
   /** stable id (save files key stamps by it) */
@@ -82,12 +82,12 @@ const ROWS: Row[] = [
   // 29–32
   ['fujigoko', 'Fuji Five Lakes', '후지고코', '富士五湖', 'JP', '#c06a8e', 'wind', 'Fields of pink moss phlox spread beneath Mount Fuji near Lake Motosu.'],
   ['tongyeong', 'Tongyeong', '통영', '統營', 'KR', '#2f7a8a', 'knots', 'Small green islands scatter across the calm sea around Tongyeong’s harbour.'],
-  ['takayama', 'Takayama', '다카야마', '高山', 'JP', '#b45a2c', 'lucky', 'Each October, lantern-hung festival floats roll through the old streets of Takayama.'],
+  ['takayama', 'Takayama', '다카야마', '高山', 'JP', '#b45a2c', 'seals', 'Each October, lantern-hung festival floats roll through the old streets of Takayama, one after another in a set order.'],
   ['hwacheon', 'Hwacheon', '화천', '華川', 'KR', '#4b7194', 'snow', 'In January, families fish through holes in the frozen river at the Hwacheon ice festival.'],
   // 33–36
   ['gangneung', 'Gangneung', '강릉', '江陵', 'KR', '#c26a80', 'wind', 'Cherry trees ring Gyeongpo Lake, where poets once counted five moons in a single night.'],
   ['furano', 'Furano', '후라노', '富良野', 'JP', '#7b62a6', 'mix', 'In July, rows of lavender stripe the rolling hills of Furano in purple.'],
-  ['jeonju', 'Jeonju', '전주', '全州', 'KR', '#b8892a', 'knots', 'Ginkgo leaves turn gold above the tiled roofs of Jeonju’s hanok village.'],
+  ['jeonju', 'Jeonju', '전주', '全州', 'KR', '#b8892a', 'ink', 'Ginkgo leaves turn gold above the tiled roofs of Jeonju’s hanok village, long a home of hanji paper.'],
   ['beppu', 'Beppu', '벳푸', '別府', 'JP', '#7a6658', 'stones', 'Steam from thousands of hot springs drifts over Beppu in the cold air.'],
   // 37–40
   ['uji', 'Uji', '우지', '宇治', 'JP', '#4f7d45', 'mix', 'In late spring, the year’s first tea is picked on the green hills around Uji.'],

@@ -23,6 +23,13 @@ export const toriiOf = (pair: number): number => TORII - pair;
 export const isWater = (v: number): boolean => v === WATER;
 /** Fixed terrain a path may use but no card ever sits on: water and torii. */
 export const isTerrain = (v: number): boolean => v === WATER || isTorii(v);
+/**
+ * Wet ink (먹 · 墨) on a cell with no card: it blocks paths like a stone until
+ * it dries. `Board.ink` holds how many more pairs each blot stays wet; when
+ * that reaches 0 the cell becomes EMPTY (see rules.ts).
+ */
+export const INK = -6;
+export const isInk = (v: number): boolean => v === INK;
 /** A gate (門) of month m is stored as GATE - m. It blocks like a stone until a pair of m is cleared. */
 export const GATE = -16;
 
@@ -46,6 +53,15 @@ export interface Board {
    * cross a fence; it never changes, so clones share it.
    */
   walls?: Uint8Array;
+  /**
+   * Ordered seals (도장 · 印), per cell: 0 for none, else the seal's number. A
+   * sealed card can only be picked once every lower number is gone from the
+   * board. Seals belong to their card: they go when it is cleared and follow it
+   * through a reshuffle.
+   */
+  seals?: number[];
+  /** Wet ink, per cell: pairs left before the blot on that INK cell dries (0 elsewhere). */
+  ink?: number[];
 }
 
 export interface Point {
@@ -66,7 +82,10 @@ export const idx = (b: Board, r: number, c: number): number => r * b.cols + c;
 export const pointOf = (b: Board, i: number): Point => ({ r: Math.floor(i / b.cols), c: i % b.cols });
 
 export function cloneBoard(b: Board): Board {
-  return b.walls ? { rows: b.rows, cols: b.cols, cells: b.cells.slice(), walls: b.walls } : { rows: b.rows, cols: b.cols, cells: b.cells.slice() };
+  const out: Board = b.walls ? { rows: b.rows, cols: b.cols, cells: b.cells.slice(), walls: b.walls } : { rows: b.rows, cols: b.cols, cells: b.cells.slice() };
+  if (b.seals) out.seals = b.seals.slice();
+  if (b.ink) out.ink = b.ink.slice();
+  return out;
 }
 
 /** True when a fence stands between two orthogonally adjacent cells. */

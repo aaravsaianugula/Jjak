@@ -488,3 +488,128 @@
     animation: none;
   }
 }
+
+/* ───────── Seals (도장 · 印) and wet ink (먹 · 墨). Art: src/art/rule-marks.ts ───────── */
+:root {
+  --seal: #c23b22;
+  --seal-cut: #fbf3e4;
+  --ink-blot: #1f1b18;
+  --ink-bleed: rgba(31, 27, 24, 0.2);
+  --ink-rim: transparent;
+  --ink-sheen: rgba(255, 255, 255, 0.55);
+}
+:root[data-theme='ink'],
+:root[data-theme='dark'] {
+  --seal: #d4563a;
+  --seal-cut: #fff4e2;
+  --ink-blot: #070605;
+  --ink-bleed: rgba(0, 0, 0, 0.5);
+  --ink-rim: rgba(222, 208, 186, 0.42);
+  --ink-sheen: rgba(200, 216, 232, 0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) {
+    --seal: #d4563a;
+    --seal-cut: #fff4e2;
+    --ink-blot: #070605;
+    --ink-bleed: rgba(0, 0, 0, 0.5);
+    --ink-rim: rgba(222, 208, 186, 0.42);
+    --ink-sheen: rgba(200, 216, 232, 0.6);
+  }
+}
+/* The seal sits in the card's top corner like a stamp pressed on the paper. */
+.seal {
+  position: absolute;
+  top: 3%;
+  right: 4%;
+  width: 42%;
+  aspect-ratio: 1;
+  z-index: 2;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  transition: opacity 260ms var(--ease-settle);
+}
+.seal__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0.5px 0.6px rgba(60, 14, 6, 0.35));
+}
+.seal__stamp {
+  fill: var(--seal);
+}
+.seal__cut {
+  stroke: var(--seal-cut);
+  opacity: 0.75;
+}
+.seal__digit {
+  stroke: var(--seal-cut);
+}
+/* A seal that must wait reads paler than the one whose turn it is. */
+.is-waiting > .seal {
+  opacity: 0.5;
+}
+/* Tapped too soon: the seal that goes first answers with a small press. */
+.is-first > .seal {
+  animation: seal-first 640ms var(--ease-settle) both;
+}
+@keyframes seal-first {
+  35% {
+    transform: scale(1.22) rotate(-4deg);
+  }
+}
+/* Wet ink on an empty cell: as dark as it is wet, lighter with every pair. */
+.ink,
+.demo__ink {
+  position: absolute;
+  pointer-events: none;
+}
+.ink__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: calc(0.3 + 0.7 * var(--wet, 1));
+  transition: opacity 600ms var(--ease-settle);
+}
+.ink__blot {
+  fill: var(--ink-blot);
+  stroke: var(--ink-rim);
+  stroke-width: 1.4;
+}
+.ink__bleed {
+  fill: var(--ink-bleed);
+}
+.ink__sheen {
+  stroke: var(--ink-sheen);
+  opacity: var(--wet, 1);
+  transition: opacity 600ms var(--ease-settle);
+}
+.ink.is-dry,
+.demo__ink.is-dry {
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 600ms var(--ease-settle),
+    transform 600ms var(--ease-settle);
+}
+/* On select, each torii twin pair answers together, one pair after the other. */
+.torii.is-twin {
+  animation: torii-twin 700ms var(--ease-settle) var(--twin-d, 0ms) both;
+}
+@keyframes torii-twin {
+  35% {
+    transform: translateY(-5%) scale(1.09);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-first > .seal,
+  .torii.is-twin {
+    animation: none;
+  }
+  .ink__art,
+  .ink__sheen,
+  .ink.is-dry,
+  .demo__ink.is-dry {
+    transition: none;
+  }
+}

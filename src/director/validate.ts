@@ -17,7 +17,7 @@
  *
  * No DOM imports.
  */
-import { type Board, TORII, isGate, isTorii, isWater } from '../engine/board';
+import { type Board, TORII, isGate, isInk, isTorii, isWater } from '../engine/board';
 import { type LevelSpec, buildBoard, windOf } from '../engine/levels';
 import { mechanicsOf } from '../engine/mechanics';
 import { hashSeed } from '../engine/rng';
@@ -63,7 +63,10 @@ export interface Verdict {
 /** A short, stable hash of the board a player will see: cells, fences, snow and knots. */
 export function boardHash(spec: LevelSpec, board: Board): string {
   const st = initialState(spec, board);
-  const key = `${board.rows}x${board.cols}|${board.cells.join(',')}|${board.walls ? [...board.walls].join('') : ''}|${[...st.hidden].sort((a, b) => a - b).join(',')}|${[...st.knots].sort((a, b) => a - b).join(',')}`;
+  const key =
+    `${board.rows}x${board.cols}|${board.cells.join(',')}|${board.walls ? [...board.walls].join('') : ''}|${[...st.hidden].sort((a, b) => a - b).join(',')}|${[...st.knots].sort((a, b) => a - b).join(',')}` +
+    (board.seals ? `|s${board.seals.join('')}` : '') +
+    (board.ink ? `|i${board.ink.join('')}` : '');
   return (hashSeed(key) % 36 ** 5).toString(36).padStart(5, '0');
 }
 
@@ -87,6 +90,16 @@ export function validate(spec: LevelSpec, board: Board, m: Metrics, opts: Valida
   const twinsWhole = [...new Set(board.cells.filter(isTorii))].every((v) => board.cells.filter((x) => x === v).length === 2);
   if ((spec.torii ?? 0) !== toriiPairs || !twinsWhole || (toriiPairs === 1 && !board.cells.includes(TORII))) reasons.push('torii');
   if ((spec.streams ?? 0) !== board.cells.filter(isWater).length) reasons.push('streams');
+  // Seals 1…n, each on two cards of one flower; the ink as asked, every blot wet.
+  if ((spec.seals ?? 0) > 0 || board.seals) {
+    const want = spec.seals ?? 0;
+    const whole = Array.from({ length: want }, (_, k) => board.cells.filter((_, i) => board.seals?.[i] === k + 1)).every(
+      (ids) => ids.length === 2 && ids[0] >> 2 === ids[1] >> 2,
+    );
+    if (!board.seals || Math.max(...board.seals) !== want || !whole) reasons.push('seals');
+  }
+  const blots = board.cells.map((v, i) => (isInk(v) ? i : -1)).filter((i) => i >= 0);
+  if ((spec.ink ?? 0) !== blots.length || blots.some((i) => !(board.ink && board.ink[i] > 0))) reasons.push('ink');
   if (spec.snow > 0 && st.hidden.size === 0) reasons.push('snow');
   if ((spec.knots ?? 0) > 0 && st.knots.size === 0) reasons.push('knots');
   if (spec.lucky && !board.cells.includes(48)) reasons.push('lucky');

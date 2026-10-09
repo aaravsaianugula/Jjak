@@ -40,6 +40,18 @@ const SLIDERS: Mechanic[] = ['leaves', 'wind'];
  * generator and solver respect every one).
  */
 const TERRAIN_CLASHES: Mechanic[] = SLIDERS;
+/**
+ * Seals are a rule about order, proven by the construction order, which sliding
+ * scrambles; and a card already covered by snow or tied by a knot carries one
+ * lock already, so seals keep to their own cards. Gates, fences and terrain mix.
+ */
+const SEAL_CLASHES: Mechanic[] = [...SLIDERS, 'snow', 'knots'];
+/**
+ * Wet ink sits on a cell like terrain until it dries (cards can't slide into
+ * it), so it never meets sliding. It mixes with everything else: drying only
+ * ever opens space.
+ */
+const INK_CLASHES: Mechanic[] = SLIDERS;
 
 export const MECHANICS: Record<Mechanic, MechanicDef> = {
   stones: {
@@ -81,6 +93,14 @@ export const MECHANICS: Record<Mechanic, MechanicDef> = {
   streams: {
     id: 'streams', name: 'Streams', native: '개울 · 小川', glyph: '川', rule: 'Paths cross water straight. No turning on it.',
     introChapter: MECHANIC_INTRO.streams, clashes: TERRAIN_CLASHES, on: (s) => (s.streams ?? 0) > 0, weight: 0.1,
+  },
+  seals: {
+    id: 'seals', name: 'Seals', native: '도장 · 印', glyph: '印', rule: 'Sealed pairs go in order: 1, then 2, then 3.',
+    introChapter: MECHANIC_INTRO.seals, clashes: SEAL_CLASHES, on: (s) => (s.seals ?? 0) > 0, weight: 0.1,
+  },
+  ink: {
+    id: 'ink', name: 'Wet ink', native: '먹 · 墨', glyph: '墨', rule: 'Wet ink blocks paths. It dries as you pair.',
+    introChapter: MECHANIC_INTRO.ink, clashes: INK_CLASHES, on: (s) => (s.ink ?? 0) > 0, weight: 0.08,
   },
 };
 

@@ -3,10 +3,12 @@
  * by the game board and the mini demo boards.
  *
  * A torii is drawn in card units (100 × 140) so it stands in a card's slot: two
- * vermilion posts, the black-capped top beam (kasagi) with upturned ends over a
- * vermilion lintel, the tie beam (nuki) and a plaque that tells the two twin
- * pairs apart by shape — one brushed stroke (一) or two (二) — with ripples
- * where it stands in the sea, like the great torii of Itsukushima.
+ * posts, the top beam (kasagi) with upturned ends over a lintel, the tie beam
+ * (nuki) and a plaque, with ripples where it stands in the sea, like the great
+ * torii of Itsukushima. The two twin pairs differ at a glance: the first is
+ * vermilion with a black cap, the second plain unpainted wood (白木, shiraki)
+ * in ink outline; their plaques carry a bold one-stroke (一) or two-stroke (二)
+ * mark as well, so colour is never the only cue.
  *
  * Water is drawn per board, in board pixels: a pale wash over each water cell,
  * flush where cells join so a run reads as one stream, and three brushed lines
@@ -21,20 +23,28 @@ const VERMILION = '#c4442a';
 const VERMILION_DARK = '#8f2f1d';
 const PAPER = '#f7f1e6';
 
-/** The plaque's mark: one stroke for the first twin pair, two for the second. */
+/** The plaque's mark, bold enough to read on a phone: one stroke for the first pair, two for the second. */
 function plaqueMark(pair: number): string {
-  const stroke = (y: number) => `<path d="M40.5 ${y + 1}C45 ${y - 1.4} 54 ${y - 1.8} 59.5 ${y - 0.2}L59 ${y + 2.4}C53 ${y + 1.2} 46 ${y + 1.8} 41 ${y + 3.6}Z" fill="${INK}"/>`;
-  return pair === 0 ? stroke(43.2) : stroke(38.6) + stroke(47.4);
+  const stroke = (y: number) =>
+    `<path d="M35.5 ${y + 1.6}C43 ${y - 1.8} 57 ${y - 2.4} 64.5 ${y - 0.4}L64 ${y + 3.6}C56 ${y + 2} 44 ${y + 2.6} 36 ${y + 5.4}Z" fill="${INK}"/>`;
+  return pair === 0 ? stroke(42.4) : stroke(36.4) + stroke(48.2);
 }
+
+/** Paint for each twin pair: vermilion with a black cap, or plain wood (白木). */
+const PAINT = [
+  { body: VERMILION, dark: VERMILION_DARK, shine: '#e98a6c', cap: INK, capLine: '#6a625a', foot: INK },
+  { body: '#dcbc88', dark: '#b08a55', shine: '#f1dcb4', cap: '#c49a62', capLine: '#8a6638', foot: '#8a6638' },
+];
 
 /** A torii of twin pair `pair` (0 or 1) as one static SVG in card units. */
 export function toriiSvg(pair: number): string {
+  const p = PAINT[pair === 1 ? 1 : 0];
   // Posts lean in a little towards the top, feet in the water.
   const post = (x: number) =>
-    `<path d="M${x - 4.2} 34L${x + 4.2} 34L${x + 5.8} 126L${x - 5.8} 126Z" fill="${VERMILION}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
-    `<path d="M${x - 1.6} 38L${x - 0.6} 122" stroke="#e98a6c" stroke-width="1.3" stroke-linecap="round" opacity=".7"/>` +
-    // Black foot bands (根巻).
-    `<path d="M${x - 5.6} 116H${x + 5.6}L${x + 6.4} 127H${x - 6.4}Z" fill="${INK}"/>`;
+    `<path d="M${x - 4.2} 34L${x + 4.2} 34L${x + 5.8} 126L${x - 5.8} 126Z" fill="${p.body}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<path d="M${x - 1.6} 38L${x - 0.6} 122" stroke="${p.shine}" stroke-width="1.3" stroke-linecap="round" opacity=".7"/>` +
+    // Foot bands (根巻).
+    `<path d="M${x - 5.6} 116H${x + 5.6}L${x + 6.4} 127H${x - 6.4}Z" fill="${p.foot}"/>`;
   return (
     `<svg class="torii__art" viewBox="0 0 100 140" aria-hidden="true">` +
     // The sea it stands in: a soft wash and two brushed ripples at each foot.
@@ -44,17 +54,16 @@ export function toriiSvg(pair: number): string {
     post(26) +
     post(74) +
     // Tie beam (貫), running out past the posts.
-    `<path d="M9 58H91L90 66H10Z" fill="${VERMILION}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<path d="M9 58H91L90 66H10Z" fill="${p.body}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
     // Centre strut (額束).
-    `<rect x="46.5" y="30" width="7" height="29" fill="${VERMILION_DARK}" stroke="${INK}" stroke-width="1.3"/>` +
+    `<rect x="46.5" y="30" width="7" height="29" fill="${p.dark}" stroke="${INK}" stroke-width="1.3"/>` +
     // Lintel (島木) under the cap, both following the cap's sweep.
-    `<path d="M6 21C30 27.5 70 27.5 94 21L92.5 30C70 35.5 30 35.5 7.5 30Z" fill="${VERMILION}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
-    // Black cap (笠木) with upturned ends.
-    `<path d="M0 10.5C8 14.4 20 17 34 18H66C80 17 92 14.4 100 10.5L98.5 18.6C88 23 74 24.6 60 24.8H40C26 24.6 12 23 1.5 18.6Z" fill="${INK}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>` +
-    `<path d="M4 14.6C16 18.8 28 20.6 42 21" stroke="#6a625a" stroke-width="1" fill="none" stroke-linecap="round" opacity=".8"/>` +
-    // The plaque (額) and its twin mark.
-    `<rect x="37" y="33" width="26" height="22" rx="1.6" fill="${PAPER}" stroke="${INK}" stroke-width="1.6"/>` +
-    `<rect x="39" y="35" width="22" height="18" rx="1" fill="none" stroke="${VERMILION}" stroke-width=".9" opacity=".8"/>` +
+    `<path d="M6 21C30 27.5 70 27.5 94 21L92.5 30C70 35.5 30 35.5 7.5 30Z" fill="${p.body}" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    // Cap (笠木) with upturned ends.
+    `<path d="M0 10.5C8 14.4 20 17 34 18H66C80 17 92 14.4 100 10.5L98.5 18.6C88 23 74 24.6 60 24.8H40C26 24.6 12 23 1.5 18.6Z" fill="${p.cap}" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>` +
+    `<path d="M4 14.6C16 18.8 28 20.6 42 21" stroke="${p.capLine}" stroke-width="1" fill="none" stroke-linecap="round" opacity=".8"/>` +
+    // The plaque (額), wide enough for a bold twin mark.
+    `<rect x="32" y="31" width="36" height="25" rx="1.6" fill="${PAPER}" stroke="${INK}" stroke-width="1.6"/>` +
     plaqueMark(pair) +
     `</svg>`
   );

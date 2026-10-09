@@ -79,8 +79,10 @@ the board each player gets comes from the offline-built bank at their tier
 | Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair |
 | Chapter 11 | | yes | **Gates (門)**: a gate opens when its flower is paired |
 | Chapter 14 | | yes | **Fences (울타리)**: paths can't cross a bamboo fence |
-| Chapter 23 (Miyajima) | | yes | **Torii (鳥居)**: a path that enters one torii comes out of its twin heading the same way; the jump costs no bend, the 2-bend rule holds over the whole path, and a path can't bend on a torii. One twin pair, two on roomy boards, told apart by the plaque (一 / 二) |
+| Chapter 23 (Miyajima) | | yes | **Torii (鳥居)**: a path that enters one torii comes out of its twin heading the same way; the jump costs no bend, the 2-bend rule holds over the whole path, and a path can't bend on a torii. One twin pair, two on roomy boards: the first vermilion, the second plain wood (白木), each with a bold plaque mark (一 / 二); selecting a card makes each pair's twins lift together for a moment |
 | Chapter 25 (Yeosu) | | yes | **Streams (개울 · 小川)**: paths cross water (or run along it) only in a straight line; they never bend on a water cell. Two to six water cells in runs of 2–3 |
+| Chapter 31 (Takayama) | | yes | **Seals (도장 · 印)**: two to four pairs carry a numbered vermilion seal on both cards; a sealed card can be picked only once every lower seal has left the board (it may pair with any card of its flower). Unsealed cards are free. Tapping one too soon gives a calm "not yet" shake and the seal that goes first answers; no penalty |
+| Chapter 35 (Jeonju) | | yes | **Wet ink (먹 · 墨)**: two blots (four on roomy boards) of wet ink sit on cells with no card and block paths like stones; each dries after its own count of pairs (3–6), lightening a shade with every pair, then the cell is open. All blots are laid at the start; none appear later |
 | Chapters 6–50 | | yes | Each place features one idea or a mix; level goals on about one board in four |
 | 601+ (Wanderer) | | yes | Hidden until level 600 is cleared, then revealed ("The road goes on"). Each level is generated live for this player in a Web Worker, with the same validators |
 
@@ -92,9 +94,11 @@ tension → peak → breather sawtooth inside each chapter (the open and rest bo
 two dips, the peak stands clear of every other board, the festival sits high but below
 it) on a road that climbs from about 0.25 (middle tier, first places) to about 0.7 (last
 places; the top tier near 0.9). Wanderer years carry on from there. Partner ideas and
-goals come from bag randomisers so neighbours don't repeat. Snow, fences, torii and streams
-never share a board with falling leaves or wind (terrain can't move and cards can't slide
-over it).
+goals come from bag randomisers so neighbours don't repeat (the bag holds each idea once, so
+an idea that keeps clashing can't pile up and bury the newer ones). Snow, fences, torii,
+streams, seals and ink never share a board with falling leaves or wind (terrain can't move,
+cards can't slide over it, and sliding would scramble the seals' order); seals also keep off
+snowy and knotted cards (one lock per card).
 
 **Harder by arrangement, never by smaller cards.** Late and high-tier boards get a tricky
 *arrangement* (`arrangeOf` in plan.ts, the generator's `arrange`): pairs placed far apart

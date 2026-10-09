@@ -237,6 +237,8 @@ deepen that reading:
 | **Level goals** (third blossom: Rhythm ×4 combo, Clean read, Full bloom, Straight brush) | **Ship** | Rewards *how* you read, not just finishing. Never fails a level; it only takes the par blossom's place. |
 | **Streams (개울 · 小川)**: water cells paths cross only straight | **Ship** (was "Bridges", rejected) | The first verdict held for a cell paths may simply cross: that is just an empty cell. The no-bend rule changes it: water is open to a straight line and closed to a corner, so it both helps and hinders, and reading where a path *may turn* becomes part of the read. Solvable by construction (water is fixed; `reachable` respects it). |
 | **Torii (鳥居)**: twin portals; a path into one leaves its twin the same way | **Ship** | A new way to *read* a connection (a jump that costs no bend) that stays inside the 2-bend rule. Fixed cells, solvable by construction. About 9 % of legal moves on Miyajima boards exist only through a torii. |
+| **Seals (도장 · 印)**: numbered sealed pairs that must go in order | **Ship** | The rejected "twin pairs" were an order rule that could strand a board; seals can't. The numbers come from the construction's own clearing order, so a clear in seal order always exists (proved by a solver that may not lean on the safety net), and if the order alone ever leaves no pair, the lowest seal lifts for free. It makes the player read *which* pair now, not just whether one joins: on Takayama boards about 21 % of the pairs a player could join are waiting on their seal, on 60 % of turns. |
+| **Wet ink (먹 · 墨)**: blots on empty cells that block paths, then dry | **Ship** | A stone with a clock: the opening is tighter and the board opens as you play, so early reads matter and late reads relax. Shown, never hidden (every blot is on the board from the start and shows its wetness). Solvable by construction with the drying time built into the placement order. On Jeonju boards about 5 % of the pairs a player could otherwise join are behind wet ink, on 19 % of turns (it matters early). |
 | Lanterns lit by paths | Rejected | The game picks the path for you, so the player can't steer through a lantern: frustration, not skill. |
 | Twin pairs (must clear back to back) | Rejected | An order constraint that can strand a board; reads as a gimmick. |
 | Fog / night boards | Rejected | Hides information the core depends on; overlaps with First snow. |
@@ -246,10 +248,12 @@ deepen that reading:
 
 Gates appear from chapter 11 (Andong Hahoe, a village of gates), fences from chapter 14
 (Damyang, the bamboo grove), torii from chapter 23 (Miyajima, the great floating torii) and
-streams from chapter 25 (Yeosu, the island joined by a long breakwater). Goals from chapter 6.
-Each has engine tests and a solvability fuzz, and an animated intro (C4). Fences, torii and
-streams never share a board with sliding (leaves/wind); they mix freely with snow, knots,
-gates and each other.
+streams from chapter 25 (Yeosu, the island joined by a long breakwater), seals from chapter 31
+(Takayama, whose festival floats roll out in a set order) and wet ink from chapter 35 (Jeonju,
+the home of hanji paper). Goals from chapter 6. Each has engine tests and a solvability fuzz,
+and an animated intro (C4). Fences, torii, streams, seals and ink never share a board with
+sliding (leaves/wind); seals also keep off snowy and knotted cards (one lock per card); the
+rest mix freely.
 
 **Torii and streams: the rules as built** (`src/engine/path.ts`). Torii: entered from any side,
 the path leaves the twin (same plaque mark) in the same direction at no bend cost; it can't
@@ -258,7 +262,26 @@ the partner card); a path never starts or ends on a torii; at most two twin pair
 each two cells on different rows and columns at least 3 apart; twins on one line can't loop
 a path. Streams: water is passable only straight on, along or across; a path may bend on the
 bank just before or after it. A portal path draws as two strokes (into the torii, out of the
-twin).
+twin). The two twin pairs read apart at a glance: the first is vermilion with a black cap, the
+second plain unpainted wood (白木) in ink outline, both with a bold plaque mark (一 / 二), and
+selecting a card makes each pair's twins lift together for a moment, one pair after the other.
+
+**Seals and wet ink: the rules as built** (`src/engine/rules.ts`, `generate.ts`). Seals: both
+cards of a sealed pair carry its number (2–4 seals, one flower each, never the lucky pair). A
+sealed card can be picked once no lower number is left on the board; it may pair with any card
+of its flower (a seal stays current until its last card goes). Unsealed cards are free. A tap
+too soon: a calm shake, the current seal answers, the screen reader hears which seal comes
+first; no penalty. Seals follow their own card through a reshuffle. Wet ink: 2 blots (4 on
+boards of 40+ cells) on cells that start empty, one cell in from the rim and apart, each wet
+for 3–6 pairs; wet ink blocks paths like a stone and is never tapped; every pair dries every
+blot one step (its opacity falls with the pairs left), and at zero the cell is open (snow or a
+knot beside it then lets go too). All blots are laid at the start; none appear later.
+Generation: placement k of P is the (P − k)-th pair cleared, so a blot that lasts L pairs blocks
+the last L placements and is open before; seal 1 is the latest placed of the sealed pairs.
+Safety net (as for snow and knots): if the seals' order or wet ink alone leaves no pair, the
+blot whose drying frees a pair (else the soonest) dries, or the lowest seal lifts, one at a
+time, before knots and snow; a true dead end keeps both and reshuffles. Proofs (the solver,
+the bank's `proveClear`) never lean on that net.
 
 ## C4. Show, don't tell
 

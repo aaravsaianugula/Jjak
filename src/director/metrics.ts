@@ -226,6 +226,8 @@ export function mechanicLoad(spec: LevelSpec, pairs: number): number {
   if (spec.fences) load += MECHANICS.fences.weight * clamp01(spec.fences / 14);
   if (spec.torii) load += MECHANICS.torii.weight * clamp01(spec.torii / 2);
   if (spec.streams) load += MECHANICS.streams.weight * clamp01(spec.streams / 6);
+  if (spec.seals) load += MECHANICS.seals.weight * clamp01(spec.seals / 4);
+  if (spec.ink) load += MECHANICS.ink.weight * clamp01(spec.ink / 4);
   // Two strong ideas at full strength reach about 0.25; three about 0.35.
   return clamp01(load / 0.36);
 }

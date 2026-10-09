@@ -1,7 +1,7 @@
 import { BONUS_IDS } from '../data/deck';
 import { routeOf } from '../data/route';
 import { levelPlan } from '../director/plan';
-import { type Board, FENCE_DOWN, FENCE_RIGHT, WATER, isTorii, isWater, toriiOf } from './board';
+import { type Board, FENCE_DOWN, FENCE_RIGHT, WATER, isInk, isTorii, isWater, toriiOf } from './board';
 import { generateBoard } from './generate';
 import { type GoalId } from './goals';
 import { type Wind } from './moves';
@@ -44,6 +44,10 @@ export interface LevelSpec {
   torii?: number;
   /** "Streams" (개울 · 小川): this many water cells (even), in short straight runs; paths cross only straight on */
   streams?: number;
+  /** "Seals" (도장 · 印): this many sealed pairs, numbered 1…n, that must be cleared in that order */
+  seals?: number;
+  /** "Ink" (먹 · 墨): this many blots of wet ink (even) on empty cells; each blocks paths until it dries */
+  ink?: number;
   /** how stones are laid out: spread apart (default), short lines that force long paths, or small clusters */
   layout?: StoneLayout;
   /** goal board: the third blossom is this goal instead of par */
@@ -78,6 +82,8 @@ export function mechanicLabel(spec: LevelSpec): string {
   if (spec.fences) return 'Fences';
   if (spec.torii) return 'Torii';
   if (spec.streams) return 'Streams';
+  if (spec.seals) return 'Seals';
+  if (spec.ink) return 'Wet ink';
   if (spec.stones) return 'Stones';
   if (spec.lucky) return 'Lucky cards';
   return '';
@@ -95,6 +101,8 @@ export function mechanicList(spec: LevelSpec): string[] {
   if (spec.fences) out.push('Fences');
   if (spec.torii) out.push('Torii');
   if (spec.streams) out.push('Streams');
+  if (spec.seals) out.push('Seals');
+  if (spec.ink) out.push('Wet ink');
   if (spec.stones) out.push('Stones');
   if (spec.lucky) out.push('Lucky cards');
   return out;
@@ -117,13 +125,17 @@ export const chapterOf = (level: number) => CHAPTERS[routeOf(level).chapter.seas
 
 const parFor = (pairs: number) => Math.ceil((pairs * 4.5 + 10) / 5) * 5;
 
-export type Mechanic = 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams';
+export type Mechanic = 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams' | 'seals' | 'ink';
 /**
  * Chapter index (0-based) where each idea first appears on the road. Torii
  * open at Miyajima (the great floating torii), streams at Yeosu (the island
- * joined to the shore by a long breakwater).
+ * joined to the shore by a long breakwater). Seals open at Takayama, whose
+ * festival floats roll out in a set order; wet ink at Jeonju, the home of
+ * hanji paper.
  */
-export const MECHANIC_INTRO: Record<Mechanic, number> = { stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13, torii: 22, streams: 24 };
+export const MECHANIC_INTRO: Record<Mechanic, number> = {
+  stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13, torii: 22, streams: 24, seals: 30, ink: 34,
+};
 
 /**
  * Journey level n (1-based): the level's identity at the middle tier. The
@@ -485,6 +497,45 @@ export function pickStreams(rows: number, cols: number, count: number, rng: Rng,
   return [...out];
 }
 
+/** Wet ink stays wet for this many pairs at least, and at most (darker = longer). */
+export const INK_MIN_LIFE = 3;
+export const INK_MAX_LIFE = 6;
+
+/**
+ * Ink (먹 · 墨): `count` blots of wet ink on cells that start with no card, one
+ * cell in from the rim where the board allows (the ring early paths run
+ * along), never touching each other or a blocked cell. Each stays wet for
+ * INK_MIN_LIFE–INK_MAX_LIFE pairs. All blots are laid at the start; none appear
+ * later, so nothing hidden ever changes the board. Returns the blots that fit.
+ */
+export function pickInk(rows: number, cols: number, count: number, rng: Rng, blocked: ReadonlySet<number>): { cell: number; life: number }[] {
+  const out: { cell: number; life: number }[] = [];
+  const used = new Set<number>();
+  const touches = (i: number) => neighbours(rows, cols, i).some((n) => used.has(n) || blocked.has(n));
+  const inner: number[] = [];
+  const all: number[] = [];
+  for (let i = 0; i < rows * cols; i++) {
+    if (blocked.has(i)) continue;
+    const [r, c] = rcOf(cols, i);
+    all.push(i);
+    if (r > 0 && c > 0 && r < rows - 1 && c < cols - 1) inner.push(i);
+  }
+  rng.shuffle(inner);
+  rng.shuffle(all);
+  for (const [pool, loose] of [[inner, false], [inner, true], [all, true]] as [number[], boolean][]) {
+    for (const i of pool) {
+      if (out.length >= count) break;
+      if (used.has(i) || (!loose && touches(i))) continue;
+      if (loose && neighbours(rows, cols, i).some((n) => used.has(n))) continue;
+      used.add(i);
+      out.push({ cell: i, life: INK_MIN_LIFE + rng.int(INK_MAX_LIFE - INK_MIN_LIFE + 1) });
+    }
+  }
+  // Keep the count even (the pair count depends on it).
+  if (out.length % 2) out.pop();
+  return out;
+}
+
 /** Choose card ids: `months` distinct months, pairs spread round-robin. */
 function pickCards(spec: LevelSpec, rng: Rng, pairs: number): number[] {
   const months = rng.shuffle([...Array(12).keys()]).slice(0, spec.months);
@@ -514,13 +565,16 @@ function pickCards(spec: LevelSpec, rng: Rng, pairs: number): number[] {
  * the title card, chips and missions never promise a mechanic that isn't there.
  */
 export function honestSpec(spec: LevelSpec): LevelSpec {
-  if (!spec.gates && !spec.fences && !spec.torii && !spec.streams) return spec;
+  if (!spec.gates && !spec.fences && !spec.torii && !spec.streams && !spec.seals && !spec.ink) return spec;
   const b = buildBoard(spec);
   const out = { ...spec };
   if (spec.gates && !b.cells.some((v) => v <= -16)) delete out.gates;
   if (spec.fences && !b.walls) delete out.fences;
   if (spec.torii && !b.cells.some(isTorii)) delete out.torii;
   if (spec.streams && !b.cells.some(isWater)) delete out.streams;
+  if (spec.seals && !b.seals) delete out.seals;
+  else if (spec.seals && Math.max(...b.seals!) !== spec.seals) out.seals = Math.max(...b.seals!);
+  if (spec.ink && !b.cells.some(isInk)) delete out.ink;
   return out;
 }
 
@@ -541,7 +595,9 @@ export function buildBoard(spec: LevelSpec): Board {
     const taken = new Set([...stones, ...gateCells, ...terrain.map((t) => t.cell)]);
     for (const cell of pickStreams(spec.rows, spec.cols, spec.streams, rng, taken)) terrain.push({ cell, value: WATER });
   }
-  const pairs = (spec.rows * spec.cols - stones.length - gateCells.length - terrain.length) / 2;
+  // Wet ink likewise: blots on cells that start without a card.
+  const ink = spec.ink ? pickInk(spec.rows, spec.cols, spec.ink, rng, new Set([...stones, ...gateCells, ...terrain.map((t) => t.cell)])) : [];
+  const pairs = (spec.rows * spec.cols - stones.length - gateCells.length - terrain.length - ink.length) / 2;
   const cards = pickCards(spec, rng, pairs);
   let gates: { cell: number; month: number }[] | undefined;
   if (gateCells.length) {
@@ -549,10 +605,21 @@ export function buildBoard(spec: LevelSpec): Board {
     const months = rng.shuffle([...new Set(cards.map((id) => id >> 2).filter((m) => m < 12))]);
     gates = gateCells.map((cell, k) => ({ cell, month: months[k % months.length] }));
   }
-  const fixed = new Set([...stones, ...gateCells, ...terrain.map((t) => t.cell)]);
+  const fixed = new Set([...stones, ...gateCells, ...terrain.map((t) => t.cell), ...ink.map((x) => x.cell)]);
   const walls = spec.fences ? pickFences(spec.rows, spec.cols, spec.fences, rng, fixed) : undefined;
   return generateBoard(
-    { rows: spec.rows, cols: spec.cols, stones, gates, walls, cards, terrain: terrain.length ? terrain : undefined, ...(spec.arrange ? { arrange: spec.arrange } : {}) },
+    {
+      rows: spec.rows,
+      cols: spec.cols,
+      stones,
+      gates,
+      walls,
+      cards,
+      terrain: terrain.length ? terrain : undefined,
+      ...(spec.arrange ? { arrange: spec.arrange } : {}),
+      ...(ink.length ? { ink } : {}),
+      ...(spec.seals ? { seals: spec.seals } : {}),
+    },
     rng,
   );
 }

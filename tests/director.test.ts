@@ -150,7 +150,7 @@ describe('tier knobs', () => {
         const spec = planSpec(p, k, 'x', t);
         expect(mechanicsOf(spec), `level ${n} tier ${t}`).toEqual(p.mechanics);
         expect(windOf(spec)).toBe(p.wind);
-        if (t > 0) for (const key of ['stones', 'months', 'snow', 'knots', 'gates', 'fences'] as const) expect(k[key], `${n} t${t} ${key}`).toBeGreaterThanOrEqual(prev[key]);
+        if (t > 0) for (const key of ['stones', 'months', 'snow', 'knots', 'gates', 'fences', 'torii', 'streams', 'seals', 'ink'] as const) expect(k[key], `${n} t${t} ${key}`).toBeGreaterThanOrEqual(prev[key]);
         prev = k;
         expect(k.stones % 2).toBe(0);
         expect((p.rows * p.cols - k.stones - k.gates) % 2).toBe(0);

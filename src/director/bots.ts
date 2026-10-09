@@ -18,7 +18,7 @@ import { type LevelSpec, windOf } from '../engine/levels';
 import { type Wind, legalMoves } from '../engine/moves';
 import { findPath, pathBends } from '../engine/path';
 import { type Rng, createRng } from '../engine/rng';
-import { type PlayState, applyPair, lockedOf, releaseIfStuck } from '../engine/rules';
+import { type Freed, type PlayState, applyPair, cloneState, lockedOf, releaseIfStuck } from '../engine/rules';
 import { Session } from '../engine/session';
 
 export type Move = [number, number];
@@ -30,9 +30,7 @@ export function initialState(spec: LevelSpec, board: Board): PlayState {
   return { board: s.board, hidden: new Set(s.hidden), knots: new Set(s.knots) };
 }
 
-export function cloneState(st: PlayState): PlayState {
-  return { board: cloneBoard(st.board), hidden: new Set(st.hidden), knots: new Set(st.knots) };
-}
+export { cloneState };
 
 export function cardsOnBoard(b: Board): number {
   let n = 0;
@@ -49,12 +47,16 @@ export function bendsOf(b: Board, i: number, j: number): number {
 /**
  * One step of play with the safety net the game gives for free. Returns false
  * when the board is truly stuck (cards left, no pair even after releasing snow
- * and knots), which the game would answer with a reshuffle.
+ * and knots), which the game would answer with a reshuffle. `strict` also
+ * returns false when the net had to break a seal or dry ink early (a proof
+ * must clear the seals in order and let the ink dry by itself).
  */
-export function step(st: PlayState, m: Move, wind: Wind | null): boolean {
+export function step(st: PlayState, m: Move, wind: Wind | null, strict = false): boolean {
   applyPair(st, m[0], m[1], wind);
   if (cardsOnBoard(st.board) === 0) return true;
-  return !releaseIfStuck(st);
+  if (!strict) return !releaseIfStuck(st);
+  const freed: Freed = { dried: [], unsealed: [] };
+  return !releaseIfStuck(st, [], [], freed) && !freed.dried.length && !freed.unsealed.length;
 }
 
 /** Legal moves after the free release (the moves a player actually has). */
@@ -231,7 +233,10 @@ const stateKey = (st: PlayState) =>
  * of a flower, or one pair of a flower whose other two cards are joined too.
  * Wind and falling leaves move cards, so there every pair is a decision and the
  * search orders them by how many pairs they leave. The found line is replayed
- * from the start before it is returned, so a proof is always a real clear.
+ * from the start before it is returned, so a proof is always a real clear. A
+ * proof never leans on the free release of seals or ink (see step's `strict`).
+ * Without that release seals and ink follow from the cells, so the key needn't
+ * carry them.
  */
 export function proveClear(start: PlayState, wind: Wind | null, budget = 6000): Proof {
   const seen = new Set<string>();
@@ -269,7 +274,7 @@ export function proveClear(start: PlayState, wind: Wind | null, budget = 6000): 
         }
         if (!safe) continue;
         const next = cloneState(st);
-        if (!step(next, m, wind)) break; // a release corner case: fall back to branching
+        if (!step(next, m, wind, true)) break; // a release corner case: fall back to branching
         path.push(m);
         if (dfs(next)) return true;
         path.pop();
@@ -280,7 +285,7 @@ export function proveClear(start: PlayState, wind: Wind | null, budget = 6000): 
     const scored: { m: Move; next: PlayState; score: number }[] = [];
     for (const m of moves) {
       const next = cloneState(st);
-      if (!step(next, m, wind)) {
+      if (!step(next, m, wind, true)) {
         if (cardsOnBoard(next.board) === 0) scored.push({ m, next, score: 1e6 });
         continue;
       }
@@ -304,7 +309,7 @@ export function proveClear(start: PlayState, wind: Wind | null, budget = 6000): 
   for (const m of path) {
     const legal = movesOf(st).some((x) => x[0] === m[0] && x[1] === m[1]);
     if (!legal) return { moves: null, nodes, exhausted: false };
-    if (!step(st, m, wind) && cardsOnBoard(st.board) > 0) return { moves: null, nodes, exhausted: false };
+    if (!step(st, m, wind, true) && cardsOnBoard(st.board) > 0) return { moves: null, nodes, exhausted: false };
   }
   return cardsOnBoard(st.board) === 0 ? { moves: path.slice(), nodes, exhausted: false } : { moves: null, nodes, exhausted: false };
 }

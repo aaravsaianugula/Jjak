@@ -3,8 +3,8 @@
  * (`npm run bank`, scripts/build-bank.ts) and validated before release. On the
  * device the Director only *selects* an entry, so getting a board is instant.
  *
- * Each entry is 18 characters: the winning attempt (2, base 36), the knobs
- * (stones, layout, months, snow, knots, gates, fences, torii, streams: 1 each, base 36), the
+ * Each entry is 20 characters: the winning attempt (2, base 36), the knobs
+ * (stones, layout, months, snow, knots, gates, fences, torii, streams, seals, ink: 1 each, base 36), the
  * measured difficulty d × 1000 (2, base 36) and a 5-character board hash that a
  * test uses to catch a generator change that would silently stale the bank.
  */
@@ -49,21 +49,23 @@ export function encodeEntry(e: BankEntry): string {
     b36(k.fences, 1) +
     b36(k.torii, 1) +
     b36(k.streams, 1) +
+    b36(k.seals, 1) +
+    b36(k.ink, 1) +
     b36(e.d * 1000, 2) +
     e.hash
   );
 }
 
 export function decodeEntry(s: string): BankEntry | null {
-  if (!s || s.length !== 18) return null;
+  if (!s || s.length !== 20) return null;
   const n = (a: number, b: number) => parseInt(s.slice(a, b), 36);
   const layout = LAYOUT_CODE[s[3] as keyof typeof LAYOUT_CODE];
   if (!layout) return null;
   return {
     attempt: n(0, 2),
-    knobs: { stones: n(2, 3), layout, months: n(4, 5), snow: n(5, 6), knots: n(6, 7), gates: n(7, 8), fences: n(8, 9), torii: n(9, 10), streams: n(10, 11) },
-    d: n(11, 13) / 1000,
-    hash: s.slice(13),
+    knobs: { stones: n(2, 3), layout, months: n(4, 5), snow: n(5, 6), knots: n(6, 7), gates: n(7, 8), fences: n(8, 9), torii: n(9, 10), streams: n(10, 11), seals: n(11, 12), ink: n(12, 13) },
+    d: n(13, 15) / 1000,
+    hash: s.slice(15),
   };
 }
 

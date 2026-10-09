@@ -6,7 +6,8 @@
  *
  * Grid notation (see demo-model.ts): card ids 0–49 (month = id >> 2), `.` empty,
  * `#` stone, `G<m>` gate of month m, `~` water, `T0` / `T1` torii of twin pair
- * 0 / 1; suffix `s` snow, `k` knot, `|` / `_` fence on the right / bottom edge.
+ * 0 / 1, `i<n>` wet ink drying in n pairs; suffix `@<n>` seal n, `s` snow,
+ * `k` knot, `|` / `_` fence on the right / bottom edge.
  * Cells in steps are row * cols + col.
  */
 import { type GoalId } from '../engine/goals';
@@ -83,6 +84,22 @@ export const MECHANIC_DEMOS: Record<Mechanic, DemoScript> = {
     steps: [cap('Straight across'), pair(4, 7), cap('No turning here'), blocked(1, 10), cap('Turn on land'), pair(0, 2), pair(1, 10)],
     turn: [[4, 7], [0, 2], [1, 10]],
     end: ['. . . 25', '. ~ ~ .', '24 28 . 29'],
+  },
+  seals: {
+    id: 'seals',
+    // Seal 2's pair sits side by side, but seal 1 goes first, round the top.
+    grid: ['8@1 0@2 1@2 9@1', '20 24 25 21'],
+    steps: [cap('Sealed in order'), tap(1), mark(0, 3), cap('One goes first'), pair(0, 3), mark(), cap('Then two'), pair(1, 2)],
+    turn: [[0, 3], [1, 2]],
+    end: ['. . . .', '20 24 25 21'],
+  },
+  ink: {
+    id: 'ink',
+    // The blot stays wet for two pairs, then the straight line runs through it.
+    grid: ['20 21 24', '4 i2 4', '28 29 25'],
+    steps: [cap('Wet ink blocks'), blocked(3, 5), cap('It dries'), pair(0, 1), pair(6, 7), cap('Now through'), pair(3, 5)],
+    turn: [[0, 1], [6, 7], [3, 5]],
+    end: ['. . 24', '. . .', '. . 25'],
   },
 };
 

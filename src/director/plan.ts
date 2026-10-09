@@ -76,22 +76,32 @@ export interface Knobs {
   torii: number;
   /** water cells (even) */
   streams: number;
+  /** sealed pairs, numbered 1…n (0–4) */
+  seals: number;
+  /** blots of wet ink (even) */
+  ink: number;
 }
 
 export type KnobId = keyof Knobs;
 
-const MECH_ORDER: Mechanic[] = ['stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams'];
+const MECH_ORDER: Mechanic[] = ['stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams', 'seals', 'ink'];
 /** Partner ideas drawn from the bag (stones are the quiet background, lucky has its own slots). */
-export const PARTNERS: Mechanic[] = ['leaves', 'snow', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams'];
+export const PARTNERS: Mechanic[] = ['leaves', 'snow', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams', 'seals', 'ink'];
 export const WIND_CYCLE: Wind[] = ['right', 'up', 'left'];
 const slides = (m: Mechanic) => m === 'leaves' || m === 'wind';
 /** Fixed things that cards can't slide against or over: snow, fences and the terrain (torii, streams). */
-const staysPut = (m: Mechanic) => m === 'snow' || m === 'fences' || m === 'torii' || m === 'streams';
-/** Same rule as MECHANICS[*].clashes (checked by a test): sliding never meets snow, fences, terrain or the other slide. */
+const staysPut = (m: Mechanic) => m === 'snow' || m === 'fences' || m === 'torii' || m === 'streams' || m === 'seals' || m === 'ink';
+/** Card locks that never share a card with a seal. */
+const covers = (m: Mechanic) => m === 'snow' || m === 'knots';
+/**
+ * Same rule as MECHANICS[*].clashes (checked by a test): sliding never meets
+ * snow, fences, terrain, seals, ink or the other slide; seals never meet snow or knots.
+ */
 export const clashes = (a: Mechanic, b: Mechanic): boolean =>
-  a !== b && ((slides(a) && slides(b)) || (slides(a) && staysPut(b)) || (slides(b) && staysPut(a)));
-/** Cells a tier's knobs take from the cards: stones, gates, torii (two per pair) and water. */
-const fixedCells = (k: Pick<Knobs, 'stones' | 'gates' | 'torii' | 'streams'>) => k.stones + k.gates + 2 * k.torii + k.streams;
+  a !== b &&
+  ((slides(a) && slides(b)) || (slides(a) && staysPut(b)) || (slides(b) && staysPut(a)) || (a === 'seals' && covers(b)) || (b === 'seals' && covers(a)));
+/** Cells a tier's knobs take from the cards: stones, gates, torii (two per pair), water and ink. */
+const fixedCells = (k: Pick<Knobs, 'stones' | 'gates' | 'torii' | 'streams' | 'ink'>) => k.stones + k.gates + 2 * k.torii + k.streams + k.ink;
 
 /** Teaching levels: small boards, identical-looking cards. */
 const TUTORIAL: [rows: number, cols: number, months: number][] = [
@@ -191,7 +201,9 @@ class Bag<T> {
       for (let pass = 0; pass < 2; pass++) {
         const i = this.items.findIndex((x) => ok(x) && (!strict || !avoid.includes(x)));
         if (i >= 0) return this.items.splice(i, 1)[0];
-        this.items.push(...this.rng.shuffle(this.refill()));
+        // Refill with what isn't already waiting: an item that keeps clashing
+        // must not pile up copies and bury every idea behind it.
+        this.items.push(...this.rng.shuffle(this.refill().filter((x) => !this.items.includes(x))));
       }
     }
     return null;
@@ -364,6 +376,8 @@ export interface KnobRange {
   fences: [number, number];
   torii: [number, number];
   streams: [number, number];
+  seals: [number, number];
+  ink: [number, number];
   layouts: StoneLayout[];
 }
 
@@ -382,8 +396,11 @@ export function knobRange(p: LevelPlan): KnobRange {
   // One twin pair, two on roomy boards; streams of 2–3 cells, two runs on roomy boards.
   const torii: [number, number] = has(p, 'torii') ? [1, cells >= 36 ? 2 : 1] : [0, 0];
   const streams: [number, number] = has(p, 'streams') ? [2, cells >= 40 && !covered ? 6 : 4] : [0, 0];
-  const lo = { stones: stones[0], gates: gates[0], torii: torii[0], streams: streams[0] };
-  const hi = { stones: stones[1], gates: gates[1], torii: torii[1], streams: streams[1] };
+  // Two to four sealed pairs; two blots of ink, four on roomy boards.
+  const seals: [number, number] = has(p, 'seals') ? [2, cells >= 36 ? 4 : 3] : [0, 0];
+  const ink: [number, number] = has(p, 'ink') ? [2, cells >= 40 ? 4 : 2] : [0, 0];
+  const lo = { stones: stones[0], gates: gates[0], torii: torii[0], streams: streams[0], ink: ink[0] };
+  const hi = { stones: stones[1], gates: gates[1], torii: torii[1], streams: streams[1], ink: ink[1] };
   const pairsHi = (cells - fixedCells(lo)) / 2;
   const flower = (pairs: number) => (p.lucky ? pairs - 1 : pairs);
   const monthsHi = Math.min(12, flower((cells - fixedCells(hi)) / 2));
@@ -397,6 +414,8 @@ export function knobRange(p: LevelPlan): KnobRange {
     fences: has(p, 'fences') ? [3, cells >= 48 ? 14 : 11] : [0, 0],
     torii,
     streams,
+    seals,
+    ink,
     layouts: has(p, 'stones') ? LAYOUTS : ['spread'],
   };
 }
@@ -409,7 +428,7 @@ export function knobRange(p: LevelPlan): KnobRange {
 export function tierKnobs(p: LevelPlan, tier: number): Knobs {
   const t = clamp(Math.round(tier), 0, 4);
   const r = knobRange(p);
-  if (p.fixed) return { stones: 0, layout: 'spread', months: r.months[1], snow: 0, knots: 0, gates: 0, fences: 0, torii: 0, streams: 0 };
+  if (p.fixed) return { stones: 0, layout: 'spread', months: r.months[1], snow: 0, knots: 0, gates: 0, fences: 0, torii: 0, streams: 0, seals: 0, ink: 0 };
   const x = intensity(p.base, t);
   const lerp = ([lo, hi]: [number, number], f = x) => lo + (hi - lo) * f;
   // Background stones climb more slowly than stones that are the place's idea (or a peak's).
@@ -418,7 +437,11 @@ export function tierKnobs(p: LevelPlan, tier: number): Knobs {
   const gates = has(p, 'gates') ? clamp(evenRound(lerp(r.gates)), 2, r.gates[1]) : 0;
   const torii = has(p, 'torii') ? clamp(Math.round(lerp(r.torii)), r.torii[0], r.torii[1]) : 0;
   const streams = has(p, 'streams') ? clamp(evenRound(lerp(r.streams)), r.streams[0], r.streams[1]) : 0;
-  const pairs = (p.rows * p.cols - fixedCells({ stones, gates, torii, streams })) / 2;
+  const seals = has(p, 'seals') ? clamp(Math.round(lerp(r.seals)), r.seals[0], r.seals[1]) : 0;
+  // Blots take cells from the cards, and the cover counts below scale with the
+  // pairs: a fixed count keeps those rising with the tier (the search may add more).
+  const ink = has(p, 'ink') ? r.ink[0] : 0;
+  const pairs = (p.rows * p.cols - fixedCells({ stones, gates, torii, streams, ink })) / 2;
   const monthsHi = Math.min(12, p.lucky ? pairs - 1 : pairs);
   const months = clamp(monthsHi - MONTH_DROP[t], Math.min(r.months[0], monthsHi), monthsHi);
   return {
@@ -431,6 +454,8 @@ export function tierKnobs(p: LevelPlan, tier: number): Knobs {
     fences: has(p, 'fences') ? Math.round(lerp(r.fences)) : 0,
     torii,
     streams,
+    seals,
+    ink,
   };
 }
 
@@ -442,7 +467,8 @@ export function clampKnobs(p: LevelPlan, k: Knobs): Knobs {
   const gates = clamp(even(k.gates), r.gates[0], r.gates[1]);
   const torii = clamp(k.torii, r.torii[0], r.torii[1]);
   const streams = clamp(even(k.streams), r.streams[0], r.streams[1]);
-  const pairs = (p.rows * p.cols - fixedCells({ stones, gates, torii, streams })) / 2;
+  const ink = clamp(even(k.ink), r.ink[0], r.ink[1]);
+  const pairs = (p.rows * p.cols - fixedCells({ stones, gates, torii, streams, ink })) / 2;
   const monthsHi = Math.min(12, p.lucky ? pairs - 1 : pairs);
   return {
     stones,
@@ -454,6 +480,8 @@ export function clampKnobs(p: LevelPlan, k: Knobs): Knobs {
     fences: clamp(k.fences, r.fences[0], r.fences[1]),
     torii,
     streams,
+    seals: clamp(k.seals, r.seals[0], r.seals[1]),
+    ink,
   };
 }
 
@@ -479,6 +507,8 @@ export function planSpec(p: LevelPlan, k: Knobs, seed: string, tier?: number): L
     ...(k.fences ? { fences: k.fences } : {}),
     ...(k.torii ? { torii: k.torii } : {}),
     ...(k.streams ? { streams: k.streams } : {}),
+    ...(k.seals ? { seals: k.seals } : {}),
+    ...(k.ink ? { ink: k.ink } : {}),
     ...(k.stones && k.layout !== 'spread' ? { layout: k.layout } : {}),
     ...(p.goal ? { goal: p.goal } : {}),
     ...(tier != null ? { tier } : {}),
@@ -489,7 +519,9 @@ export function planSpec(p: LevelPlan, k: Knobs, seed: string, tier?: number): L
 /** Par from the identity: the middle tier's pair count, the moving/covered extras, festival room. */
 export function parOf(id: Pick<Identity, 'mechanics' | 'wind' | 'festival' | 'year'>, pairs: number): number {
   const m = id.mechanics;
-  const extra = Math.min(20, (id.wind ? 10 : 0) + (m.includes('snow') ? 10 : 0) + (m.includes('knots') ? 10 : 0)) + (id.festival ? 15 : 0);
+  // Moving and covered cards cost time; so does reading a jump, a stream, the seals' order or wet ink.
+  const reads = (['torii', 'streams', 'seals', 'ink'] as Mechanic[]).filter((x) => m.includes(x)).length * 5;
+  const extra = Math.min(20, (id.wind ? 10 : 0) + (m.includes('snow') ? 10 : 0) + (m.includes('knots') ? 10 : 0) + reads) + (id.festival ? 15 : 0);
   return Math.max(parFor(pairs), parFor(pairs) + extra - 5 * Math.min(id.year, 2));
 }
 
