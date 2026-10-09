@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { stampDate, stampShape, stampSvg } from '../src/art/stamp';
 import { ALL_CARD_IDS, BONUS_IDS, cardDef, monthDef } from '../src/data/deck';
 import { ROUTE, ROUTE_CHAPTERS, ROUTE_LEVELS, chapterFirstLevel, festivalTitle, placeLine, routeOf } from '../src/data/route';
-import { EMPTY, STONE, type Board, cardsLeft, isCard, isGate, monthOf } from '../src/engine/board';
+import { EMPTY, STONE, type Board, cardsLeft, isCard, isGate, isTerrain, monthOf } from '../src/engine/board';
 import { generateBoard, reshuffle } from '../src/engine/generate';
 import {
   CHAPTERS,
@@ -97,7 +97,7 @@ describe('the Flower Road route', () => {
       expect(c.postcard.length).toBeGreaterThan(30);
       expect(c.postcard.length).toBeLessThan(130);
       expect(c.postcard.endsWith('.')).toBe(true);
-      expect(['basics', 'stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'mix']).toContain(c.focus);
+      expect(['basics', 'stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams', 'mix']).toContain(c.focus);
     }
   });
 
@@ -223,7 +223,7 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 700; n++) {
       const sp = journeyLevel(n);
       const b = buildBoard(sp);
-      expect(cardsLeft(b) + b.cells.filter((v) => v === STONE || isGate(v)).length).toBe(sp.rows * sp.cols);
+      expect(cardsLeft(b) + b.cells.filter((v) => v === STONE || isGate(v) || isTerrain(v)).length).toBe(sp.rows * sp.cols);
       const counts = new Map<number, number>();
       for (const v of b.cells) if (isCard(v)) counts.set(monthOf(v), (counts.get(monthOf(v)) ?? 0) + 1);
       for (const c of counts.values()) expect(c % 2).toBe(0);

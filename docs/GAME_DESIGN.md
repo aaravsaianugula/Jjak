@@ -79,6 +79,8 @@ the board each player gets comes from the offline-built bank at their tier
 | Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair |
 | Chapter 11 | | yes | **Gates (門)**: a gate opens when its flower is paired |
 | Chapter 14 | | yes | **Fences (울타리)**: paths can't cross a bamboo fence |
+| Chapter 23 (Miyajima) | | yes | **Torii (鳥居)**: a path that enters one torii comes out of its twin heading the same way; the jump costs no bend, the 2-bend rule holds over the whole path, and a path can't bend on a torii. One twin pair, two on roomy boards, told apart by the plaque (一 / 二) |
+| Chapter 25 (Yeosu) | | yes | **Streams (개울 · 小川)**: paths cross water (or run along it) only in a straight line; they never bend on a water cell. Two to six water cells in runs of 2–3 |
 | Chapters 6–50 | | yes | Each place features one idea or a mix; level goals on about one board in four |
 | 601+ (Wanderer) | | yes | Hidden until level 600 is cleared, then revealed ("The road goes on"). Each level is generated live for this player in a Web Worker, with the same validators |
 
@@ -90,8 +92,9 @@ tension → peak → breather sawtooth inside each chapter (the open and rest bo
 two dips, the peak stands clear of every other board, the festival sits high but below
 it) on a road that climbs from about 0.25 (middle tier, first places) to about 0.7 (last
 places; the top tier near 0.9). Wanderer years carry on from there. Partner ideas and
-goals come from bag randomisers so neighbours don't repeat. Snow and fences never share
-a board with falling leaves or wind.
+goals come from bag randomisers so neighbours don't repeat. Snow, fences, torii and streams
+never share a board with falling leaves or wind (terrain can't move and cards can't slide
+over it).
 
 **Harder by arrangement, never by smaller cards.** Late and high-tier boards get a tricky
 *arrangement* (`arrangeOf` in plan.ts, the generator's `arrange`): pairs placed far apart

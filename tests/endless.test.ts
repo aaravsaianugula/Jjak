@@ -101,7 +101,7 @@ describe('generation (core)', () => {
 
   it('clustered stones never crowd a board (the layout that stalls the generator)', () => {
     const p = levelPlan(611);
-    const many = { stones: maxStones(p.rows, p.cols), layout: 'clusters' as const, months: 12, snow: 0, knots: 0, gates: 0, fences: 0 };
+    const many = { stones: maxStones(p.rows, p.cols), layout: 'clusters' as const, months: 12, snow: 0, knots: 0, gates: 0, fences: 0, torii: 0, streams: 0 };
     expect(safeLayout(p, many).layout).toBe('lines');
     expect(safeLayout(p, { ...many, stones: 2 }).layout).toBe('clusters');
   });

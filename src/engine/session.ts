@@ -4,7 +4,7 @@ import { reshuffle } from './generate';
 import { GOALS, type GoalStats } from './goals';
 import { type LevelSpec, buildBoard, pickKnots, pickSnow, windOf } from './levels';
 import { findMove } from './moves';
-import { findPath } from './path';
+import { findPath, pathBends } from './path';
 import { type PlayState, applyPair, lockedOf, releaseIfStuck } from './rules';
 import { createRng, type Rng } from './rng';
 import { type Yaku, newYaku } from './yaku';
@@ -204,7 +204,7 @@ export class Session implements PlayState, GoalStats {
     this.score += gained;
     this.pairsMade++;
 
-    const turns = Math.max(0, Math.min(2, path.length - 2));
+    const turns = Math.min(2, pathBends(path));
     this.turns[turns]++;
     const wind = windOf(this.spec);
     const { moved, opened, revealed, untied } = applyPair(this, a, b, wind);

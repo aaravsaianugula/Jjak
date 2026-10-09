@@ -1,4 +1,4 @@
-import { type Board, EMPTY, STONE, gateMonth, gateOf, isBlock, isCard, isGate, monthOf } from './board';
+import { type Board, EMPTY, STONE, gateMonth, gateOf, isBlock, isCard, isGate, isTerrain, monthOf } from './board';
 import { reachable } from './path';
 import { type Rng } from './rng';
 
@@ -16,7 +16,8 @@ import { type Rng } from './rng';
  * Gates (門) open the first time a pair of their month is cleared. In reverse
  * order that is the *last placed* pair of the month, so a gate counts as open
  * for the placements before it and closed from then on. Fences live in
- * `base.walls` and `reachable` respects them, so the guarantee holds for both.
+ * `base.walls`, and water and torii never change; `reachable` respects all
+ * three, so the guarantee holds for them too.
  */
 function placePairs(
   base: Board,
@@ -146,6 +147,8 @@ export interface GenerateOptions {
   gates?: { cell: number; month: number }[];
   /** fence bits per cell (see FENCE_RIGHT / FENCE_DOWN) */
   walls?: Uint8Array;
+  /** fixed terrain: water and torii cells (see board.ts), as cell index and value */
+  terrain?: { cell: number; value: number }[];
   /** card ids, length must equal playable cells; consecutive entries form pairs */
   cards: number[];
   /**
@@ -161,6 +164,7 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
   if (opts.walls) base.walls = opts.walls;
   for (const s of opts.stones ?? []) base.cells[s] = STONE;
   for (const g of opts.gates ?? []) base.cells[g.cell] = gateOf(g.month);
+  for (const t of opts.terrain ?? []) base.cells[t.cell] = t.value;
   const slots: number[] = [];
   base.cells.forEach((v, i) => v === EMPTY && slots.push(i));
   if (slots.length !== opts.cards.length) {
@@ -171,8 +175,10 @@ export function generateBoard(opts: GenerateOptions, rng: Rng): Board {
 
   const b = placePairs(base, slots, pairs, rng, 40, opts.arrange ?? 0);
   if (b) return b;
-  // Fences and gates are extras: lose the fences first, then turn gates into stones.
+  // Fences, terrain and gates are extras: lose the fences first, then turn
+  // terrain and then gates into stones.
   if (opts.walls) return generateBoard({ ...opts, walls: undefined }, rng);
+  if (opts.terrain?.length) return generateBoard({ ...opts, terrain: [], stones: (opts.stones ?? []).concat(opts.terrain.map((t) => t.cell)) }, rng);
   if (opts.gates?.length) return generateBoard({ ...opts, gates: [], stones: (opts.stones ?? []).concat(opts.gates.map((g) => g.cell)) }, rng);
   // Stones can occasionally wall a region off: drop two at a time and fill the
   // freed cells with a copy of an existing pair.
@@ -205,23 +211,29 @@ export function reshuffle(b: Board, rng: Rng): Board {
   const out = placePairs(base, slots, pairs, rng, 200);
   if (out) return out;
   // The cells themselves can be a dead end (say, a card in a stone pocket with
-  // its partner walled off behind it). Re-deal onto open cells, rim first.
+  // its partner walled off behind it). Re-deal onto open cells, rim first. A
+  // few cells on the rim can still be a dead end of their own (two far corners
+  // need three bends; fences can part neighbours), so each try draws the cells
+  // again, looser each time.
   const open: number[] = [];
-  b.cells.forEach((v, i) => !isBlock(v) && open.push(i));
-  const rim = (i: number) => {
-    const r = Math.floor(i / b.cols);
-    const c = i % b.cols;
-    return Math.min(r, c, b.rows - 1 - r, b.cols - 1 - c) + rng.next() * 0.5;
-  };
-  const target = open
-    .map((i) => ({ i, k: rim(i) }))
-    .sort((p, q) => p.k - q.k)
-    .slice(0, slots.length)
-    .map((p) => p.i);
-  const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (isBlock(v) ? v : EMPTY)) };
+  b.cells.forEach((v, i) => !isBlock(v) && !isTerrain(v) && open.push(i));
+  const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (isBlock(v) || isTerrain(v) ? v : EMPTY)) };
   if (b.walls) cleared.walls = b.walls;
-  const moved = placePairs(cleared, target, pairs, rng, 200);
-  if (moved) return moved;
+  for (let tries = 0; tries < 12; tries++) {
+    const noise = 0.5 + tries;
+    const rim = (i: number) => {
+      const r = Math.floor(i / b.cols);
+      const c = i % b.cols;
+      return Math.min(r, c, b.rows - 1 - r, b.cols - 1 - c) + rng.next() * noise;
+    };
+    const target = open
+      .map((i) => ({ i, k: rim(i) }))
+      .sort((p, q) => p.k - q.k)
+      .slice(0, slots.length)
+      .map((p) => p.i);
+    const moved = placePairs(cleared, target, pairs, rng, tries === 0 ? 200 : 40);
+    if (moved) return moved;
+  }
   // Extremely unlikely; a plain shuffle at least changes the position.
   const vals = rng.shuffle(slots.map((s) => b.cells[s]));
   const cells = b.cells.slice();

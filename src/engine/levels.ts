@@ -1,7 +1,7 @@
 import { BONUS_IDS } from '../data/deck';
 import { routeOf } from '../data/route';
 import { levelPlan } from '../director/plan';
-import { type Board, FENCE_DOWN, FENCE_RIGHT } from './board';
+import { type Board, FENCE_DOWN, FENCE_RIGHT, WATER, isTorii, isWater, toriiOf } from './board';
 import { generateBoard } from './generate';
 import { type GoalId } from './goals';
 import { type Wind } from './moves';
@@ -40,6 +40,10 @@ export interface LevelSpec {
   gates?: number;
   /** "Fences" (울타리 · 垣): this many bamboo fence segments on cell edges; paths can't cross them */
   fences?: number;
+  /** "Torii" (鳥居): this many twin pairs of torii (1 or 2); a path into one comes out of its twin */
+  torii?: number;
+  /** "Streams" (개울 · 小川): this many water cells (even), in short straight runs; paths cross only straight on */
+  streams?: number;
   /** how stones are laid out: spread apart (default), short lines that force long paths, or small clusters */
   layout?: StoneLayout;
   /** goal board: the third blossom is this goal instead of par */
@@ -72,6 +76,8 @@ export function mechanicLabel(spec: LevelSpec): string {
   if (spec.knots) return 'Knots';
   if (spec.gates) return 'Gates';
   if (spec.fences) return 'Fences';
+  if (spec.torii) return 'Torii';
+  if (spec.streams) return 'Streams';
   if (spec.stones) return 'Stones';
   if (spec.lucky) return 'Lucky cards';
   return '';
@@ -87,6 +93,8 @@ export function mechanicList(spec: LevelSpec): string[] {
   if (spec.knots) out.push('Knots');
   if (spec.gates) out.push('Gates');
   if (spec.fences) out.push('Fences');
+  if (spec.torii) out.push('Torii');
+  if (spec.streams) out.push('Streams');
   if (spec.stones) out.push('Stones');
   if (spec.lucky) out.push('Lucky cards');
   return out;
@@ -109,9 +117,13 @@ export const chapterOf = (level: number) => CHAPTERS[routeOf(level).chapter.seas
 
 const parFor = (pairs: number) => Math.ceil((pairs * 4.5 + 10) / 5) * 5;
 
-export type Mechanic = 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences';
-/** Chapter index (0-based) where each idea first appears on the road. */
-export const MECHANIC_INTRO: Record<Mechanic, number> = { stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13 };
+export type Mechanic = 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams';
+/**
+ * Chapter index (0-based) where each idea first appears on the road. Torii
+ * open at Miyajima (the great floating torii), streams at Yeosu (the island
+ * joined to the shore by a long breakwater).
+ */
+export const MECHANIC_INTRO: Record<Mechanic, number> = { stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13, torii: 22, streams: 24 };
 
 /**
  * Journey level n (1-based): the level's identity at the middle tier. The
@@ -376,6 +388,103 @@ export function pickFences(rows: number, cols: number, count: number, rng: Rng, 
   return walls;
 }
 
+const rcOf = (cols: number, i: number) => [Math.floor(i / cols), i % cols] as const;
+
+/** The orthogonal neighbours of cell i that are on the board. */
+const neighbours = (rows: number, cols: number, i: number): number[] => {
+  const [r, c] = rcOf(cols, i);
+  const out: number[] = [];
+  if (c > 0) out.push(i - 1);
+  if (c < cols - 1) out.push(i + 1);
+  if (r > 0) out.push(i - cols);
+  if (r < rows - 1) out.push(i + cols);
+  return out;
+};
+
+/**
+ * Torii (鳥居): `pairs` twin pairs (1 or 2), each two cells on different rows
+ * and different columns, at least 3 steps apart, so a jump really takes a path
+ * somewhere it couldn't go. Inside the board where possible (a torii on the rim
+ * mostly leads to the outer lane, which is open anyway), never touching a
+ * blocked cell or another torii. Returns the pairs that fit.
+ */
+export function pickTorii(rows: number, cols: number, pairs: number, rng: Rng, blocked: ReadonlySet<number>): [number, number][] {
+  const out: [number, number][] = [];
+  const used = new Set<number>();
+  const touches = (i: number, extra = -1) => neighbours(rows, cols, i).some((n) => n === extra || used.has(n) || blocked.has(n));
+  const twinOk = (a: number, b: number) => {
+    const [ar, ac] = rcOf(cols, a);
+    const [br, bc] = rcOf(cols, b);
+    return ar !== br && ac !== bc && Math.abs(ar - br) + Math.abs(ac - bc) >= 3;
+  };
+  const inner: number[] = [];
+  const all: number[] = [];
+  for (let i = 0; i < rows * cols; i++) {
+    if (blocked.has(i)) continue;
+    const [r, c] = rcOf(cols, i);
+    all.push(i);
+    if (r > 0 && c > 0 && r < rows - 1 && c < cols - 1) inner.push(i);
+  }
+  rng.shuffle(inner);
+  rng.shuffle(all);
+  const passes: [number[], boolean][] = [[inner, false], [all, false], [all, true]];
+  for (let p = 0; p < pairs; p++) {
+    let found: [number, number] | null = null;
+    for (const [pool, loose] of passes) {
+      for (const a of pool) {
+        if (found) break;
+        if (used.has(a) || (!loose && touches(a))) continue;
+        const b = pool.find((x) => x !== a && !used.has(x) && twinOk(a, x) && (loose || !touches(x, a)));
+        if (b !== undefined) found = [a, b];
+      }
+      if (found) break;
+    }
+    if (!found) break;
+    used.add(found[0]).add(found[1]);
+    out.push(found);
+  }
+  return out;
+}
+
+/**
+ * Streams (개울 · 小川): `count` water cells laid as short straight runs (two or
+ * three cells, along a row or down a column), one cell in from the rim where
+ * the board allows so paths have to cross them, off blocked cells and apart
+ * from each other. Always an even number of cells (the pair count depends on it).
+ */
+export function pickStreams(rows: number, cols: number, count: number, rng: Rng, blocked: ReadonlySet<number>): number[] {
+  const out = new Set<number>();
+  const runs: number[][] = [];
+  const near = (i: number) => neighbours(rows, cols, i).some((n) => out.has(n) || blocked.has(n));
+  const r0 = rows > 3 ? 1 : 0;
+  const c0 = cols > 3 ? 1 : 0;
+  for (let guard = 0; out.size < count && guard < 300; guard++) {
+    const loose = guard >= 200;
+    const rem = count - out.size;
+    if (rem < 2) break;
+    // Runs of 2 or 3 that never leave a single cell over.
+    let len = rem <= 3 ? rem : rng.pick([2, 2, 3]);
+    if (rem - len === 1) len = 2;
+    const [dr, dc] = rng.next() < 0.5 ? [0, 1] : [1, 0];
+    const r = r0 + rng.int(Math.max(1, rows - 2 * r0 - dr * (len - 1)));
+    const c = c0 + rng.int(Math.max(1, cols - 2 * c0 - dc * (len - 1)));
+    const cells: number[] = [];
+    for (let k = 0; k < len; k++) {
+      const rr = r + dr * k;
+      const cc = c + dc * k;
+      if (rr >= rows || cc >= cols) break;
+      cells.push(rr * cols + cc);
+    }
+    if (cells.length < len || cells.some((x) => out.has(x) || blocked.has(x))) continue;
+    if (!loose && cells.some(near)) continue;
+    for (const x of cells) out.add(x);
+    runs.push(cells);
+  }
+  // Keep the count even: trim one cell off a run of three (an odd total has one).
+  if (out.size % 2) out.delete(runs.find((run) => run.length === 3)![2]);
+  return [...out];
+}
+
 /** Choose card ids: `months` distinct months, pairs spread round-robin. */
 function pickCards(spec: LevelSpec, rng: Rng, pairs: number): number[] {
   const months = rng.shuffle([...Array(12).keys()]).slice(0, spec.months);
@@ -405,11 +514,13 @@ function pickCards(spec: LevelSpec, rng: Rng, pairs: number): number[] {
  * the title card, chips and missions never promise a mechanic that isn't there.
  */
 export function honestSpec(spec: LevelSpec): LevelSpec {
-  if (!spec.gates && !spec.fences) return spec;
+  if (!spec.gates && !spec.fences && !spec.torii && !spec.streams) return spec;
   const b = buildBoard(spec);
   const out = { ...spec };
   if (spec.gates && !b.cells.some((v) => v <= -16)) delete out.gates;
   if (spec.fences && !b.walls) delete out.fences;
+  if (spec.torii && !b.cells.some(isTorii)) delete out.torii;
+  if (spec.streams && !b.cells.some(isWater)) delete out.streams;
   return out;
 }
 
@@ -419,7 +530,18 @@ export function buildBoard(spec: LevelSpec): Board {
   // Gates and fences draw from the stream only when the board has them, so
   // every older board (and the worldwide Daily) stays exactly the same.
   const gateCells = spec.gates ? pickGateCells(spec.rows, spec.cols, spec.gates, rng, new Set(stones)) : [];
-  const pairs = (spec.rows * spec.cols - stones.length - gateCells.length) / 2;
+  // Torii and streams likewise; they take cells, so they come before the cards.
+  const terrain: { cell: number; value: number }[] = [];
+  if (spec.torii) {
+    pickTorii(spec.rows, spec.cols, spec.torii, rng, new Set([...stones, ...gateCells])).forEach(([a, b], k) =>
+      terrain.push({ cell: a, value: toriiOf(k) }, { cell: b, value: toriiOf(k) }),
+    );
+  }
+  if (spec.streams) {
+    const taken = new Set([...stones, ...gateCells, ...terrain.map((t) => t.cell)]);
+    for (const cell of pickStreams(spec.rows, spec.cols, spec.streams, rng, taken)) terrain.push({ cell, value: WATER });
+  }
+  const pairs = (spec.rows * spec.cols - stones.length - gateCells.length - terrain.length) / 2;
   const cards = pickCards(spec, rng, pairs);
   let gates: { cell: number; month: number }[] | undefined;
   if (gateCells.length) {
@@ -427,8 +549,12 @@ export function buildBoard(spec: LevelSpec): Board {
     const months = rng.shuffle([...new Set(cards.map((id) => id >> 2).filter((m) => m < 12))]);
     gates = gateCells.map((cell, k) => ({ cell, month: months[k % months.length] }));
   }
-  const walls = spec.fences ? pickFences(spec.rows, spec.cols, spec.fences, rng, new Set([...stones, ...gateCells])) : undefined;
-  return generateBoard({ rows: spec.rows, cols: spec.cols, stones, gates, walls, cards, ...(spec.arrange ? { arrange: spec.arrange } : {}) }, rng);
+  const fixed = new Set([...stones, ...gateCells, ...terrain.map((t) => t.cell)]);
+  const walls = spec.fences ? pickFences(spec.rows, spec.cols, spec.fences, rng, fixed) : undefined;
+  return generateBoard(
+    { rows: spec.rows, cols: spec.cols, stones, gates, walls, cards, terrain: terrain.length ? terrain : undefined, ...(spec.arrange ? { arrange: spec.arrange } : {}) },
+    rng,
+  );
 }
 
 /**

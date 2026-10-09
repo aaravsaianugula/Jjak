@@ -1,10 +1,28 @@
 /**
- * Board model. Cells hold a card id (0–49), EMPTY, STONE, or a GATE keyed to a
- * month. Card ids follow the deck: month = id >> 2 (0–11, 12 = lucky), variant = id & 3.
+ * Board model. Cells hold a card id (0–49), EMPTY, STONE, WATER, a TORII of one
+ * of two twin pairs, or a GATE keyed to a month. Card ids follow the deck:
+ * month = id >> 2 (0–11, 12 = lucky), variant = id & 3.
  */
 
 export const EMPTY = -1;
 export const STONE = -2;
+/**
+ * A stream (개울 · 小川): water a path may cross, but only straight on. It never
+ * holds a card and never changes; a path can't bend on it (see path.ts).
+ */
+export const WATER = -3;
+/**
+ * A torii (鳥居) of twin pair k (0 or 1) is stored as TORII - k. A path that
+ * enters one torii leaves its twin in the same direction (see path.ts).
+ */
+export const TORII = -4;
+export const TORII_PAIRS = 2;
+export const isTorii = (v: number): boolean => v <= TORII && v > TORII - TORII_PAIRS;
+export const toriiPair = (v: number): number => TORII - v;
+export const toriiOf = (pair: number): number => TORII - pair;
+export const isWater = (v: number): boolean => v === WATER;
+/** Fixed terrain a path may use but no card ever sits on: water and torii. */
+export const isTerrain = (v: number): boolean => v === WATER || isTorii(v);
 /** A gate (門) of month m is stored as GATE - m. It blocks like a stone until a pair of m is cleared. */
 export const GATE = -16;
 
@@ -33,6 +51,11 @@ export interface Board {
 export interface Point {
   r: number;
   c: number;
+  /**
+   * Set on the point where a path comes out of a torii: the stretch from the
+   * previous point (the torii it went into) to this one is a jump, not a line.
+   */
+  jump?: true;
 }
 
 export const monthOf = (cardId: number): number => cardId >> 2;

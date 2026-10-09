@@ -22,7 +22,7 @@ export function calendarSeason(d: Date): Season {
 }
 
 /** The idea a chapter features. 'basics' = chapter 1, 'mix' = several at once. */
-export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'mix';
+export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams' | 'mix';
 
 export interface RouteChapter {
   /** stable id (save files key stamps by it) */
@@ -72,10 +72,10 @@ const ROWS: Row[] = [
   // 21–24
   ['ashikaga', 'Ashikaga', '아시카가', '足利', 'JP', '#7a5aa0', 'mix', 'In late April, great wisteria at Ashikaga hang in long violet curtains.'],
   ['busan', 'Busan', '부산', '釜山', 'KR', '#3f78a0', 'wind', 'Summer crowds and sea breezes fill the long sands of Haeundae Beach.'],
-  ['miyajima', 'Miyajima', '미야지마', '宮島', 'JP', '#b4432f', 'leaves', 'Maple leaves fill the Momijidani valley behind Miyajima’s great red gate in the sea.'],
+  ['miyajima', 'Miyajima', '미야지마', '宮島', 'JP', '#b4432f', 'torii', 'At high tide the great vermilion torii of Itsukushima seems to float on the sea off Miyajima.'],
   ['seoul', 'Seoul', '서울', 'ソウル', 'KR', '#5a6680', 'snow', 'Snow settles on the curved palace roofs of Gyeongbokgung below the northern hills.'],
   // 25–28
-  ['yeosu', 'Yeosu', '여수', '麗水', 'KR', '#b8383d', 'knots', 'Red camellias bloom in the woods of Odongdo, an island joined to Yeosu by a long breakwater.'],
+  ['yeosu', 'Yeosu', '여수', '麗水', 'KR', '#b8383d', 'streams', 'Red camellias bloom in the woods of Odongdo, an island joined to Yeosu by a long breakwater.'],
   ['hakone', 'Hakone', '하코네', '箱根', 'JP', '#5f74a6', 'stones', 'Hydrangeas bloom beside the little mountain railway as it zigzags up to Hakone.'],
   ['jirisan', 'Jirisan', '지리산', '智異山', 'KR', '#a9542c', 'leaves', 'Autumn colour pours down Piagol valley on the slopes of Jirisan.'],
   ['hakodate', 'Hakodate', '하코다테', '函館', 'JP', '#47648a', 'mix', 'From Mount Hakodate, the winter city glitters on a narrow neck of land with the sea on both sides.'],

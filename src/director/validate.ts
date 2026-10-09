@@ -17,7 +17,7 @@
  *
  * No DOM imports.
  */
-import { type Board, isGate } from '../engine/board';
+import { type Board, TORII, isGate, isTorii, isWater } from '../engine/board';
 import { type LevelSpec, buildBoard, windOf } from '../engine/levels';
 import { mechanicsOf } from '../engine/mechanics';
 import { hashSeed } from '../engine/rng';
@@ -82,6 +82,11 @@ export function validate(spec: LevelSpec, board: Board, m: Metrics, opts: Valida
   if (stones !== spec.stones) reasons.push('stones');
   if ((spec.gates ?? 0) !== gates) reasons.push('gates');
   if ((spec.fences ?? 0) > 0 && !(board.walls && board.walls.some((w) => w !== 0))) reasons.push('fences');
+  // Terrain as asked: every twin pair whole, and the full stream.
+  const toriiPairs = new Set(board.cells.filter(isTorii)).size;
+  const twinsWhole = [...new Set(board.cells.filter(isTorii))].every((v) => board.cells.filter((x) => x === v).length === 2);
+  if ((spec.torii ?? 0) !== toriiPairs || !twinsWhole || (toriiPairs === 1 && !board.cells.includes(TORII))) reasons.push('torii');
+  if ((spec.streams ?? 0) !== board.cells.filter(isWater).length) reasons.push('streams');
   if (spec.snow > 0 && st.hidden.size === 0) reasons.push('snow');
   if ((spec.knots ?? 0) > 0 && st.knots.size === 0) reasons.push('knots');
   if (spec.lucky && !board.cells.includes(48)) reasons.push('lucky');

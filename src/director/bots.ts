@@ -16,7 +16,7 @@
 import { type Board, cloneBoard, isCard, monthOf } from '../engine/board';
 import { type LevelSpec, windOf } from '../engine/levels';
 import { type Wind, legalMoves } from '../engine/moves';
-import { findPath } from '../engine/path';
+import { findPath, pathBends } from '../engine/path';
 import { type Rng, createRng } from '../engine/rng';
 import { type PlayState, applyPair, lockedOf, releaseIfStuck } from '../engine/rules';
 import { Session } from '../engine/session';
@@ -43,7 +43,7 @@ export function cardsOnBoard(b: Board): number {
 /** Bends in the best path between two cells (0–2), or -1 if they don't connect. */
 export function bendsOf(b: Board, i: number, j: number): number {
   const p = findPath(b, i, j);
-  return p ? Math.max(0, Math.min(2, p.length - 2)) : -1;
+  return p ? Math.min(2, pathBends(p)) : -1;
 }
 
 /**

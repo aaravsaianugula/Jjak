@@ -86,6 +86,26 @@ describe('each demo shows its idea', () => {
     expect(pairs(ev).at(-1)!.turns).toBe(2);
   });
 
+  it('torii: the first pair goes in one torii and out of its twin, with no bend', () => {
+    const { ev } = events(MECHANIC_DEMOS.torii);
+    const [portal] = pairs(ev);
+    const jump = portal.path.findIndex((p) => p.jump);
+    expect(jump).toBeGreaterThan(0);
+    // In at the first torii, out at the other one.
+    expect(portal.path[jump - 1]).toMatchObject({ r: 1, c: 1 });
+    expect(portal.path[jump]).toMatchObject({ r: 2, c: 2 });
+    expect(portal.turns).toBe(0);
+  });
+
+  it('streams: straight across the water, blocked where it would turn on it, then a turn on dry land', () => {
+    const { ev } = events(MECHANIC_DEMOS.streams);
+    const [across, , turned] = pairs(ev);
+    expect(across.turns).toBe(0);
+    const blocked = ev.find((e) => e.kind === 'blocked');
+    expect(blocked).toBeDefined();
+    expect(turned.turns).toBe(1);
+  });
+
   it('variants: different pictures of one flower pair', () => {
     const p = pairs(events(VARIANTS_DEMO).ev);
     expect(p.every((x) => x.cards[0] !== x.cards[1])).toBe(true);

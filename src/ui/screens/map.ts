@@ -39,6 +39,8 @@ const FOCUS_NOTE: Record<Focus, { en: string; native: string; note: string }> = 
   wind: { en: 'Wind', native: '바람 · 風', note: 'After each pair, cards drift sideways or up with the wind.' },
   gates: { en: 'Gates', native: '문 · 門', note: 'A gate opens when you pair the flower painted on it.' },
   fences: { en: 'Fences', native: '울타리 · 垣', note: 'Paths can’t cross the bamboo fences between cards.' },
+  torii: { en: 'Torii', native: '토리이 · 鳥居', note: 'A path into one torii comes out of its twin, heading the same way.' },
+  streams: { en: 'Streams', native: '개울 · 小川', note: 'Paths cross water only in a straight line. No turning on it.' },
   mix: { en: 'A mix', native: '섞기 · 混', note: 'Everything you’ve met so far, side by side.' },
 };
 
@@ -51,6 +53,8 @@ function twistOf(spec: LevelSpec): { glyph: string; name: string } {
   if (spec.knots) return { glyph: '結', name: 'knots' };
   if (spec.gates) return { glyph: MECHANICS.gates.glyph, name: 'gates' };
   if (spec.fences) return { glyph: MECHANICS.fences.glyph, name: 'fences' };
+  if (spec.torii) return { glyph: MECHANICS.torii.glyph, name: 'torii' };
+  if (spec.streams) return { glyph: MECHANICS.streams.glyph, name: 'streams' };
   if (spec.stones) return { glyph: '石', name: 'stones' };
   return { glyph: '', name: '' };
 }
