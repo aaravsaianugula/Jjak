@@ -48,6 +48,8 @@ export interface LevelSpec {
   tier?: number;
   /** Level Director: measured difficulty of this board, 0–1 (for the dev panel and analytics) */
   difficulty?: number;
+  /** Level Director: 0–1, how tricky the card arrangement is (long reads, look-alike pairs); absent = classic */
+  arrange?: number;
 }
 
 export type StoneLayout = 'spread' | 'lines' | 'clusters';
@@ -424,7 +426,7 @@ export function buildBoard(spec: LevelSpec): Board {
     gates = gateCells.map((cell, k) => ({ cell, month: months[k % months.length] }));
   }
   const walls = spec.fences ? pickFences(spec.rows, spec.cols, spec.fences, rng, new Set([...stones, ...gateCells])) : undefined;
-  return generateBoard({ rows: spec.rows, cols: spec.cols, stones, gates, walls, cards }, rng);
+  return generateBoard({ rows: spec.rows, cols: spec.cols, stones, gates, walls, cards, ...(spec.arrange ? { arrange: spec.arrange } : {}) }, rng);
 }
 
 /**

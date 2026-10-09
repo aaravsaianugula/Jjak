@@ -85,9 +85,24 @@ the board each player gets comes from the offline-built bank at their tier
 plain board, a mix, a smaller breather in the middle, a peak, and the **festival board**
 (8×6 with +15 s par; 8×7 for peaks and festivals from place 20). Boards never exceed
 8 rows × 7 columns, so cards stay tappable at 360 px wide. Designed difficulty is a
-sawtooth inside each chapter (open and rest boards dip, the peak tops it) on a road that
-rises; partner ideas and goals come from bag randomisers so neighbours don't repeat.
-Snow and fences never share a board with falling leaves or wind.
+tension → peak → breather sawtooth inside each chapter (the open and rest boards are the
+two dips, the peak stands clear of every other board, the festival sits high but below
+it) on a road that climbs from about 0.25 (middle tier, first places) to about 0.7 (last
+places; the top tier near 0.9). Wanderer years carry on from there. Partner ideas and
+goals come from bag randomisers so neighbours don't repeat. Snow and fences never share
+a board with falling leaves or wind.
+
+**Harder by arrangement, never by smaller cards.** Late and high-tier boards get a tricky
+*arrangement* (`arrangeOf` in plan.ts, the generator's `arrange`): pairs placed far apart
+(long two-bend reads), look-alike cards of one flower side by side (blocked decoys and
+tempting wrong matches that lead to a dead end), and on the hardest boards the rim filled
+first so the opening moves sit inside the board. Board sizes are unchanged.
+
+**Fun, measured** (`src/director/metrics.ts`, folded into the search's fitness):
+an **early foothold** (a hard gate: at least one easy 0–1 bend pair at the start, and the
+human-like bot finds a first pair inside 10 s), a **mid-board crunch** (legal pairs dip in
+the middle of the game), a **combo finish** (the last third opens up), and **variety**
+against the previous levels. The audit reports how many bank boards pass each mark.
 
 **Show, don't tell.** New players get an animated first minute instead of a rules
 screen: the brush pairs two cards and the 0/1/2-bend rule draws itself, the player

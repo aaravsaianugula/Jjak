@@ -8,7 +8,8 @@
  *                through the real rules (gates, wind, snow, knots and their free
  *                release), without any reshuffle
  *   identity     every mechanic the level's identity names is really on the board
- *   foothold     enough opening pairs for the tier
+ *   foothold     enough opening pairs for the tier, and at least one of them an
+ *                easy read (0–1 bend, short path) so nobody starts stuck
  *   non-trivial  a minimum share of 2-bend reading on boards of real size
  *   dead ends    the naive dead-end rate sits inside the tier's band
  *   determinism  rebuilding the spec gives the same board, cell for cell
@@ -91,12 +92,12 @@ export function validate(spec: LevelSpec, board: Board, m: Metrics, opts: Valida
   }
 
   if (!fixed) {
-    if (m.opening < Math.min(BANDS.opening[t], Math.max(1, m.pairs - 1))) reasons.push('foothold');
+    if (m.opening < Math.min(BANDS.opening[t], Math.max(1, m.pairs - 1)) || m.easyOpen < 1) reasons.push('foothold');
     if (m.pairs >= 14 && m.twoBend < BANDS.twoBend[t]) reasons.push('trivial');
     const [lo, hi] = BANDS.deadEnd[t];
     const room = windOf(spec) ? BANDS.slideRoom : 0;
     if (m.deadEnd < lo || m.deadEnd > hi + room) reasons.push('dead-ends');
-  } else if (m.opening < 1) reasons.push('foothold');
+  } else if (m.opening < 1 || m.easyOpen < 1) reasons.push('foothold');
 
   if (!opts.skipRebuild) {
     const again = buildBoard(spec);

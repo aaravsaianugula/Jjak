@@ -21,7 +21,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { encodeEntry } from '../src/director/bank';
-import { type Metrics, measure } from '../src/director/metrics';
+import { type Metrics, funChecks, measure } from '../src/director/metrics';
 import { levelPlan } from '../src/director/plan';
 import { type Feature, featureOf, searchTiers, tierTarget } from '../src/director/search';
 import { boardHash } from '../src/director/validate';
@@ -56,7 +56,16 @@ const pick = (m: Metrics) => ({
   deadEnd: +m.deadEnd.toFixed(3),
   humanTime: +m.humanTime.toFixed(1),
   fun: +m.fun.toFixed(3),
+  easyOpen: m.easyOpen,
+  firstSeconds: +m.firstSeconds.toFixed(1),
+  crunch: +m.crunch.toFixed(3),
+  finale: +m.finale.toFixed(3),
 });
+/** The fun marks a board passes, as three 0/1 characters: foothold, crunch, finale. */
+const funCode = (m: Metrics) => {
+  const c = funChecks(m);
+  return `${+c.foothold}${+c.crunch}${+c.finale}`;
+};
 
 function runChapter(ch: number, K: number): LevelResult[] {
   const out: LevelResult[] = [];
@@ -98,6 +107,7 @@ function runChapter(ch: number, K: number): LevelResult[] {
         after: r.picks.map((c) => c.metrics.d),
         knobs: r.picks.map((c) => `${c.knobs.stones}${c.knobs.layout[0]} m${c.knobs.months}${c.knobs.snow ? ` sn${c.knobs.snow}` : ''}${c.knobs.knots ? ` k${c.knobs.knots}` : ''}${c.knobs.gates ? ` g${c.knobs.gates}` : ''}${c.knobs.fences ? ` f${c.knobs.fences}` : ''}`),
         t2: pick(r.picks[2].metrics),
+        fun: r.picks.map((c) => funCode(c.metrics)),
         sim,
       },
       tried: r.tried,
