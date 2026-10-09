@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cloneState, initialState, movesOf, proveClear, step } from '../src/director/bots';
-import { FUN, funChecks, funShape, measure, pairTrace } from '../src/director/metrics';
+import { FUN, funChecks, funShape, isEasy, measure, pairTrace } from '../src/director/metrics';
 import { levelPlan, planSpec, tierKnobs } from '../src/director/plan';
 import { funScore, searchLevel } from '../src/director/search';
 import { validate } from '../src/director/validate';
@@ -51,7 +51,8 @@ describe('fun shape', () => {
   });
 
   it('a mid-board dip in legal pairs is a crunch; a flat game is not', () => {
-    const dip = funShape([8, 7, 6, 2, 2, 3, 5, 4, 3, 2, 1]);
+    // The tightest point is mid-way through the middle third, not at its edge.
+    const dip = funShape([8, 7, 6, 5, 2, 3, 5, 4, 3, 2, 1]);
     const flat = funShape([8, 8, 8, 8, 8, 8, 7, 6, 5, 3, 1]);
     expect(dip.crunch).toBeGreaterThanOrEqual(FUN.crunch);
     expect(flat.crunch).toBeLessThan(FUN.crunch);
@@ -62,6 +63,13 @@ describe('fun shape', () => {
     const tight = funShape([6, 5, 3, 2, 2, 3, 2, 1, 1, 1, 1]);
     expect(open.finale).toBeGreaterThanOrEqual(FUN.finale);
     expect(tight.finale).toBeLessThan(FUN.finale);
+  });
+
+  it('an easy read has at most one bend and a path no longer than the long side of the board', () => {
+    const b: Board = { rows: 4, cols: 3, cells: new Array(12).fill(EMPTY) };
+    expect(isEasy(b, { bends: 1, length: 4 })).toBe(true);
+    expect(isEasy(b, { bends: 1, length: 5 })).toBe(false);
+    expect(isEasy(b, { bends: 2, length: 3 })).toBe(false);
   });
 
   it('a slow first read (over 10 s) is not a foothold even with an easy pair on the board', () => {
@@ -100,6 +108,35 @@ describe('board reading (the tailoring contract)', () => {
       expect(monthOf(board.cells[a])).toBe(monthOf(board.cells[b]));
       expect(legal.some(([x, y]) => (x === a && y === b) || (x === b && y === a))).toBe(false);
     }
+  });
+
+  it('an unfinished proof never counts as a dead end', () => {
+    // A board with a stranding wrong match at the normal budget…
+    let found = false;
+    for (let k = 0; k < 12 && !found; k++) {
+      const p = levelPlan(200 + k);
+      if (p.fixed || p.wind) continue;
+      const s = planSpec(p, tierKnobs(p, 4), `strand-${k}`, 4);
+      const board = buildBoard(s);
+      if (!measure(s, board, { reading: true }).reading!.pairs.some((t) => t.strands)) continue;
+      found = true;
+      // …claims none when no proof can finish.
+      const r = measure(s, board, { reading: true, strandBudget: 1 }).reading!;
+      expect(r.pairs.length).toBeGreaterThan(0);
+      expect(r.pairs.some((t) => t.strands)).toBe(false);
+    }
+    expect(found).toBe(true);
+  });
+
+  it('a pair that must be cleared before another becomes possible is critical', () => {
+    // A corridor walled by stones: B B sits between the two A cards.
+    const b: Board = { rows: 3, cols: 4, cells: [S, S, S, S, A, B, B + 1, A + 1, S, S, S, S] };
+    const r = measure(spec(3, 4, 8), b, { reading: true }).reading!;
+    expect(r.pairs.map((t) => [t.a, t.b].sort((x, y) => x - y))).toEqual([[5, 6], [4, 7]]);
+    expect(r.pairs[0]).toMatchObject({ legalBefore: 1, opens: 1, strands: false, critical: true });
+    expect(r.pairs[1]).toMatchObject({ legalBefore: 1, opens: 0, critical: false, bends: 0, length: 3 });
+    expect(r.decoys).toEqual([{ a: 4, b: 7 }]);
+    expect(r.opening.footholds).toEqual([{ a: 5, b: 6, row: 0.5, col: 0.5 }]);
   });
 
   it('a pair flagged as stranding really has a tempting wrong match that dead-ends', () => {

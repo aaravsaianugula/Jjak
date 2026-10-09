@@ -206,6 +206,8 @@ export interface MeasureOptions {
   seed?: string;
   /** also trace the board pair by pair (`Metrics.reading`); off in the searches */
   reading?: boolean;
+  /** solver nodes per wrong-match check in the reading (default 4000): "no clear" only counts if the proof finishes inside it */
+  strandBudget?: number;
 }
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -361,18 +363,16 @@ export function measureState(spec: LevelSpec, start: PlayState, opts: MeasureOpt
     d: 0,
   };
   m.d = foldD(m);
-  if (opts.reading) m.reading = readLine(start, wind, line);
+  if (opts.reading) m.reading = readLine(start, wind, line, opts.strandBudget ?? 4000);
   return m;
 }
 
 /** Order-free key of a pair of cells. */
 const pairKey = (m: Move) => (m[0] < m[1] ? m[0] * 4096 + m[1] : m[1] * 4096 + m[0]);
 const cardsLeft = (st: PlayState) => st.board.cells.reduce((n, v) => n + (isCard(v) ? 1 : 0), 0);
-/** Solver nodes for the wrong-match check: "no clear" only counts if the proof finishes inside it. */
-const STRAND_BUDGET = 4000;
 
 /** The pair-by-pair reading along a proven line (see `BoardReading`). */
-function readLine(start: PlayState, wind: ReturnType<typeof windOf>, line: Move[]): BoardReading {
+function readLine(start: PlayState, wind: ReturnType<typeof windOf>, line: Move[], strandBudget: number): BoardReading {
   const { rows, cols } = start.board;
   const st = cloneState(start);
   const frac = (i: number, j: number) => ({
@@ -413,7 +413,7 @@ function readLine(start: PlayState, wind: ReturnType<typeof windOf>, line: Move[
       const x = cloneState(st);
       if (!step(x, w, wind)) strands = cardsLeft(x) > 0;
       else {
-        const p = proveClear(x, wind, STRAND_BUDGET);
+        const p = proveClear(x, wind, strandBudget);
         strands = !p.moves && !p.exhausted;
       }
       if (strands) break;
