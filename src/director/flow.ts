@@ -2,7 +2,8 @@
  * Flow detection (EXPANSION_PLAN §C1, player model): where the player is right now,
  * read from the last few boards against their own norms.
  *
- *   struggling  quits, restarts, assists beyond a light one (model.ts), far over par
+ *   struggling  quits, restarts, assists on a slow clear (model.ts `struggleOf`: a quick
+ *               clear never reads as a struggle however many hints), far over par
  *   frozen      long silences: the think time before the first pair is far above
  *               their usual, one pair took many times their usual gap, or the pair
  *               rhythm went stop-start (gaps far more uneven than their usual)
