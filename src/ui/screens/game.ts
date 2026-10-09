@@ -1,11 +1,12 @@
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
 import { ECONOMY, LINKS } from '../../config';
 import { cardDef, monthDef, KIND_LABEL, MONTHS } from '../../data/deck';
-import { type Point, FENCE_DOWN, FENCE_RIGHT, STONE, cardsLeft, gateMonth, isCard, isGate, monthOf } from '../../engine/board';
+import { type Point, FENCE_DOWN, FENCE_RIGHT, STONE, cardsLeft, gateMonth, isCard, isGate, isTorii, isWater, monthOf, toriiPair } from '../../engine/board';
 import { GOALS, type GoalId, straightNeed } from '../../engine/goals';
 import { legalMoves } from '../../engine/moves';
-import { findPath } from '../../engine/path';
+import { findPath, pathStrokes } from '../../engine/path';
 import { fencesMarkup, gateInner, gateLabel } from '../../art/mechanics';
+import { toriiLabel, toriiSvg, waterMarkup } from '../../art/terrain';
 import { type LevelSpec, RUSH, chapterOf, dailyTheme, rushLevel, zenLevel } from '../../engine/levels';
 import { levelPlan } from '../../director';
 import { isBonus } from '../../data/deck';
@@ -200,6 +201,10 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
   const fenceLayer = document.createElementNS(SVG_NS, 'svg');
   fenceLayer.classList.add('fences');
   fenceLayer.setAttribute('aria-hidden', 'true');
+  // Streams: brushed water under everything, drawn per board so a run reads as one stream.
+  const terrainLayer = document.createElementNS(SVG_NS, 'svg');
+  terrainLayer.classList.add('terrain');
+  terrainLayer.setAttribute('aria-hidden', 'true');
 
   const xOf = (c: number) => (c < 0 ? margin / 2 : c >= spec.cols ? margin + spec.cols * cw + margin / 2 : margin + (c + 0.5) * cw);
   const yOf = (r: number) => (r < 0 ? margin / 2 : r >= spec.rows ? margin + spec.rows * ch + margin / 2 : margin + (r + 0.5) * ch);
@@ -267,6 +272,7 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     }
     const walls = session.board.walls;
     if (walls && fenceLayer.parentNode === board) fenceLayer.innerHTML = fencesMarkup(walls, spec.rows, spec.cols, margin, margin, cw, ch);
+    if (terrainLayer.parentNode === board) terrainLayer.innerHTML = waterMarkup(session.board.cells, spec.rows, spec.cols, margin, margin, cw, ch);
   }
 
   function faceLabel(id: number) {
@@ -291,9 +297,19 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   function renderBoard() {
     board.replaceChildren(paper);
+    if (session.board.cells.some(isWater)) board.append(terrainLayer);
     cardEls.clear();
     session.board.cells.forEach((v, i) => {
-      if (v === STONE) {
+      if (isTorii(v)) {
+        const t = h('div', { class: 'torii', role: 'img', 'aria-label': toriiLabel(toriiPair(v)), 'data-torii': toriiPair(v), html: toriiSvg(toriiPair(v)) });
+        cardEls.set(i, t);
+        board.append(t);
+      } else if (isWater(v)) {
+        // The water itself is drawn by the terrain layer; this names the cell for screen readers.
+        const w = h('div', { class: 'water-cell', role: 'img', 'aria-label': 'Water: paths cross it only in a straight line' });
+        cardEls.set(i, w);
+        board.append(w);
+      } else if (v === STONE) {
         const s = h('div', { class: 'stone', 'aria-hidden': 'true' });
         cardEls.set(i, s);
         board.append(s);
@@ -856,7 +872,13 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
 
   function onMatch(res: Extract<ReturnType<Session['tap']>, { kind: 'match' }>) {
     clearHint();
-    drawPath(res.path);
+    // A path through a torii is two strokes: into one torii, out of its twin.
+    for (const stroke of pathStrokes(res.path)) drawPath(stroke);
+    for (const p of res.path) {
+      if (!p.jump) continue;
+      const twin = cardEls.get(p.r * spec.cols + p.c);
+      if (twin) retrigger(twin, 'is-through');
+    }
     const gone = [res.a, res.b].map((i) => cardEls.get(i)).filter((x): x is HTMLElement => !!x);
     for (const i of [res.a, res.b]) petals(i);
     gone.forEach((c, k) => {
@@ -1805,6 +1827,8 @@ export function gameScreen(initialSpec: LevelSpec): Screen {
     (window as unknown as Record<string, unknown>).__game = {
       session: () => session,
       path: (i: number, j: number) => findPath(session.board, i, j),
+      /** A legal pair whose path jumps through a torii, if there is one. */
+      portalMove: () => legalMoves(session.board, session.locked).find(([a, b]) => findPath(session.board, a, b)?.some((p) => p.jump)) ?? null,
       gateMove: () => {
         const months = new Set(session.board.cells.filter(isGate).map(gateMonth));
         return legalMoves(session.board, session.locked).find(([a]) => months.has(monthOf(session.board.cells[a]))) ?? null;

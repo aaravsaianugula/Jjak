@@ -5,8 +5,9 @@
  * first-minute intro and How to Play are built from.
  *
  * Grid notation (see demo-model.ts): card ids 0–49 (month = id >> 2), `.` empty,
- * `#` stone, `G<m>` gate of month m; suffix `s` snow, `k` knot, `|` / `_` fence
- * on the right / bottom edge. Cells in steps are row * cols + col.
+ * `#` stone, `G<m>` gate of month m, `~` water, `T0` / `T1` torii of twin pair
+ * 0 / 1; suffix `s` snow, `k` knot, `|` / `_` fence on the right / bottom edge.
+ * Cells in steps are row * cols + col.
  */
 import { type GoalId } from '../engine/goals';
 import { type Mechanic } from '../engine/levels';
@@ -67,6 +68,21 @@ export const MECHANIC_DEMOS: Record<Mechanic, DemoScript> = {
     grid: ['4 4 20', '8| 8 20', '24 24 .'],
     steps: [cap('Fences block'), blocked(3, 4), cap('Go around'), pair(0, 1), pair(3, 4)],
     end: ['. . 20', '.| . 20', '24 24 .'],
+  },
+  torii: {
+    id: 'torii',
+    // The lone 4 is boxed in; its partner waits past the second torii.
+    grid: ['20 21 8 9', '4 T0 24 25', '28 29 T0 5'],
+    steps: [mark(5, 10), cap('Into a torii'), pair(4, 11), mark(), cap('Out its twin')],
+    turn: [[4, 11]],
+    end: ['20 21 8 9', '. T0 24 25', '28 29 T0 .'],
+  },
+  streams: {
+    id: 'streams',
+    grid: ['20 8 21 25', '0 ~ ~ 1', '24 28 9 29'],
+    steps: [cap('Straight across'), pair(4, 7), cap('No turning here'), blocked(1, 10), cap('Turn on land'), pair(0, 2), pair(1, 10)],
+    turn: [[4, 7], [0, 2], [1, 10]],
+    end: ['. . . 25', '. ~ ~ .', '24 28 . 29'],
   },
 };
 

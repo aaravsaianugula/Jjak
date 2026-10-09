@@ -5,10 +5,10 @@
  * player in demo.ts animates what this reports; tests/demos.test.ts checks
  * every script is legal and ends where it should.
  */
-import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, STONE, gateMonth, gateOf, isCard, isGate, monthOf } from '../engine/board';
+import { type Board, type Point, EMPTY, FENCE_DOWN, FENCE_RIGHT, STONE, WATER, gateMonth, gateOf, isCard, isGate, isTorii, monthOf, toriiOf, toriiPair } from '../engine/board';
 import { type GoalId, type GoalStats } from '../engine/goals';
 import { type Wind, legalMoves } from '../engine/moves';
-import { findPath } from '../engine/path';
+import { findPath, pathBends } from '../engine/path';
 import { type PlayState, type StepResult, applyPair, lockedOf } from '../engine/rules';
 import { MAX_COMBO } from '../engine/session';
 
@@ -68,7 +68,7 @@ export interface DemoBoard extends PlayState {
   wind: Wind | null;
 }
 
-const TOKEN = /^(#|\.|G\d{1,2}|\d{1,2})([sk|_]*)$/;
+const TOKEN = /^(#|\.|~|T[01]|G\d{1,2}|\d{1,2})([sk|_]*)$/;
 
 export function parseGrid(grid: string[], wind: Wind | null = null): DemoBoard {
   const rows = grid.map((r) => r.trim().split(/\s+/));
@@ -85,7 +85,7 @@ export function parseGrid(grid: string[], wind: Wind | null = null): DemoBoard {
       if (!m) throw new Error(`bad demo token "${tok}"`);
       const i = r * cols + c;
       const [, v, mods] = m;
-      cells.push(v === '.' ? EMPTY : v === '#' ? STONE : v[0] === 'G' ? gateOf(Number(v.slice(1))) : Number(v));
+      cells.push(v === '.' ? EMPTY : v === '#' ? STONE : v === '~' ? WATER : v[0] === 'T' ? toriiOf(Number(v.slice(1))) : v[0] === 'G' ? gateOf(Number(v.slice(1))) : Number(v));
       if (mods.includes('s')) hidden.add(i);
       if (mods.includes('k')) knots.add(i);
       if (mods.includes('|')) (walls[i] |= FENCE_RIGHT), (fenced = true);
@@ -105,7 +105,7 @@ export function gridOf(st: PlayState): string[] {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c;
       const v = cells[i];
-      let t = v === EMPTY ? '.' : v === STONE ? '#' : isGate(v) ? `G${gateMonth(v)}` : String(v);
+      let t = v === EMPTY ? '.' : v === STONE ? '#' : v === WATER ? '~' : isTorii(v) ? `T${toriiPair(v)}` : isGate(v) ? `G${gateMonth(v)}` : String(v);
       if (st.hidden.has(i)) t += 's';
       if (st.knots.has(i)) t += 'k';
       if (walls && walls[i] & FENCE_RIGHT) t += '|';
@@ -260,7 +260,7 @@ export class DemoRun implements GoalStats {
     if (why) throw new Error(`${this.script.id}: pair(${a}, ${b}) is illegal (${why})`);
     const path = findPath(st.board, a, b)!;
     const cards: [number, number] = [st.board.cells[a], st.board.cells[b]];
-    const turns = Math.max(0, Math.min(2, path.length - 2));
+    const turns = Math.min(2, pathBends(path));
     const res = applyPair(st, a, b, st.wind);
     this.pairsMade++;
     if (turns === 0) this.straightPairs++;

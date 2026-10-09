@@ -281,3 +281,17 @@ export function reachable(
   }
   return out;
 }
+
+/**
+ * A path as the strokes to draw: one per stretch of ink, split where it jumps
+ * through a torii (the twin starts a new stroke). A path without a jump is one
+ * stroke, the points unchanged.
+ */
+export function pathStrokes(pts: readonly Point[]): Point[][] {
+  const out: Point[][] = [[]];
+  for (const p of pts) {
+    if (p.jump) out.push([]);
+    out[out.length - 1].push(p);
+  }
+  return out;
+}

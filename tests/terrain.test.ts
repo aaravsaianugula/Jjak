@@ -5,10 +5,15 @@
  * solver), and boards without the new fields staying exactly what they were.
  */
 import { describe, expect, it } from 'vitest';
+import { ROUTE, ROUTE_LEVELS_PER_CHAPTER } from '../src/data/route';
+import { TIERS, bankEntry, bankSpec } from '../src/director/bank';
+import { measure } from '../src/director/metrics';
+import { fallbackSpec, levelPlan, tierKnobs } from '../src/director/plan';
+import { validate } from '../src/director/validate';
 import { type Board, EMPTY, STONE, TORII, WATER, isCard, isTorii, isWater, toriiOf, toriiPair } from '../src/engine/board';
 import { type LevelSpec, buildBoard, honestSpec, maxStones, pickKnots, pickSnow, pickStreams, pickTorii } from '../src/engine/levels';
 import { clash } from '../src/engine/mechanics';
-import { findPath, pathBends, reachable } from '../src/engine/path';
+import { findPath, pathBends, pathStrokes, reachable } from '../src/engine/path';
 import { createRng } from '../src/engine/rng';
 import { Session } from '../src/engine/session';
 import { solve } from '../src/engine/solve';
@@ -399,5 +404,95 @@ describe('solvability fuzz (torii and streams)', () => {
       const base = spec({ seed: `tz-${k}`, stones: 4, snow: 3, gates: 2, fences: 4 });
       expect(buildBoard({ ...base, torii: 0, streams: 0 }).cells).toEqual(buildBoard(base).cells);
     }
+  });
+});
+
+// ─────────────────────────────── The Director ───────────────────────────────
+
+describe('the road brings torii in at Miyajima and streams at Yeosu', () => {
+  const chapterLevels = (index: number) => Array.from({ length: ROUTE_LEVELS_PER_CHAPTER }, (_, s) => index * ROUTE_LEVELS_PER_CHAPTER + s + 1);
+
+  it('introduces each alone on the second board of its chapter, never before', () => {
+    expect(ROUTE[22].id).toBe('miyajima');
+    expect(ROUTE[24].id).toBe('yeosu');
+    for (const [m, ch] of [['torii', 22], ['streams', 24]] as const) {
+      const intro = levelPlan(ch * ROUTE_LEVELS_PER_CHAPTER + 2);
+      expect(intro.introduces).toBe(m);
+      expect(intro.mechanics).toEqual([m]);
+      for (let n = 1; n < intro.n; n++) expect(levelPlan(n).mechanics, `level ${n}`).not.toContain(m);
+      // The chapter is about it: most of its boards carry it.
+      const on = chapterLevels(ch).filter((n) => levelPlan(n).mechanics.includes(m)).length;
+      expect(on, m).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it('come back later as partners from the bag, and never with sliding', () => {
+    for (const [m, ch] of [['torii', 22], ['streams', 24]] as const) {
+      const later = [];
+      for (let n = (ch + 1) * ROUTE_LEVELS_PER_CHAPTER + 1; n <= 600; n++) if (levelPlan(n).mechanics.includes(m) && levelPlan(n).place.focus !== m) later.push(n);
+      expect(later.length, m).toBeGreaterThanOrEqual(8);
+      for (let n = 1; n <= 900; n++) {
+        const p = levelPlan(n);
+        if (p.mechanics.includes(m)) expect(p.wind, `level ${n}`).toBeNull();
+      }
+    }
+  });
+
+  it('the plan’s specs carry the terrain counts the tiers ask for', () => {
+    for (const n of [266, 270, 274, 290, 296, 299]) {
+      const p = levelPlan(n);
+      for (let t = 0; t < 5; t++) {
+        const k = tierKnobs(p, t);
+        expect(k.torii > 0, `${n}/${t}`).toBe(p.mechanics.includes('torii'));
+        expect(k.streams > 0, `${n}/${t}`).toBe(p.mechanics.includes('streams'));
+        expect(k.streams % 2).toBe(0);
+      }
+    }
+  });
+
+  it('validators reject a board missing its torii or its stream', () => {
+    const spec = fallbackSpec(266, 2);
+    const board = buildBoard(spec);
+    const m = measure(spec, board);
+    const plan = levelPlan(266);
+    expect(validate(spec, board, m, { plan }).reasons).not.toContain('torii');
+    expect(validate({ ...spec, torii: 0 }, board, m, { plan, skipRebuild: true }).reasons).toEqual(expect.arrayContaining(['torii', 'missing:torii']));
+    const s2 = fallbackSpec(290, 2);
+    const b2 = buildBoard(s2);
+    const stones = { ...b2, cells: b2.cells.map((v) => (isWater(v) ? STONE : v)) };
+    expect(validate(s2, stones, measure(s2, b2), { plan: levelPlan(290), skipRebuild: true }).reasons).toContain('streams');
+  });
+
+  it('every bank entry of the two chapters (all tiers) validates and carries its mechanic', () => {
+    for (const ch of [22, 24]) {
+      for (const n of chapterLevels(ch)) {
+        const plan = levelPlan(n);
+        for (let t = 0; t < TIERS; t++) {
+          expect(bankEntry(n, t), `${n}/${t}`).not.toBeNull();
+          const spec = bankSpec(n, t);
+          const board = buildBoard(spec);
+          const v = validate(spec, board, measure(spec, board), { tier: t, plan });
+          expect(v.reasons, `level ${n} tier ${t}`).toEqual([]);
+          if (plan.mechanics.includes('torii')) expect(board.cells.some(isTorii), `${n}/${t}`).toBe(true);
+          if (plan.mechanics.includes('streams')) expect(board.cells.some(isWater), `${n}/${t}`).toBe(true);
+        }
+      }
+    }
+  });
+});
+
+describe('pathStrokes', () => {
+  it('draws a portal path as two strokes, into the torii and out of its twin', () => {
+    const b = grid([
+      '# # # # # #',
+      '# 0 T # # #',
+      '# # # # # #',
+      '# T ~ ~ 1 #',
+      '# # # # # #',
+    ]);
+    const strokes = pathStrokes(findPath(b, at(b, 1, 1), at(b, 3, 4))!);
+    expect(strokes.map((s) => s.map((p) => `${p.r},${p.c}`))).toEqual([['1,1', '1,2'], ['3,1', '3,4']]);
+    const plain = [{ r: 0, c: 0 }, { r: 0, c: 3 }, { r: 2, c: 3 }];
+    expect(pathStrokes(plain)).toEqual([plain]);
   });
 });

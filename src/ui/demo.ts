@@ -10,8 +10,10 @@
  */
 import { cardSvg } from '../art/cards';
 import { gateSvg } from '../art/mechanics';
+import { toriiSvg, waterMarkup } from '../art/terrain';
 import { MONTHS } from '../data/deck';
-import { FENCE_DOWN, FENCE_RIGHT, STONE, gateMonth, isCard, isGate, monthOf } from '../engine/board';
+import { FENCE_DOWN, FENCE_RIGHT, STONE, gateMonth, isCard, isGate, isTorii, monthOf, toriiPair } from '../engine/board';
+import { pathStrokes } from '../engine/path';
 import { GOALS } from '../engine/goals';
 import { findMove } from '../engine/moves';
 import { lockedOf } from '../engine/rules';
@@ -131,6 +133,7 @@ export class DemoPlayer {
       if (isCard(v)) node = this.cardEl(v, i);
       else if (v === STONE) node = h('div', { class: 'demo__stone', 'aria-hidden': 'true' });
       else if (isGate(v)) node = h('div', { class: 'demo__gate', 'aria-hidden': 'true', html: gateSvg(gateMonth(v)) });
+      else if (isTorii(v)) node = h('div', { class: 'demo__torii', 'aria-hidden': 'true', html: toriiSvg(toriiPair(v)) });
       if (!node) return;
       this.place(node, i);
       this.nodes.set(i, node);
@@ -186,10 +189,10 @@ export class DemoPlayer {
     return { x: this.xOf(i % cols), y: this.yOf(Math.floor(i / cols)) };
   }
 
-  /** Bamboo fences on cell edges: a pole with nodes, drawn under the cards' gaps. */
+  /** Water (brushed lines along each stream), then bamboo fences on cell edges: a pole with nodes. */
   private drawFences() {
-    const { rows, cols, walls } = this.run.state.board;
-    this.fenceSvg.replaceChildren();
+    const { rows, cols, walls, cells } = this.run.state.board;
+    this.fenceSvg.innerHTML = waterMarkup(cells, rows, cols, LANE, LANE, CW, CH);
     if (!walls) return;
     const seg = (x1: number, y1: number, x2: number, y2: number) => {
       const g = document.createElementNS(SVG_NS, 'g');
@@ -413,8 +416,10 @@ export class DemoPlayer {
 
   private async pairFx(ev: Extract<DemoEvent, { kind: 'pair' }>, tok: Token, byPlayer = false) {
     const rm = reducedMotion();
-    const pts = ev.path.map((p) => ({ x: this.xOf(p.c), y: this.yOf(p.r) }));
-    this.ink(pts, { bends: !!this.script.bends && !byPlayer });
+    // A path through a torii is two strokes: into one torii, out of its twin.
+    for (const stroke of pathStrokes(ev.path)) {
+      this.ink(stroke.map((p) => ({ x: this.xOf(p.c), y: this.yOf(p.r) })), { bends: !!this.script.bends && !byPlayer });
+    }
     if (!byPlayer) this.hideBrushSoon();
     await this.sleep(rm ? 380 : 270, tok);
     const a = this.nodes.get(ev.a);

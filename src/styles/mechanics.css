@@ -403,3 +403,84 @@
     display: none;
   }
 }
+
+/* ─────────────────────── Torii and streams (terrain) ─────────────────────── */
+/* Water and torii never hold a card and never move. Art: src/art/terrain.ts. */
+:root {
+  --water-wash: rgba(132, 168, 178, 0.26);
+  --water-ink: #4f7684;
+  --water-ink-soft: rgba(79, 118, 132, 0.6);
+  --torii-sea: rgba(132, 168, 178, 0.3);
+}
+:root[data-theme='ink'],
+:root[data-theme='dark'] {
+  --water-wash: rgba(110, 160, 176, 0.2);
+  --water-ink: #9cc3cf;
+  --water-ink-soft: rgba(156, 195, 207, 0.55);
+  --torii-sea: rgba(110, 160, 176, 0.24);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) {
+    --water-wash: rgba(110, 160, 176, 0.2);
+    --water-ink: #9cc3cf;
+    --water-ink-soft: rgba(156, 195, 207, 0.55);
+    --torii-sea: rgba(110, 160, 176, 0.24);
+  }
+}
+.terrain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+.water__wash {
+  fill: var(--water-wash);
+}
+.water__line {
+  stroke: var(--water-ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.water__line--0,
+.water__line--2 {
+  stroke: var(--water-ink-soft);
+}
+.water-cell {
+  position: absolute;
+  pointer-events: none;
+}
+.torii {
+  position: absolute;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(40, 20, 5, 0.22));
+}
+.torii svg,
+.demo__torii svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.torii__sea {
+  fill: var(--torii-sea);
+}
+.torii__ripple {
+  stroke: var(--water-ink);
+}
+/* A path just went through: the twin it came out of answers with a small lift. */
+.torii.is-through {
+  animation: torii-through 520ms var(--ease-settle) both;
+}
+@keyframes torii-through {
+  40% {
+    transform: translateY(-4%) scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .torii.is-through {
+    animation: none;
+  }
+}

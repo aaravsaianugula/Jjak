@@ -72,18 +72,26 @@ export interface Knobs {
   knots: number;
   gates: number;
   fences: number;
+  /** torii twin pairs (0–2) */
+  torii: number;
+  /** water cells (even) */
+  streams: number;
 }
 
 export type KnobId = keyof Knobs;
 
-const MECH_ORDER: Mechanic[] = ['stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences'];
+const MECH_ORDER: Mechanic[] = ['stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams'];
 /** Partner ideas drawn from the bag (stones are the quiet background, lucky has its own slots). */
-export const PARTNERS: Mechanic[] = ['leaves', 'snow', 'knots', 'wind', 'gates', 'fences'];
+export const PARTNERS: Mechanic[] = ['leaves', 'snow', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams'];
 export const WIND_CYCLE: Wind[] = ['right', 'up', 'left'];
 const slides = (m: Mechanic) => m === 'leaves' || m === 'wind';
-/** Same rule as MECHANICS[*].clashes (checked by a test): sliding never meets snow, fences or the other slide. */
+/** Fixed things that cards can't slide against or over: snow, fences and the terrain (torii, streams). */
+const staysPut = (m: Mechanic) => m === 'snow' || m === 'fences' || m === 'torii' || m === 'streams';
+/** Same rule as MECHANICS[*].clashes (checked by a test): sliding never meets snow, fences, terrain or the other slide. */
 export const clashes = (a: Mechanic, b: Mechanic): boolean =>
-  a !== b && ((slides(a) && slides(b)) || (slides(a) && (b === 'snow' || b === 'fences')) || (slides(b) && (a === 'snow' || a === 'fences')));
+  a !== b && ((slides(a) && slides(b)) || (slides(a) && staysPut(b)) || (slides(b) && staysPut(a)));
+/** Cells a tier's knobs take from the cards: stones, gates, torii (two per pair) and water. */
+const fixedCells = (k: Pick<Knobs, 'stones' | 'gates' | 'torii' | 'streams'>) => k.stones + k.gates + 2 * k.torii + k.streams;
 
 /** Teaching levels: small boards, identical-looking cards. */
 const TUTORIAL: [rows: number, cols: number, months: number][] = [
@@ -338,6 +346,8 @@ export interface KnobRange {
   knots: [number, number];
   gates: [number, number];
   fences: [number, number];
+  torii: [number, number];
+  streams: [number, number];
   layouts: StoneLayout[];
 }
 
@@ -353,9 +363,14 @@ export function knobRange(p: LevelPlan): KnobRange {
   const covered = has(p, 'snow') || has(p, 'knots');
   const stones: [number, number] = has(p, 'stones') ? [Math.min(2, maxS), covered ? Math.min(has(p, 'gates') ? 2 : 4, maxS) : maxS] : [0, 0];
   const gates: [number, number] = has(p, 'gates') ? [2, cells >= 40 && !covered ? 6 : 4] : [0, 0];
-  const pairsHi = (cells - stones[0] - gates[0]) / 2;
+  // One twin pair, two on roomy boards; streams of 2–3 cells, two runs on roomy boards.
+  const torii: [number, number] = has(p, 'torii') ? [1, cells >= 36 ? 2 : 1] : [0, 0];
+  const streams: [number, number] = has(p, 'streams') ? [2, cells >= 40 && !covered ? 6 : 4] : [0, 0];
+  const lo = { stones: stones[0], gates: gates[0], torii: torii[0], streams: streams[0] };
+  const hi = { stones: stones[1], gates: gates[1], torii: torii[1], streams: streams[1] };
+  const pairsHi = (cells - fixedCells(lo)) / 2;
   const flower = (pairs: number) => (p.lucky ? pairs - 1 : pairs);
-  const monthsHi = Math.min(12, flower((cells - stones[1] - gates[1]) / 2));
+  const monthsHi = Math.min(12, flower((cells - fixedCells(hi)) / 2));
   const monthsLo = p.fixed ? monthsHi : Math.max(Math.ceil(monthsHi * 0.6), monthsHi - MONTH_DROP[0]);
   return {
     stones,
@@ -364,6 +379,8 @@ export function knobRange(p: LevelPlan): KnobRange {
     knots: has(p, 'knots') ? [2, Math.max(2, Math.round(pairsHi * 0.32))] : [0, 0],
     gates,
     fences: has(p, 'fences') ? [3, cells >= 48 ? 14 : 11] : [0, 0],
+    torii,
+    streams,
     layouts: has(p, 'stones') ? LAYOUTS : ['spread'],
   };
 }
@@ -376,14 +393,16 @@ export function knobRange(p: LevelPlan): KnobRange {
 export function tierKnobs(p: LevelPlan, tier: number): Knobs {
   const t = clamp(Math.round(tier), 0, 4);
   const r = knobRange(p);
-  if (p.fixed) return { stones: 0, layout: 'spread', months: r.months[1], snow: 0, knots: 0, gates: 0, fences: 0 };
+  if (p.fixed) return { stones: 0, layout: 'spread', months: r.months[1], snow: 0, knots: 0, gates: 0, fences: 0, torii: 0, streams: 0 };
   const x = intensity(p.base, t);
   const lerp = ([lo, hi]: [number, number], f = x) => lo + (hi - lo) * f;
   // Background stones climb more slowly than stones that are the place's idea (or a peak's).
   const feature = p.place.focus === 'stones' || p.role === 'peak';
   const stones = has(p, 'stones') ? clamp(evenRound(lerp(r.stones, feature ? x : 0.75 * x)), r.stones[0], r.stones[1] - (r.stones[1] % 2)) : 0;
   const gates = has(p, 'gates') ? clamp(evenRound(lerp(r.gates)), 2, r.gates[1]) : 0;
-  const pairs = (p.rows * p.cols - stones - gates) / 2;
+  const torii = has(p, 'torii') ? clamp(Math.round(lerp(r.torii)), r.torii[0], r.torii[1]) : 0;
+  const streams = has(p, 'streams') ? clamp(evenRound(lerp(r.streams)), r.streams[0], r.streams[1]) : 0;
+  const pairs = (p.rows * p.cols - fixedCells({ stones, gates, torii, streams })) / 2;
   const monthsHi = Math.min(12, p.lucky ? pairs - 1 : pairs);
   const months = clamp(monthsHi - MONTH_DROP[t], Math.min(r.months[0], monthsHi), monthsHi);
   return {
@@ -394,6 +413,8 @@ export function tierKnobs(p: LevelPlan, tier: number): Knobs {
     knots: has(p, 'knots') ? Math.round(lerp([2, Math.max(2, Math.round(pairs * 0.32))])) : 0,
     gates,
     fences: has(p, 'fences') ? Math.round(lerp(r.fences)) : 0,
+    torii,
+    streams,
   };
 }
 
@@ -403,7 +424,9 @@ export function clampKnobs(p: LevelPlan, k: Knobs): Knobs {
   const even = (x: number) => x - (x % 2);
   const stones = clamp(even(k.stones), r.stones[0], even(r.stones[1]));
   const gates = clamp(even(k.gates), r.gates[0], r.gates[1]);
-  const pairs = (p.rows * p.cols - stones - gates) / 2;
+  const torii = clamp(k.torii, r.torii[0], r.torii[1]);
+  const streams = clamp(even(k.streams), r.streams[0], r.streams[1]);
+  const pairs = (p.rows * p.cols - fixedCells({ stones, gates, torii, streams })) / 2;
   const monthsHi = Math.min(12, p.lucky ? pairs - 1 : pairs);
   return {
     stones,
@@ -413,6 +436,8 @@ export function clampKnobs(p: LevelPlan, k: Knobs): Knobs {
     knots: has(p, 'knots') ? clamp(k.knots, 2, Math.max(2, Math.round(pairs * 0.32))) : 0,
     gates,
     fences: clamp(k.fences, r.fences[0], r.fences[1]),
+    torii,
+    streams,
   };
 }
 
@@ -435,6 +460,8 @@ export function planSpec(p: LevelPlan, k: Knobs, seed: string, tier?: number): L
     festival: p.festival,
     ...(k.gates ? { gates: k.gates } : {}),
     ...(k.fences ? { fences: k.fences } : {}),
+    ...(k.torii ? { torii: k.torii } : {}),
+    ...(k.streams ? { streams: k.streams } : {}),
     ...(k.stones && k.layout !== 'spread' ? { layout: k.layout } : {}),
     ...(p.goal ? { goal: p.goal } : {}),
     ...(tier != null ? { tier } : {}),
@@ -482,7 +509,7 @@ export function levelPlan(n: number): LevelPlan {
     plan.spec = { mode: 'journey', number: n, seed: `journey-${n}`, rows: id.rows, cols: id.cols, stones: 0, months: id.tutorialMonths, variants: false, par: plan.par, gravity: false, snow: 0 };
   } else {
     const k2 = tierKnobs(plan, 2);
-    plan.par = parOf(id, (id.rows * id.cols - k2.stones - k2.gates) / 2);
+    plan.par = parOf(id, (id.rows * id.cols - fixedCells(k2)) / 2);
     plan.spec = planSpec(plan, k2, `journey-${n}`);
   }
   planCache.set(n, plan);

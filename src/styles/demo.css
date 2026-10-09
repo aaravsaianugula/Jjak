@@ -1013,3 +1013,7 @@
   color: var(--accent-text);
   box-shadow: inset 0 0 0 1.25px color-mix(in srgb, var(--accent) 40%, transparent);
 }
+.demo__torii {
+  position: absolute;
+  filter: drop-shadow(0 2px 3px rgba(40, 20, 5, 0.22));
+}
