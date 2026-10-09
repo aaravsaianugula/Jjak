@@ -136,7 +136,7 @@ export class DemoPlayer {
       else if (v === STONE) node = h('div', { class: 'demo__stone', 'aria-hidden': 'true' });
       else if (isGate(v)) node = h('div', { class: 'demo__gate', 'aria-hidden': 'true', html: gateSvg(gateMonth(v)) });
       else if (isTorii(v)) node = h('div', { class: 'demo__torii', 'aria-hidden': 'true', html: toriiSvg(toriiPair(v)) });
-      else if (isInk(v)) node = inkBlot(this.run.state.board.ink![i], 'demo__ink');
+      else if (isInk(v)) node = inkBlot(this.run.state.board.ink![i], 'demo__blot');
       if (!node) return;
       this.place(node, i);
       this.nodes.set(i, node);
@@ -175,7 +175,7 @@ export class DemoPlayer {
     const b = this.run.state.board;
     for (const [i, n] of this.nodes) {
       if (n.classList.contains('demo__card')) setSeal(n, b.seals?.[i] ?? 0, sealWaits(b, i));
-      else if (n.classList.contains('demo__ink')) {
+      else if (n.classList.contains('demo__blot')) {
         if (isInk(b.cells[i])) setWet(n, b.ink![i]);
         else {
           this.nodes.delete(i);
