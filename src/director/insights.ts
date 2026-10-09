@@ -7,7 +7,7 @@
  * evidence the screen says "play a few more boards" instead of guessing. Wording is
  * encouraging: strengths, habits and a "growth edge", never weak, bad or slow.
  *
- * Tempo is read only at high confidence and only as "quick hands" or "even pace":
+ * Tempo is read only at high confidence and only as quick hands or few misreads:
  * a record's longest find still includes the opening think time, so "freeze" is
  * never claimed here.
  */
@@ -33,7 +33,7 @@ export const INSIGHT = {
   max: 5,
   /** points on the trend line, and the fewest worth drawing */
   trendPoints: 24,
-  trendMin: 3,
+  trendMin: 5,
   /** change (d units) between the first and last third that reads as risen or eased */
   trendMove: 0.02,
 };
@@ -90,7 +90,7 @@ function mechInsights(h: PlayerHabits, a: AnalyticsSave): Insight[] {
     .sort(([, x], [, y]) => y.r - x.r)[0];
   if (best) out.push({ kind: 'strength', key: `mech:${best[0]}`, text: `You’re at home with ${mechName(best[0])}.` });
   const edge = h.weakMechanics.find((m) => mechName(m.id) && m.confidence >= INSIGHT.minConf);
-  if (edge) out.push({ kind: 'edge', key: `mech:${edge.id}`, text: `${mechName(edge.id)} is your growth edge. The Practice room has gentle boards for it.` });
+  if (edge) out.push({ kind: 'edge', key: `mech:${edge.id}`, text: `Boards with ${mechName(edge.id)} are your growth edge. The Practice room has gentle ones to try.` });
   return out;
 }
 
@@ -107,7 +107,7 @@ function habitInsights(h: PlayerHabits): Insight[] {
   }
   if (h.tempo.confidence >= INSIGHT.tempoConf) {
     if (h.tempo.style === 'rush') out.push({ kind: 'habit', key: 'tempo', text: 'You play with quick hands. A breath before the second tap saves a misread.' });
-    if (h.tempo.style === 'balanced') out.push({ kind: 'habit', key: 'tempo', text: 'Your pace stays even from pair to pair.' });
+    if (h.tempo.style === 'balanced') out.push({ kind: 'habit', key: 'tempo', text: 'You read before you tap, with few misreads.' });
   }
   if (h.assists.confidence >= INSIGHT.minConf) {
     out.push({

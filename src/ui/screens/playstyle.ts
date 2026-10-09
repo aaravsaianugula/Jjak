@@ -20,7 +20,7 @@ const H = 112;
 const PAD = 8;
 
 const insightRow = (i: Insight, k: number) =>
-  `<li class="style__insight style__insight--${i.kind}" style="--i:${k}"><span class="style__kind">${KIND_LABEL[i.kind]}</span><span class="style__say">${esc(i.text)}</span></li>`;
+  `<li class="style__insight style__insight--${i.kind}" style="--i:${k}"><span class="style__kind">${KIND_LABEL[i.kind]}<span class="sr-only">: </span></span><span class="style__say">${esc(i.text)}</span></li>`;
 
 function trendCard(points: number[], text: string): string {
   if (!points.length) return `<p class="style__chart-empty muted">Your line starts drawing after a few more boards.</p>`;
@@ -29,7 +29,7 @@ function trendCard(points: number[], text: string): string {
       <line class="style__base" x1="0" y1="${H - 1}" x2="${W}" y2="${H - 1}" />
       <path class="style__line" d="${trendLine(points, W, H, PAD)}" />
     </svg>
-    <figcaption class="style__caption">${esc(text)}</figcaption>
+    <figcaption class="style__caption" aria-hidden="true">${esc(text)}</figcaption>
   </figure>`;
 }
 

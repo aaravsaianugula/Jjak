@@ -3871,9 +3871,6 @@ button.row:active,
 }
 
 /* ── Your play style (기풍 · 棋風): insights, skill line, mastery and best runs ── */
-.playstyle .section-label + .list {
-  margin-bottom: 0;
-}
 .style__insight {
   position: relative;
   display: flex;

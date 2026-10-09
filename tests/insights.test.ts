@@ -97,7 +97,7 @@ describe('habit sentences', () => {
     const h = habits({ weakMechanics: [{ id: 'wind', rating: 0.33, gap: -0.07, confidence: 0.8 }] });
     const out = insightsFrom(h, a);
     expect(out).toContainEqual({ kind: 'strength', key: 'mech:snow', text: 'You’re at home with First snow.' });
-    expect(out).toContainEqual({ kind: 'edge', key: 'mech:wind', text: 'Wind is your growth edge. The Practice room has gentle boards for it.' });
+    expect(out).toContainEqual({ kind: 'edge', key: 'mech:wind', text: 'Boards with Wind are your growth edge. The Practice room has gentle ones to try.' });
     // "at home" in words only where the mastery band says "at home" too
     a.mech = { snow: stat(0.45, MASTERY.homeConf - 0.05) };
     expect(masteryBand(a.mech.snow, a.rating)).toBe('steady');
@@ -111,7 +111,7 @@ describe('habit sentences', () => {
     expect(texts(habits({ tempo: { style: 'rush', confidence: INSIGHT.tempoConf } }))).toEqual([
       'You play with quick hands. A breath before the second tap saves a misread.',
     ]);
-    expect(texts(habits({ tempo: { style: 'balanced', confidence: 1 } }))).toEqual(['Your pace stays even from pair to pair.']);
+    expect(texts(habits({ tempo: { style: 'balanced', confidence: 1 } }))).toEqual(['You read before you tap, with few misreads.']);
     expect(texts(habits({ tempo: { style: 'rush', confidence: INSIGHT.tempoConf - 0.01 } }))).toEqual([]);
     expect(texts(habits({ tempo: { style: 'freeze', confidence: 1 } }))).toEqual([]);
   });
@@ -226,11 +226,11 @@ describe('skill trend', () => {
     expect(s[0]).toBeCloseTo(0.302, 2);
     expect(s[s.length - 1]).toBeCloseTo(0.397, 2);
     // too short to draw a line
-    a.trail = [0.3, 0.31];
+    a.trail = [0.3, 0.31, 0.32, 0.33];
     expect(trendSeries(a)).toEqual([]);
     // a save edited by hand: NaN never reaches the series
-    a.trail = [0.3, NaN, 0.31, 0.32] as number[];
-    expect(trendSeries(a)).toEqual([0.3, 0.31, 0.32]);
+    a.trail = [0.3, NaN, 0.31, 0.32, Infinity, 0.33, 0.34] as number[];
+    expect(trendSeries(a)).toEqual([0.3, 0.31, 0.32, 0.33, 0.34]);
   });
 
   it('the line is a finite path inside the box, flat when steady', () => {
