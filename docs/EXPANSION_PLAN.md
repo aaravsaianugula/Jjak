@@ -212,7 +212,8 @@ deepen that reading:
 | **Gates (門)**: a gate shows a flower; pair that flower and the gate opens | **Ship** | Pure path-reading with planning: "which pair opens the way?" Solvable by construction (gate-aware placement order). |
 | **Fences (울타리 · 垣)**: bamboo fences on cell edges block paths | **Ship** | Makes the 2-bend rule richer without hiding information; solvable by construction (fence-aware paths). |
 | **Level goals** (third blossom: Rhythm ×4 combo, Clean read, Full bloom, Straight brush) | **Ship** | Rewards *how* you read, not just finishing. Never fails a level; it only takes the par blossom's place. |
-| Bridges / stepping stones | Rejected | A cell paths may cross is just an empty cell; it only makes boards easier. |
+| **Streams (개울 · 小川)**: water cells paths cross only straight | **Ship** (was "Bridges", rejected) | The first verdict held for a cell paths may simply cross: that is just an empty cell. The no-bend rule changes it: water is open to a straight line and closed to a corner, so it both helps and hinders, and reading where a path *may turn* becomes part of the read. Solvable by construction (water is fixed; `reachable` respects it). |
+| **Torii (鳥居)**: twin portals; a path into one leaves its twin the same way | **Ship** | A new way to *read* a connection (a jump that costs no bend) that stays inside the 2-bend rule. Fixed cells, solvable by construction. About 9 % of legal moves on Miyajima boards exist only through a torii. |
 | Lanterns lit by paths | Rejected | The game picks the path for you, so the player can't steer through a lantern: frustration, not skill. |
 | Twin pairs (must clear back to back) | Rejected | An order constraint that can strand a board; reads as a gimmick. |
 | Fog / night boards | Rejected | Hides information the core depends on; overlaps with First snow. |
@@ -221,8 +222,20 @@ deepen that reading:
 | Clear within N moves | Rejected | Pair count is fixed by the board, so "N moves" is either trivial or confusing. |
 
 Gates appear from chapter 11 (Andong Hahoe, a village of gates), fences from chapter 14
-(Damyang, the bamboo grove). Goals from chapter 6. Each has engine tests and a solvability fuzz,
-and an animated intro (C4). Fences never share a board with sliding (leaves/wind).
+(Damyang, the bamboo grove), torii from chapter 23 (Miyajima, the great floating torii) and
+streams from chapter 25 (Yeosu, the island joined by a long breakwater). Goals from chapter 6.
+Each has engine tests and a solvability fuzz, and an animated intro (C4). Fences, torii and
+streams never share a board with sliding (leaves/wind); they mix freely with snow, knots,
+gates and each other.
+
+**Torii and streams: the rules as built** (`src/engine/path.ts`). Torii: entered from any side,
+the path leaves the twin (same plaque mark) in the same direction at no bend cost; it can't
+bend on either torii, so the cell past the twin must be open (free, water, the outer lane or
+the partner card); a path never starts or ends on a torii; at most two twin pairs per board,
+each two cells on different rows and columns at least 3 apart; twins on one line can't loop
+a path. Streams: water is passable only straight on, along or across; a path may bend on the
+bank just before or after it. A portal path draws as two strokes (into the torii, out of the
+twin).
 
 ## C4. Show, don't tell
 
@@ -240,7 +253,7 @@ two or three words. Skippable from the first frame, never shown to a returning p
 measured from the intro title's Begin tap (not app launch; `performance.measure('jjak:begin-to-first-pair')`):
 the first real pair should land within 20 s.
 
-**Mechanic intros** for stones, falling leaves, snow, lucky cards, knots, wind, gates, fences
+**Mechanic intros** for stones, falling leaves, snow, lucky cards, knots, wind, gates, fences, torii, streams
 and goals use the demo player. **Replay intro** from How to Play and from the pause menu.
 
 ## C5. Beyond 600: the endless, personal road

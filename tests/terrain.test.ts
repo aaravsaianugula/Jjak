@@ -12,7 +12,9 @@ import { fallbackSpec, levelPlan, tierKnobs } from '../src/director/plan';
 import { validate } from '../src/director/validate';
 import { type Board, EMPTY, STONE, TORII, WATER, isCard, isTorii, isWater, toriiOf, toriiPair } from '../src/engine/board';
 import { type LevelSpec, buildBoard, honestSpec, maxStones, pickKnots, pickSnow, pickStreams, pickTorii } from '../src/engine/levels';
+import { reshuffle } from '../src/engine/generate';
 import { clash } from '../src/engine/mechanics';
+import { findMove } from '../src/engine/moves';
 import { findPath, pathBends, pathStrokes, reachable } from '../src/engine/path';
 import { createRng } from '../src/engine/rng';
 import { Session } from '../src/engine/session';
@@ -494,5 +496,31 @@ describe('pathStrokes', () => {
     expect(strokes.map((s) => s.map((p) => `${p.r},${p.c}`))).toEqual([['1,1', '1,2'], ['3,1', '3,4']]);
     const plain = [{ r: 0, c: 0 }, { r: 0, c: 3 }, { r: 2, c: 3 }];
     expect(pathStrokes(plain)).toEqual([plain]);
+  });
+});
+
+describe('reshuffle onto open cells', () => {
+  it('a last pair stuck behind fences is re-dealt where it can pair (any seed)', () => {
+    // Level 692's board as built in this branch: stones, fences, and a last pair that can't meet.
+    const s = spec({ seed: 'journey-692', rows: 7, cols: 6, stones: 2, months: 11, snow: 7, fences: 8 });
+    const built = buildBoard(s);
+    const b: Board = { ...built, cells: built.cells.map((v) => (v === STONE ? STONE : EMPTY)) };
+    b.cells[7] = 30;
+    b.cells[37] = 31;
+    expect(findMove(b)).toBeNull();
+    for (let k = 0; k < 40; k++) expect(findMove(reshuffle(b, createRng(`rs-${k}`))), `rs-${k}`).not.toBeNull();
+  });
+
+  it('never deals a card onto water or a torii', () => {
+    const b = grid([
+      '0 # T ~ ~ 1',
+      '# . . . . T',
+    ]);
+    for (let k = 0; k < 20; k++) {
+      const out = reshuffle(b, createRng(`rt-${k}`));
+      expect(out.cells.filter(isTorii).length).toBe(2);
+      expect(out.cells.filter(isWater).length).toBe(2);
+      expect(findMove(out)).not.toBeNull();
+    }
   });
 });

@@ -78,6 +78,8 @@ the board each player gets comes from the offline-built bank at their tier
 | Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair |
 | Chapter 11 | | yes | **Gates (門)**: a gate opens when its flower is paired |
 | Chapter 14 | | yes | **Fences (울타리)**: paths can't cross a bamboo fence |
+| Chapter 23 (Miyajima) | | yes | **Torii (鳥居)**: a path that enters one torii comes out of its twin heading the same way; the jump costs no bend, the 2-bend rule holds over the whole path, and a path can't bend on a torii. One twin pair, two on roomy boards, told apart by the plaque (一 / 二) |
+| Chapter 25 (Yeosu) | | yes | **Streams (개울 · 小川)**: paths cross water (or run along it) only in a straight line; they never bend on a water cell. Two to six water cells in runs of 2–3 |
 | Chapters 6–50 | | yes | Each place features one idea or a mix; level goals on about one board in four |
 | 601+ (Wanderer) | | yes | Hidden until level 600 is cleared, then revealed ("The road goes on"). Each level is generated live for this player in a Web Worker, with the same validators |
 
@@ -87,7 +89,8 @@ plain board, a mix, a smaller breather in the middle, a peak, and the **festival
 8 rows × 7 columns, so cards stay tappable at 360 px wide. Designed difficulty is a
 sawtooth inside each chapter (open and rest boards dip, the peak tops it) on a road that
 rises; partner ideas and goals come from bag randomisers so neighbours don't repeat.
-Snow and fences never share a board with falling leaves or wind.
+Snow, fences, torii and streams never share a board with falling leaves or wind
+(terrain can't move and cards can't slide over it).
 
 **Show, don't tell.** New players get an animated first minute instead of a rules
 screen: the brush pairs two cards and the 0/1/2-bend rule draws itself, the player

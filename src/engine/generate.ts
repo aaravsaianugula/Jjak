@@ -181,23 +181,29 @@ export function reshuffle(b: Board, rng: Rng): Board {
   const out = placePairs(base, slots, pairs, rng, 200);
   if (out) return out;
   // The cells themselves can be a dead end (say, a card in a stone pocket with
-  // its partner walled off behind it). Re-deal onto open cells, rim first.
+  // its partner walled off behind it). Re-deal onto open cells, rim first. A
+  // few cells on the rim can still be a dead end of their own (two far corners
+  // need three bends; fences can part neighbours), so each try draws the cells
+  // again, looser each time.
   const open: number[] = [];
   b.cells.forEach((v, i) => !isBlock(v) && !isTerrain(v) && open.push(i));
-  const rim = (i: number) => {
-    const r = Math.floor(i / b.cols);
-    const c = i % b.cols;
-    return Math.min(r, c, b.rows - 1 - r, b.cols - 1 - c) + rng.next() * 0.5;
-  };
-  const target = open
-    .map((i) => ({ i, k: rim(i) }))
-    .sort((p, q) => p.k - q.k)
-    .slice(0, slots.length)
-    .map((p) => p.i);
   const cleared: Board = { rows: b.rows, cols: b.cols, cells: b.cells.map((v) => (isBlock(v) || isTerrain(v) ? v : EMPTY)) };
   if (b.walls) cleared.walls = b.walls;
-  const moved = placePairs(cleared, target, pairs, rng, 200);
-  if (moved) return moved;
+  for (let tries = 0; tries < 12; tries++) {
+    const noise = 0.5 + tries;
+    const rim = (i: number) => {
+      const r = Math.floor(i / b.cols);
+      const c = i % b.cols;
+      return Math.min(r, c, b.rows - 1 - r, b.cols - 1 - c) + rng.next() * noise;
+    };
+    const target = open
+      .map((i) => ({ i, k: rim(i) }))
+      .sort((p, q) => p.k - q.k)
+      .slice(0, slots.length)
+      .map((p) => p.i);
+    const moved = placePairs(cleared, target, pairs, rng, tries === 0 ? 200 : 40);
+    if (moved) return moved;
+  }
   // Extremely unlikely; a plain shuffle at least changes the position.
   const vals = rng.shuffle(slots.map((s) => b.cells[s]));
   const cells = b.cells.slice();
