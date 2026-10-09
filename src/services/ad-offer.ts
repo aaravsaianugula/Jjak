@@ -165,9 +165,13 @@ export function offerDue(now: Date, state: OfferState): OfferDue | null {
   return week ? { kind: 'festival', festival: week.festival, month: week.month } : null;
 }
 
-/** The state after an ask was shown today: it counts for the month the ask was due for. */
+/**
+ * The state after an ask was shown today: it counts for the month the ask was due for
+ * (never moving the remembered month backwards), and today starts the 14-day spacing.
+ */
 export function recordOffer(state: AdOfferSave, now: Date, due: OfferDue): AdOfferSave {
-  return { ...state, firstShown: true, lastMonth: due.month, lastAsk: dayKey(now) };
+  const lastMonth = state.lastMonth && state.lastMonth > due.month ? state.lastMonth : due.month;
+  return { ...state, firstShown: true, lastMonth, lastAsk: dayKey(now) };
 }
 
 export const defaultAdOffer = (): AdOfferSave => ({ never: false, firstShown: false, lastMonth: null, lastAsk: null });

@@ -225,6 +225,13 @@ describe('recording an ask', () => {
     });
     expect(s).toEqual(defaultAdOffer());
   });
+
+  it('never moves the remembered month backwards (a first ask on a tail day of last month’s week)', () => {
+    const odd = { ...defaultAdOffer(), lastMonth: '2026-10' };
+    const due = offerDue(day(2026, 10, 1), { adFree: false, ...odd })!;
+    expect(due).toMatchObject({ kind: 'first', month: '2026-09' });
+    expect(recordOffer(odd, day(2026, 10, 1), due)).toMatchObject({ lastMonth: '2026-10', lastAsk: '2026-10-01' });
+  });
 });
 
 describe('saved offer state', () => {

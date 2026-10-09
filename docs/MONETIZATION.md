@@ -87,7 +87,8 @@ triggered from Home by `askRemoveAdsIfDue` in `src/ui/remove-ads.ts`):
   (Chuseok from 30 September) is one ask for its first month, and its tail days never ask
   again. The first ask counts the same way, so a first start inside a festival week is one
   ask, not two. Saves from before the ask date was kept assume the last ask was on the last
-  day of its month, so the spacing holds for them too.
+  day of its month, so the spacing holds for them too. (A phone clock set back in time simply
+  holds the asks until the calendar passes the last one again.)
 * **Never** once ads are off (Remove ads, the festival product or the Supporter pack), and
   never after **"Don't ask again"**, a quiet button beside "Not now" that appears only on
   these asks. It's a preference: Reset progress keeps it (and keeps the ask history, so a
