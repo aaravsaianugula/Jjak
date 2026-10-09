@@ -1,7 +1,8 @@
 /**
  * A tiny typed event bus so features (missions, Flower Path, Market…) can react
  * to play without the game screen knowing about each of them.
- * The game screen emits; services subscribe once at startup.
+ * The game screen emits; services subscribe once at startup. Practice boards are
+ * never delivered (see emit), so practice can't change progression.
  */
 import type { Session, TapResult } from '../engine/session';
 import type { ModeId } from '../engine/levels';
@@ -37,7 +38,14 @@ export function on<K extends keyof GameEvents>(kind: K, fn: Handler<K>): () => v
   return () => list.splice(list.indexOf(fn), 1);
 }
 
+/** A Practice room board: nothing listening (progress, missions, the skill model) may count it. */
+function isPractice(e: object): boolean {
+  if ('mode' in e && e.mode === 'practice') return true;
+  return 'session' in e && (e.session as Session).spec.mode === 'practice';
+}
+
 export function emit<K extends keyof GameEvents>(kind: K, e: GameEvents[K]): void {
+  if (isPractice(e)) return;
   for (const fn of (handlers[kind] ?? []) as Handler<K>[]) {
     try {
       fn(e);

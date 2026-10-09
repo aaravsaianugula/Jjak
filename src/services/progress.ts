@@ -69,8 +69,11 @@ export function lanternGift(level: number): number {
   return ECONOMY.lanternPetals + (hintTurn ? ECONOMY.hintCost : ECONOMY.shuffleCost) + chapterGift;
 }
 
-/** Lucky pairs pay petals on a Journey level's first clear (and on other modes' boards, which have no replays to farm). */
-export const luckyPays = (mode: string, firstClear: boolean) => mode !== 'journey' || firstClear;
+/**
+ * Lucky pairs pay petals on a Journey level's first clear (and on Daily, Zen and Rush
+ * boards, which have no replays to farm); practice boards pay nothing.
+ */
+export const luckyPays = (mode: string, firstClear: boolean) => (mode === 'journey' ? firstClear : mode !== 'practice');
 
 /** Apply a finished board to the save file and report what the player earned. */
 export function recordClear(s: Session): ClearSummary {
