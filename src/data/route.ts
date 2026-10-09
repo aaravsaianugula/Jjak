@@ -13,8 +13,16 @@
 export type Country = 'KR' | 'JP';
 /** 0 spring, 1 summer, 2 autumn, 3 winter */
 export type Season = 0 | 1 | 2 | 3;
+
+/** The real calendar's season for each month, January first (northern hemisphere, as Korea and Japan). */
+const MONTH_SEASON: readonly Season[] = [3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3];
+/** The season of a date in local time: Mar–May spring, Jun–Aug summer, Sep–Nov autumn, Dec–Feb winter. */
+export function calendarSeason(d: Date): Season {
+  return MONTH_SEASON[d.getMonth()];
+}
+
 /** The idea a chapter features. 'basics' = chapter 1, 'mix' = several at once. */
-export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'mix';
+export type Focus = 'basics' | 'stones' | 'leaves' | 'snow' | 'lucky' | 'knots' | 'wind' | 'gates' | 'fences' | 'torii' | 'streams' | 'seals' | 'ink' | 'mix';
 
 export interface RouteChapter {
   /** stable id (save files key stamps by it) */
@@ -49,11 +57,11 @@ const ROWS: Row[] = [
   // 9–12
   ['jeju', 'Jeju', '제주', '濟州', 'KR', '#c29a2a', 'wind', 'Yellow canola flowers sway in the island wind below the slopes of Hallasan.'],
   ['yakushima', 'Yakushima', '야쿠시마', '屋久島', 'JP', '#3f6e55', 'mix', 'Summer rain keeps moss on every stone in the ancient cedar forests of Yakushima.'],
-  ['andong', 'Andong Hahoe', '안동 하회', '安東 河回', 'KR', '#9a5a2f', 'knots', 'Mask dancers perform each autumn in Hahoe, a village held in a bend of the river.'],
+  ['andong', 'Andong Hahoe', '안동 하회', '安東 河回', 'KR', '#9a5a2f', 'gates', 'Mask dancers perform each autumn in Hahoe, a village held in a bend of the river.'],
   ['sapporo', 'Sapporo', '삿포로', '札幌', 'JP', '#557ea0', 'snow', 'Each February, snow sculptures line Odori Park for the Sapporo Snow Festival.'],
   // 13–16
   ['hirosaki', 'Hirosaki', '히로사키', '弘前', 'JP', '#c46a7f', 'wind', 'Fallen cherry petals drift on Hirosaki’s castle moat until the water turns pink.'],
-  ['damyang', 'Damyang', '담양', '潭陽', 'KR', '#567f3e', 'stones', 'The bamboo grove of Juknokwon keeps a cool green shade all summer long.'],
+  ['damyang', 'Damyang', '담양', '潭陽', 'KR', '#567f3e', 'fences', 'The bamboo grove of Juknokwon keeps a cool green shade all summer long.'],
   ['nikko', 'Nikko', '닛코', '日光', 'JP', '#b0502d', 'leaves', 'Maples redden along the hairpin bends of the Irohazaka road above Nikko.'],
   ['pohang', 'Pohang', '포항', '浦項', 'KR', '#b4573a', 'mix', 'On New Year’s morning, crowds at Homigot watch the first sunrise beside the bronze Hand of Harmony.'],
   // 17–20
@@ -64,22 +72,22 @@ const ROWS: Row[] = [
   // 21–24
   ['ashikaga', 'Ashikaga', '아시카가', '足利', 'JP', '#7a5aa0', 'mix', 'In late April, great wisteria at Ashikaga hang in long violet curtains.'],
   ['busan', 'Busan', '부산', '釜山', 'KR', '#3f78a0', 'wind', 'Summer crowds and sea breezes fill the long sands of Haeundae Beach.'],
-  ['miyajima', 'Miyajima', '미야지마', '宮島', 'JP', '#b4432f', 'leaves', 'Maple leaves fill the Momijidani valley behind Miyajima’s great red gate in the sea.'],
+  ['miyajima', 'Miyajima', '미야지마', '宮島', 'JP', '#b4432f', 'torii', 'At high tide the great vermilion torii of Itsukushima seems to float on the sea off Miyajima.'],
   ['seoul', 'Seoul', '서울', 'ソウル', 'KR', '#5a6680', 'snow', 'Snow settles on the curved palace roofs of Gyeongbokgung below the northern hills.'],
   // 25–28
-  ['yeosu', 'Yeosu', '여수', '麗水', 'KR', '#b8383d', 'knots', 'Red camellias bloom in the woods of Odongdo, an island joined to Yeosu by a long breakwater.'],
+  ['yeosu', 'Yeosu', '여수', '麗水', 'KR', '#b8383d', 'streams', 'Red camellias bloom in the woods of Odongdo, an island joined to Yeosu by a long breakwater.'],
   ['hakone', 'Hakone', '하코네', '箱根', 'JP', '#5f74a6', 'stones', 'Hydrangeas bloom beside the little mountain railway as it zigzags up to Hakone.'],
   ['jirisan', 'Jirisan', '지리산', '智異山', 'KR', '#a9542c', 'leaves', 'Autumn colour pours down Piagol valley on the slopes of Jirisan.'],
   ['hakodate', 'Hakodate', '하코다테', '函館', 'JP', '#47648a', 'mix', 'From Mount Hakodate, the winter city glitters on a narrow neck of land with the sea on both sides.'],
   // 29–32
   ['fujigoko', 'Fuji Five Lakes', '후지고코', '富士五湖', 'JP', '#c06a8e', 'wind', 'Fields of pink moss phlox spread beneath Mount Fuji near Lake Motosu.'],
   ['tongyeong', 'Tongyeong', '통영', '統營', 'KR', '#2f7a8a', 'knots', 'Small green islands scatter across the calm sea around Tongyeong’s harbour.'],
-  ['takayama', 'Takayama', '다카야마', '高山', 'JP', '#b45a2c', 'lucky', 'Each October, lantern-hung festival floats roll through the old streets of Takayama.'],
+  ['takayama', 'Takayama', '다카야마', '高山', 'JP', '#b45a2c', 'seals', 'Each October, lantern-hung festival floats roll through the old streets of Takayama, one after another in a set order.'],
   ['hwacheon', 'Hwacheon', '화천', '華川', 'KR', '#4b7194', 'snow', 'In January, families fish through holes in the frozen river at the Hwacheon ice festival.'],
   // 33–36
   ['gangneung', 'Gangneung', '강릉', '江陵', 'KR', '#c26a80', 'wind', 'Cherry trees ring Gyeongpo Lake, where poets once counted five moons in a single night.'],
   ['furano', 'Furano', '후라노', '富良野', 'JP', '#7b62a6', 'mix', 'In July, rows of lavender stripe the rolling hills of Furano in purple.'],
-  ['jeonju', 'Jeonju', '전주', '全州', 'KR', '#b8892a', 'knots', 'Ginkgo leaves turn gold above the tiled roofs of Jeonju’s hanok village.'],
+  ['jeonju', 'Jeonju', '전주', '全州', 'KR', '#b8892a', 'ink', 'Ginkgo leaves turn gold above the tiled roofs of Jeonju’s hanok village, long a home of hanji paper.'],
   ['beppu', 'Beppu', '벳푸', '別府', 'JP', '#7a6658', 'stones', 'Steam from thousands of hot springs drifts over Beppu in the cold air.'],
   // 37–40
   ['uji', 'Uji', '우지', '宇治', 'JP', '#4f7d45', 'mix', 'In late spring, the year’s first tea is picked on the green hills around Uji.'],

@@ -6,6 +6,9 @@
  * in tests/economy.test.ts can run every number here without a browser.
  * Tuned against the 50-hour budget in docs/EXPANSION_PLAN.md §1.
  */
+import { ECONOMY } from '../config';
+import { MAX_STREAK_FREEZES } from './market';
+
 
 // ───────────────────────────── XP ─────────────────────────────
 
@@ -97,8 +100,6 @@ export interface Reward {
   /** Flower Path XP (chests only; rank rewards never give XP) */
   xp?: number;
   petals?: number;
-  hints?: number;
-  shuffles?: number;
   /** Warm tea: keeps the Daily streak through one missed day (max 2 held) */
   tea?: number;
   /** gold-leaf editions of cards already in the album */
@@ -117,7 +118,11 @@ export const PATH_EXCLUSIVES: Record<number, { key: string; name: string }> = {
   100: { key: 'music:moonlight', name: 'Moonlight music' },
 };
 
-/** What reaching rank `r` (2…100) gives. A ten-rank rhythm, with exclusives on top. */
+/**
+ * What reaching rank `r` (2…100) gives. A ten-rank rhythm, with exclusives on top.
+ * Ranks that once gave hints or shuffles give their petal price instead: tools
+ * come only from a rewarded ad or the Market.
+ */
 export function rankReward(r: number): Reward {
   const out: Reward = {};
   switch (r % 10) {
@@ -125,7 +130,7 @@ export function rankReward(r: number): Reward {
       out.petals = 10;
       break;
     case 2:
-      out.hints = 1;
+      out.petals = ECONOMY.hintCost;
       break;
     case 3:
       out.petals = 10;
@@ -134,20 +139,19 @@ export function rankReward(r: number): Reward {
       out.tea = 1;
       break;
     case 5:
-      out.hints = 1;
-      out.shuffles = 1;
+      out.petals = ECONOMY.hintCost + ECONOMY.shuffleCost;
       break;
     case 6:
       out.petals = 15;
       break;
     case 7:
-      out.shuffles = 1;
+      out.petals = ECONOMY.shuffleCost;
       break;
     case 8:
       out.petals = 10;
       break;
     case 9:
-      out.hints = 2;
+      out.petals = 2 * ECONOMY.hintCost;
       break;
     case 0:
       out.petals = 30;
@@ -190,6 +194,9 @@ export type MissionMetric =
   | 'stones'
   | 'knots'
   | 'wind'
+  | 'gates'
+  | 'fences'
+  | 'goal'
   | 'lucky'
   | 'zen'
   | 'boards'
@@ -199,7 +206,7 @@ export type MissionMetric =
 export const BEST_METRICS: MissionMetric[] = ['rushBest', 'score'];
 
 /** Mechanic a mission needs the player to have met first. */
-export type MissionNeed = 'gravity' | 'snow' | 'stones' | 'knots' | 'wind' | 'lucky';
+export type MissionNeed = 'gravity' | 'snow' | 'stones' | 'knots' | 'wind' | 'lucky' | 'gates' | 'fences' | 'goal';
 
 export interface MissionDef {
   id: string;
@@ -215,7 +222,7 @@ export interface MissionDef {
   minLevel?: number;
 }
 
-/** 40 templates across every mode. Three are drawn each day: one per tier. */
+/** 43 templates across every mode. Three are drawn each day: one per tier. */
 export const MISSIONS: MissionDef[] = [
   // ── Tier 1: a few minutes ──
   { id: 'pairs40', tier: 1, metric: 'pairs', target: 40, text: 'Make {n} pairs', go: 'journey' },
@@ -250,6 +257,9 @@ export const MISSIONS: MissionDef[] = [
   { id: 'snow1', tier: 2, metric: 'snow', target: 1, text: 'Clear a First-snow board', go: 'journey', needs: 'snow' },
   { id: 'knots1', tier: 2, metric: 'knots', target: 1, text: 'Clear a board with knots', go: 'journey', needs: 'knots' },
   { id: 'wind1', tier: 2, metric: 'wind', target: 1, text: 'Clear a Wind board', go: 'journey', needs: 'wind' },
+  { id: 'gates1', tier: 2, metric: 'gates', target: 1, text: 'Clear a board with gates', go: 'journey', needs: 'gates' },
+  { id: 'fences1', tier: 2, metric: 'fences', target: 1, text: 'Clear a board with bamboo fences', go: 'journey', needs: 'fences' },
+  { id: 'goal2', tier: 2, metric: 'goal', target: 2, text: 'Meet the goal on {n} goal boards', go: 'journey', needs: 'goal' },
   { id: 'score8k', tier: 2, metric: 'score', target: 8000, text: 'Score {n} on one board', go: 'journey', minLevel: 8 },
 
   // ── Tier 3: a proper sit-down ──
@@ -277,7 +287,8 @@ export const MISSION_REWARD: Record<MissionTier, { xp: number; petals: number }>
 /** Weekly chest: fills with each completed daily mission (Monday to Sunday). */
 export const WEEKLY = {
   target: 15,
-  reward: { xp: 200, hints: 2, shuffles: 1, foil: 1 } as Reward,
+  /** petals: the price of the two hints and a shuffle it used to hold */
+  reward: { xp: 200, petals: 2 * ECONOMY.hintCost + ECONOMY.shuffleCost, foil: 1 } as Reward,
 };
 
 // ───────────────────────────── Star chests ─────────────────────────────
@@ -285,10 +296,10 @@ export const WEEKLY = {
 export const CHEST_STEPS = [12, 24, 36] as const;
 export type ChestStep = (typeof CHEST_STEPS)[number];
 
-/** Each Journey chapter (12 levels, 36 blossoms) has three chests. */
+/** Each Journey chapter (12 levels, 36 blossoms) has three chests. The first two pay a hint's and a hint-and-shuffle's price. */
 export const STAR_CHESTS: Record<ChestStep, Reward> = {
-  12: { xp: 40, hints: 1 },
-  24: { xp: 60, hints: 1, shuffles: 1 },
+  12: { xp: 40, petals: ECONOMY.hintCost },
+  24: { xp: 60, petals: ECONOMY.hintCost + ECONOMY.shuffleCost },
   36: { xp: 100, petals: 40, foil: 1 },
 };
 
@@ -298,17 +309,15 @@ export const FOIL_DROP = { fromChapter: 4, chance: 0.04 };
 /** Petals given instead when a foil would drop but every album card is already gilded. */
 export const FOIL_FALLBACK_PETALS = 25;
 
-/** Warm tea a player can hold. */
-export const MAX_TEA = 2;
+/** Warm tea a player can hold: the Market's cap, so rewards and purchases agree. */
+export const MAX_TEA = MAX_STREAK_FREEZES;
 /** Petals given instead of tea when the pot is full. */
 export const TEA_FALLBACK_PETALS = 20;
 
-/** Plain-language list of a reward, e.g. "20 petals · 1 hint". */
+/** Plain-language list of a reward, e.g. "20 petals · Warm tea". */
 export function rewardText(r: Reward, itemNames: Record<string, string> = {}): string {
   const parts: string[] = [];
   if (r.petals) parts.push(`${r.petals} petals`);
-  if (r.hints) parts.push(`${r.hints} hint${r.hints > 1 ? 's' : ''}`);
-  if (r.shuffles) parts.push(`${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`);
   if (r.tea) parts.push('Warm tea');
   if (r.foil) parts.push('Gold-leaf card');
   for (const k of r.items ?? []) parts.push(itemNames[k] ?? k);

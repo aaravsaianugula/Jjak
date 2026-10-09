@@ -1,4 +1,4 @@
-import { type Board, EMPTY, STONE, isCard, monthOf } from './board';
+import { type Board, EMPTY, isBlock, isCard, monthOf } from './board';
 import { reachable } from './path';
 
 /**
@@ -18,15 +18,31 @@ export function findMove(b: Board, hidden?: ReadonlySet<number>): [number, numbe
 }
 
 /** Number of distinct legal jjaks (used for difficulty telemetry and tests). */
-export function countMoves(b: Board): number {
-  let n = 0;
+export function countMoves(b: Board, hidden?: ReadonlySet<number>): number {
+  return legalMoves(b, hidden).length;
+}
+
+/**
+ * Every legal jjak [i, j] (i < j) right now. Months with fewer than two pickable
+ * cards are skipped without a path search, so this stays cheap for the bots.
+ */
+export function legalMoves(b: Board, hidden?: ReadonlySet<number>): [number, number][] {
+  const count = new Array(13).fill(0);
   for (let i = 0; i < b.cells.length; i++) {
     const v = b.cells[i];
-    if (!isCard(v)) continue;
-    const m = monthOf(v);
-    for (const j of reachable(b, i)) if (j > i && isCard(b.cells[j]) && monthOf(b.cells[j]) === m) n++;
+    if (isCard(v) && !hidden?.has(i)) count[monthOf(v)]++;
   }
-  return n;
+  const out: [number, number][] = [];
+  for (let i = 0; i < b.cells.length; i++) {
+    const v = b.cells[i];
+    if (!isCard(v) || hidden?.has(i)) continue;
+    const m = monthOf(v);
+    if (count[m] < 2) continue;
+    for (const j of reachable(b, i)) {
+      if (j > i && isCard(b.cells[j]) && !hidden?.has(j) && monthOf(b.cells[j]) === m) out.push([i, j]);
+    }
+  }
+  return out;
 }
 
 /** Which way cards slide after each pair: falling leaves are 'down', wind blows the other three ways. */
@@ -34,8 +50,8 @@ export type Wind = 'down' | 'left' | 'right' | 'up';
 export const WINDS: readonly Wind[] = ['down', 'left', 'right', 'up'];
 
 /**
- * "Falling leaves" and "Wind": cards slide in `dir` to fill gaps. Stones act as
- * floors (or walls), so each line is compacted segment by segment.
+ * "Falling leaves" and "Wind": cards slide in `dir` to fill gaps. Stones and closed
+ * gates act as floors (or walls), so each line is compacted segment by segment.
  * Returns the moves as [fromCell, toCell] pairs.
  */
 export function applyGravity(b: Board, dir: Wind = 'down'): [number, number][] {
@@ -54,7 +70,7 @@ export function applyGravity(b: Board, dir: Wind = 'down'): [number, number][] {
     for (let k = 0; k < len; k++) {
       const i = cellAt(k);
       const v = b.cells[i];
-      if (v === STONE) {
+      if (isBlock(v)) {
         write = k + 1;
       } else if (isCard(v)) {
         if (k !== write) {

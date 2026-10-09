@@ -1,14 +1,21 @@
 import { sceneParticles, sceneSvg } from '../../art/scene';
 import { GIFTS } from '../../config';
 import { cardSvg } from '../../art/cards';
+import { pathArt } from '../../art/path-art';
 import { ads } from '../../services/ads';
+import { store } from '../../services/store';
+import { Capacitor } from '@capacitor/core';
+import { askRemoveAdsIfDue, openRemoveAds } from '../remove-ads';
 import { music } from '../../services/music';
 import { checkSeals } from '../../services/achievements';
 import { cardDef, monthDef } from '../../data/deck';
-import { LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
+import { LEVELS_PER_CHAPTER, chapterOf, dailyLevel, dailyTheme, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
+import { shownSpec } from '../../director';
 import { formatTime } from '../../engine/session';
-import { ROUTE_CHAPTERS, routeOf } from '../../data/route';
+import { ROUTE_CHAPTERS, ROUTE_LEVELS, routeOf } from '../../data/route';
+import { roadGoesOn } from '../reveal';
 import { mechanicLabel, windArrow, windOf } from '../../engine/levels';
+import { GOALS } from '../../engine/goals';
 import { SEALS } from '../../services/achievements';
 import { unlockAudio } from '../../services/audio';
 import { claimGift, formatCountdown, lastWeek, levelsToLantern, liveStreak, msToNextDaily, pendingGift } from '../../services/progress';
@@ -18,14 +25,20 @@ import { esc, frag, h, toast } from '../dom';
 import { openSheet } from '../modal';
 import { ICONS } from '../icons';
 import { nav } from '../nav';
-import { pathStrip } from './path';
+import { fillStrip, pathStrip } from './path';
+import { petalBump, reducedMotion } from '../motion';
 import { GARDEN_ITEMS } from '../../art/garden';
 import { hasAffordableNew, isOwned } from '../../services/market';
 
 /** Last petal total shown on Home, to animate gains. */
 let shownPetals: number | null = null;
+/** Flower Path XP the Home strip last showed (the strip fills from there). */
+let shownXp: number | null = null;
 /** Auto-open the gift once per app session. */
 let giftShownThisSession = false;
+
+/** The tagline under the wordmark, in English with its Korean and Japanese lines (Home and the intro title). */
+export const BRAND_TAG = `<p class="brand__tag"><span class="brand__en">Pair the flowers of the four seasons</span><span class="brand__native" lang="ko"><span class="serif">꽃을 맞추다</span> · <span class="ja" lang="ja">花を合わせる</span></span></p>`;
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -41,12 +54,12 @@ export function homeScreen(): Screen {
     const lantern = i >= slot && levelsToLantern(chapterStart + i) === 0;
     return `<span class="${i < slot ? 'done' : i === slot ? 'now' : ''}${lantern ? ' lan' : ''}"></span>`;
   }).join('');
-  const spec = journeyLevel(level);
+  const spec = shownSpec(level);
   music.setSeason(season);
   // Where the road has reached: the place, its season, and the board's twist.
   const road = routeOf(level);
   const wind = windOf(spec);
-  const twist = `${mechanicLabel(spec)}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}`;
+  const twist = [`${mechanicLabel(spec)}${wind && wind !== 'down' ? ` ${windArrow(wind)}` : ''}`, spec.goal ? `Goal: ${GOALS[spec.goal].name}` : ''].filter(Boolean).join(' · ');
   const roadPlace = `<div class="journey__place"><b>${esc(road.chapter.en)}</b><span class="journey__place-native"><span lang="ko">${road.chapter.ko}</span> · <span class="ja" lang="${road.chapter.country === 'JP' ? 'ja' : 'ko'}">${road.chapter.ja}</span></span></div>`;
   const toLantern = levelsToLantern();
   const lanternText = toLantern === 0 ? 'This level hangs a lantern gift' : `Lantern gift in ${toLantern} level${toLantern > 1 ? 's' : ''}`;
@@ -90,13 +103,13 @@ export function homeScreen(): Screen {
       <div class="scene__brand">
         <div class="seal" aria-hidden="true">짝</div>
         <h1 class="brand__word">Jjak</h1>
-        <p class="brand__tag"><span class="brand__en">Pair the flowers of the four seasons</span><span class="brand__native" lang="ko"><span class="serif">꽃을 맞추다</span> · <span class="ja" lang="ja">花を合わせる</span></span></p>
+        ${BRAND_TAG}
       </div>
     </div>
     <div class="panel journey">
       <span class="journey__season ja" aria-hidden="true">${chapter.ja}</span>
       <div class="journey__top">
-        <span class="eyebrow"><span class="journey__kicker">Journey · </span>${esc(chapter.name)} · ${road.year > 0 ? `Wanderer ${road.year}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
+        <span class="eyebrow"><span class="journey__kicker">Journey · </span>${esc(chapter.name)} · ${road.year > 0 ? `Wanderer · Year ${road.year + 1}` : `Chapter ${road.index + 1}/${ROUTE_CHAPTERS}`}</span>
         <button class="chip-btn journey__map" data-go="map" aria-label="Journey map">${ICONS.map}<span>Map</span></button>
       </div>
       ${roadPlace}
@@ -140,7 +153,7 @@ export function homeScreen(): Screen {
     if (!go) return;
     e.stopPropagation();
     unlockAudio();
-    if (go === 'journey') nav.game(journeyLevel(save.level));
+    if (go === 'journey') nav.journey(save.level);
     if (go === 'map') nav.map();
     if (go === 'daily') nav.game(dailyLevel(today));
     if (go === 'zen') nav.game(zenLevel(`zen-${Date.now()}`));
@@ -152,31 +165,37 @@ export function homeScreen(): Screen {
     if (go === 'garden') nav.garden();
     if (go === 'settings') nav.settings();
     if (go === 'path') nav.path();
+    if (go === 'noads') void openRemoveAds().then((off) => off && el.querySelector('.home__noads')?.remove());
   });
-  if (pendingGift() && !giftShownThisSession) {
-    giftShownThisSession = true;
-    setTimeout(() => openGift(el), 650);
+  // Where the banner is, say plainly that it can go; the price joins once Play has it.
+  if (Capacitor.isNativePlatform() && !save.adFree) {
+    const line = h('button', { class: 'upsell home__noads', 'data-go': 'noads' }, 'Ads keep Jjak free · Remove ads');
+    el.append(line);
+    void store.ready.then(() => {
+      if (store.available) line.textContent = `Ads keep Jjak free · Remove ads for ${store.price}`;
+    });
+  }
+  // Level 600 is behind the player but the road's reveal hasn't played yet (say the
+  // app closed on the result sheet): play it before anything else.
+  if (save.level > ROUTE_LEVELS && !save.journey.revealed) {
+    setTimeout(() => el.isConnected && void roadGoesOn().then(() => nav.home()), 400);
+  } else {
+    if (pendingGift() && !giftShownThisSession) {
+      giftShownThisSession = true;
+      setTimeout(() => openGift(el), 650);
+    }
+    // First start, or this month's festival week: the game asks once (after the gift).
+    void askRemoveAdsIfDue(el).then((off) => off && el.querySelector('.home__noads')?.remove());
   }
 
-  // Count up petals earned since the last visit.
-  const pet = el.querySelector<HTMLElement>('.petals')!;
-  const num = pet.querySelector<HTMLElement>('.petals__n')!;
+  // Count the petals earned (or spent) since the last visit.
   const from = shownPetals ?? save.petals;
-  const to = save.petals;
-  shownPetals = to;
-  if (to > from) {
-    const t0 = performance.now() + 350;
-    const step = (now: number) => {
-      const k = Math.max(0, Math.min(1, (now - t0) / 700));
-      num.textContent = String(Math.round(from + (to - from) * (1 - (1 - k) ** 3)));
-      if (k < 1) requestAnimationFrame(step);
-    };
-    num.textContent = String(from);
-    setTimeout(() => {
-      pet.classList.add('is-bump');
-      requestAnimationFrame(step);
-    }, 350);
-  }
+  shownPetals = save.petals;
+  petalBump(el.querySelector<HTMLElement>('.petals'), from, save.petals, { delay: 350, ms: 700 });
+  // The Flower Path strip fills with the XP gained since the last visit.
+  const xpFrom = shownXp ?? save.meta.xp;
+  shownXp = save.meta.xp;
+  fillStrip(el.querySelector<HTMLElement>('.fp-strip'), xpFrom, 420);
   return { name: 'home', el };
 }
 
@@ -186,10 +205,12 @@ function openGift(home: HTMLElement): void {
   if (!p) return;
   const days = GIFTS.map((g, i) => {
     const state = i < p.day ? 'done' : i === p.day ? 'now' : 'next';
-    const icon = g.card ? '<span class="ja">札</span>' : g.hints ? ICONS.hint : g.shuffles ? ICONS.shuffle : ICONS.petal;
+    // Each day shows what's inside: petals (a fuller handful for the bigger days), or an album card.
+    const pic = g.card ? 'i-card' : `i-petal${Math.min(3, Math.max(1, Math.round(g.petals / 5) - 1))}`;
+    const icon = pathArt(pic, 'gday__art');
     return `<li class="gday gday--${state}" aria-label="Day ${i + 1}: ${esc(g.label)}${state === 'done' ? ', claimed' : state === 'now' ? ', today' : ''}">
       <span class="gday__n">${state === 'now' ? 'Today' : `Day ${i + 1}`}</span>
-      <span class="gday__icon" aria-hidden="true">${state === 'done' ? ICONS.check : icon}</span>
+      <span class="gday__icon" aria-hidden="true">${icon}${state === 'done' ? `<i class="gday__done">${ICONS.check}</i>` : ''}</span>
       <span class="gday__label">${esc(g.label)}</span>
     </li>`;
   }).join('');
@@ -204,11 +225,19 @@ function openGift(home: HTMLElement): void {
   const actions = h('div', { class: 'sheet__actions' });
   content.append(actions);
   const sheet = openSheet(content, { label: 'Daily gift' });
+  const before = save.petals;
   const done = (card: number | null, times: number) => {
     sheet.close();
     const won = checkSeals();
-    toast(`Gift claimed${times > 1 ? ' ×2' : ''}${won.length ? ` · Seal earned: ${won[0].title}` : ''}`);
-    home.querySelector('.gift-btn')?.remove();
+    // The note follows once the sheet has slid away, so the two never overlap.
+    const note = `Gift claimed${times > 1 ? ' ×2' : ''}${won.length ? ` · Seal earned: ${won[0].title}` : ''}`;
+    setTimeout(() => toast(note), reducedMotion() ? 0 : 240);
+    // The gift dot bows out instead of vanishing.
+    const giftBtn = home.querySelector<HTMLElement>('.gift-btn');
+    if (giftBtn) {
+      giftBtn.classList.add('is-leaving');
+      setTimeout(() => giftBtn.remove(), reducedMotion() ? 0 : 260);
+    }
     if (card != null) {
       const m = monthDef(card);
       const c = frag(`<div class="detail"><div class="detail__card draw__card is-reveal">${cardSvg(card)}</div>
@@ -216,22 +245,27 @@ function openGift(home: HTMLElement): void {
         <p class="muted"><span class="serif" lang="ko">${m.ko}</span> ${esc(m.koRoman)} · <span class="ja" lang="ja">${m.ja}</span> ${esc(m.jaRoman)}</p></div>`);
       openSheet(c, { center: true, label: 'New card' });
     }
-    const pet = home.querySelector('.petals');
-    if (pet) {
-      pet.setAttribute('aria-label', `${save.petals} petals`);
-      const n = pet.querySelector('.petals__n');
-      if (n) n.textContent = String(save.petals);
-    }
+    petalBump(home.querySelector<HTMLElement>('.petals'), shownPetals ?? before, save.petals, { delay: 200 });
     shownPetals = save.petals;
   };
-  actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => done(claimGift(1), 1) }, 'Claim'));
+  /** Today's square gets its seal pressed on, then the sheet goes (the claim itself is saved at once). */
+  const stampThen = (card: number | null, times: number) => {
+    actions.querySelectorAll('button').forEach((b) => b.setAttribute('disabled', ''));
+    const today = content.querySelector<HTMLElement>('.gday--now');
+    if (!today || reducedMotion()) return done(card, times);
+    today.append(h('span', { class: 'gday__stamp', 'aria-hidden': 'true' }, '受'));
+    today.querySelector('.gday__icon')?.insertAdjacentHTML('beforeend', `<i class="gday__done">${ICONS.check}</i>`);
+    today.classList.add('is-claimed');
+    setTimeout(() => done(card, times), 640);
+  };
+  actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => stampThen(claimGift(1), 1) }, 'Claim'));
   if (ads.rewardedAvailable && !p.gift.card) {
     actions.append(
       h('button', {
         class: 'btn btn--ghost btn--block',
         html: `${ICONS.ad}<span>Claim ×2 · watch a short ad</span>`,
         onclick: async () => {
-          if (await ads.rewarded()) done(claimGift(2), 2);
+          if (await ads.rewarded()) stampThen(claimGift(2), 2);
           else toast('The ad didn’t finish. You can still claim the normal gift.');
         },
       }),

@@ -1,0 +1,73 @@
+/* Director dev panel (dev builds only): paper and ink, small, out of the way. */
+.devp {
+  position: fixed;
+  left: calc(6px + env(safe-area-inset-left, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  z-index: 9000;
+  max-width: min(300px, calc(100vw - 12px));
+  font: 11px/1.35 ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink, #2a2724);
+  pointer-events: none;
+}
+.devp__chip,
+.devp__body {
+  pointer-events: auto;
+}
+.devp__chip {
+  display: block;
+  padding: 3px 8px;
+  border: 1px solid var(--line, #ddd2bf);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface, #faf6ee) 88%, transparent);
+  color: var(--ink-soft, #5d554c);
+  font: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+}
+.devp__chip:hover,
+.devp__chip[aria-expanded='true'] {
+  opacity: 1;
+}
+.devp__body {
+  margin-bottom: 4px;
+  padding: 6px 9px 8px;
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--line, #ddd2bf);
+  border-radius: 10px;
+  background: var(--surface, #faf6ee);
+  box-shadow: var(--shadow, 0 6px 16px -10px rgba(60, 40, 20, 0.4));
+  /* the chip sits under the panel */
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: min(300px, calc(100vw - 12px));
+}
+.devp__body[hidden] {
+  display: none;
+}
+.devp__body h3 {
+  margin: 6px 0 2px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent-text, #ad3d27);
+  letter-spacing: 0.02em;
+}
+.devp__body h3:first-child {
+  margin-top: 0;
+}
+.devp__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px dotted var(--line-soft, #e8dfcf);
+}
+.devp__row span {
+  color: var(--muted, #72685c);
+  white-space: nowrap;
+}
+.devp__row b {
+  font-weight: 500;
+  text-align: right;
+}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-launching>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
@@ -8,8 +8,99 @@
     <meta name="description" content="Jjak (짝) — a calm pair-connecting puzzle built on the flower-card deck Korea and Japan share." />
     <title>Jjak · 짝</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script>
+      // The loader paints in the player's chosen look before the app's code runs, as
+      // MainActivity paints the window: a forced Paper or Ink from the save (the key in
+      // src/services/storage.ts), otherwise the phone's light/dark setting.
+      (function () {
+        var text = localStorage.getItem('jjak.save.v1');
+        if (!text) return;
+        var data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          return; // an unreadable save follows the phone, as the app itself does
+        }
+        var theme = data && data.settings && data.settings.theme;
+        if (theme === 'paper' || theme === 'ink') document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
+    <style>
+      /* First frame of the loader (src/ui/launch.ts drives it, src/styles/launch.css moves it).
+         Flat paper or ink exactly as the native splash, the seal centred where the splash icon sits. */
+      #launch {
+        /* Measured on a Pixel 10a: the system splash draws the seal (drawable/splash_icon) at the same size. */
+        --launch-seal: 106px;
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        background: #f3ecdf;
+        color: #2a2724;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='paper']):not([data-theme='light']) #launch {
+          background: #1c1b19;
+          color: #eee6d7;
+        }
+      }
+      :root[data-theme='ink'] #launch,
+      :root[data-theme='dark'] #launch {
+        background: #1c1b19;
+        color: #eee6d7;
+      }
+      #launch .launch__seal {
+        position: absolute;
+        left: calc(50% - var(--launch-seal) / 2);
+        top: calc(50% - var(--launch-seal) / 2);
+        width: var(--launch-seal);
+        height: var(--launch-seal);
+        display: grid;
+        place-items: center;
+        border-radius: 14%;
+        background: #c0442d;
+        color: #fbf5ea;
+        font-family: 'Gowun Batang', serif;
+        font-size: calc(var(--launch-seal) * 0.56);
+        font-weight: 700;
+        line-height: 1;
+        transform: rotate(-5deg);
+      }
+      #launch .launch__foot {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(50% + var(--launch-seal) / 2 + 22px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #launch .launch__stroke,
+      #launch .launch__word,
+      #launch .launch__line {
+        opacity: 0;
+      }
+    </style>
   </head>
   <body>
+    <div id="launch" role="progressbar" aria-label="Loading Jjak" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="seal launch__seal" aria-hidden="true">짝</div>
+      <div class="launch__foot" aria-hidden="true">
+        <svg class="launch__stroke" viewBox="0 0 200 24" width="132" height="16">
+          <defs>
+            <mask id="launch-draw" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="24">
+              <path class="launch__draw" d="M2 13.5C50 10 120 9 198 11" pathLength="1" fill="none" stroke="#fff" stroke-width="22" />
+            </mask>
+          </defs>
+          <path
+            mask="url(#launch-draw)"
+            fill="currentColor"
+            d="M5 15.2C5.6 11.4 10 9.6 17 9.9C60 9.2 124 7.4 192 9.6C195.6 9.8 196.4 11.6 193.6 12.2C130 13 66 15 20 17.6C11 18.1 5.2 17.6 5 15.2Z"
+          />
+        </svg>
+        <p class="launch__word"><span class="launch__en">Jjak</span><span class="launch__ko" lang="ko">짝</span></p>
+        <span class="launch__line"><i></i></span>
+      </div>
+    </div>
     <div id="app" aria-live="polite"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -1,8 +1,8 @@
 import { ECONOMY, GIFTS } from '../config';
 import { ALL_CARD_IDS } from '../data/deck';
 import { ROUTE, ROUTE_LEVELS_PER_CHAPTER, routeOf } from '../data/route';
-import { localDateKey } from '../engine/levels';
-import { LUCKY_PETALS, type Session, starCount } from '../engine/session';
+import { LEVELS_PER_CHAPTER, localDateKey } from '../engine/levels';
+import { LUCKY_PETALS, type Session, starCount, thirdStar } from '../engine/session';
 import { persist, save } from './storage';
 
 export interface ClearSummary {
@@ -13,12 +13,12 @@ export interface ClearSummary {
   drawn: number | null;
   /** daily only */
   daily?: { counted: boolean; streak: number; number: number; tea?: number };
-  /** lantern gift for every 4th Journey level */
-  lantern?: { petals: number; hints: number; shuffles: number };
+  /** lantern gift for every 4th Journey level (already added to the balance; not part of `petals`) */
+  lantern?: { petals: number };
   /** petals from lucky bonus pairs on this board (already added to the balance; not part of `petals`) */
   lucky?: number;
-  /** passport stamp earned by first clearing a chapter's festival board */
-  stamp?: { id: string; date: string };
+  /** passport stamp earned by first clearing a chapter's festival board (year ≥ 1 past level 600) */
+  stamp?: { id: string; date: string; year?: number };
 }
 
 const yesterdayKey = (today: string) => {
@@ -56,6 +56,25 @@ export function drawCard(): number | null {
   return id;
 }
 
+/**
+ * Petals hung on Journey level `level`'s lantern (0 when it has none). Lanterns
+ * alternate a hint's and a shuffle's worth on top of their own petals, and the
+ * lantern at a chapter's end also carries the chapter gift (a hint and a
+ * shuffle's worth). Tools themselves come only from a rewarded ad or the Market.
+ */
+export function lanternGift(level: number): number {
+  if (level % ECONOMY.lanternEvery !== 0) return 0;
+  const hintTurn = (level / ECONOMY.lanternEvery) % 2 === 1;
+  const chapterGift = level % LEVELS_PER_CHAPTER === 0 ? ECONOMY.hintCost + ECONOMY.shuffleCost : 0;
+  return ECONOMY.lanternPetals + (hintTurn ? ECONOMY.hintCost : ECONOMY.shuffleCost) + chapterGift;
+}
+
+/**
+ * Lucky pairs pay petals on a Journey level's first clear (and on Daily, Zen and Rush
+ * boards, which have no replays to farm); practice boards pay nothing.
+ */
+export const luckyPays = (mode: string, firstClear: boolean) => (mode === 'journey' ? firstClear : mode !== 'practice');
+
 /** Apply a finished board to the save file and report what the player earned. */
 export function recordClear(s: Session): ClearSummary {
   const st = s.stars();
@@ -77,25 +96,22 @@ export function recordClear(s: Session): ClearSummary {
     save.stars[n] = Math.max(prev, stars);
     if (n >= save.level) save.level = n + 1;
     if (out.firstClear) out.drawn = drawCard();
-    if (out.firstClear && n % ECONOMY.lanternEvery === 0) {
-      // Alternate the bonus tool so both stay topped up.
-      const hint = (n / ECONOMY.lanternEvery) % 2 === 1;
-      out.lantern = { petals: ECONOMY.lanternPetals, hints: hint ? 1 : 0, shuffles: hint ? 0 : 1 };
-      save.petals += out.lantern.petals;
-      save.hints += out.lantern.hints;
-      save.shuffles += out.lantern.shuffles;
-    }
-    // A small gift at the end of each chapter.
-    if (out.firstClear && n % 12 === 0) {
-      save.hints++;
-      save.shuffles++;
+    const lantern = out.firstClear ? lanternGift(n) : 0;
+    if (lantern) {
+      out.lantern = { petals: lantern };
+      save.petals += lantern;
     }
     // The place's passport stamp, the first time its festival board is cleared.
+    // Past 600 every place-year earns its own stamp on the Wanderer pages.
     if (n % ROUTE_LEVELS_PER_CHAPTER === 0) {
-      const id = routeOf(n).chapter.id;
-      if (!save.journey.stamps[id]) {
+      const pos = routeOf(n);
+      const id = pos.chapter.id;
+      if (pos.year === 0 && !save.journey.stamps[id]) {
         save.journey.stamps[id] = localDateKey();
         out.stamp = { id, date: save.journey.stamps[id] };
+      } else if (pos.year > 0 && !save.journey.yearStamps[`${id}@${pos.year}`]) {
+        save.journey.yearStamps[`${id}@${pos.year}`] = localDateKey();
+        out.stamp = { id, date: localDateKey(), year: pos.year };
       }
     }
   } else if (s.spec.mode === 'daily') {
@@ -126,12 +142,15 @@ export function recordClear(s: Session): ClearSummary {
     out.petals = ECONOMY.zenPetals;
   }
 
-  // Lucky bonus pairs: a small gift of petals on top of the board's own.
+  // Lucky bonus pairs: a small gift of petals on top of the board's own, the first
+  // time a level is cleared (like blossom petals, replays can't be farmed for them).
   if (s.luckyPairs > 0) {
-    out.lucky = s.luckyPairs * LUCKY_PETALS;
-    save.petals += out.lucky;
     save.journey.luckyPairs += s.luckyPairs;
-    save.journey.luckyPetals += out.lucky;
+    if (luckyPays(s.spec.mode, out.firstClear)) {
+      out.lucky = s.luckyPairs * LUCKY_PETALS;
+      save.petals += out.lucky;
+      save.journey.luckyPetals += out.lucky;
+    }
   }
 
   save.petals += out.petals;
@@ -166,7 +185,7 @@ export function liveStreak(): number {
 
 export function shareTextFor(s: Session, summary: ClearSummary, storeUrl: string): string {
   const st = s.stars();
-  const flowers = [st.clear, st.noAssist, st.underPar].map((on) => (on ? '🌸' : '▫️')).join('');
+  const flowers = [st.clear, st.noAssist, thirdStar(st)].map((on) => (on ? '🌸' : '▫️')).join('');
   const secs = Math.floor(s.elapsedMs(s.finishedAt) / 1000);
   const time = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   const claps = '짝'.repeat(Math.min(5, Math.max(1, s.bestCombo)));
@@ -218,15 +237,29 @@ export interface RushSummary {
   rounds: number;
 }
 
-/** Record a finished Rush run. */
-export function recordRush(score: number, rounds: number, pairs: number, bestCombo: number): RushSummary {
-  const prevBest = save.rush.best;
-  save.rush.runs++;
-  save.rush.best = Math.max(prevBest, score);
+/** What a Rush run has already recorded (for a "Keep going" continuation). */
+export interface RushRecorded {
+  score: number;
+  pairs: number;
+  /** the personal best before this run */
+  bestBefore: number;
+}
+
+const rushPetals = (score: number) => Math.min(ECONOMY.rushPetalCap, Math.floor(score / ECONOMY.rushPointsPerPetal));
+
+/**
+ * Record a finished Rush run. When a run that was already recorded continues
+ * ("Keep going") and ends again, pass what was recorded as `prev`: only the
+ * difference is added (petals, pairs) and the run isn't counted twice.
+ */
+export function recordRush(score: number, rounds: number, pairs: number, bestCombo: number, prev?: RushRecorded): RushSummary {
+  const prevBest = prev ? prev.bestBefore : save.rush.best;
+  if (!prev) save.rush.runs++;
+  save.rush.best = Math.max(save.rush.best, score);
   save.rush.bestRound = Math.max(save.rush.bestRound, rounds);
-  save.stats.pairs += pairs;
+  save.stats.pairs += Math.max(0, pairs - (prev?.pairs ?? 0));
   save.stats.bestCombo = Math.max(save.stats.bestCombo, bestCombo);
-  const petals = Math.min(ECONOMY.rushPetalCap, Math.floor(score / ECONOMY.rushPointsPerPetal));
+  const petals = Math.max(0, rushPetals(score) - (prev ? rushPetals(prev.score) : 0));
   save.petals += petals;
   persist();
   return { score, best: save.rush.best, newBest: score > prevBest && prevBest > 0, petals, rounds };
@@ -243,9 +276,7 @@ export function claimGift(times = 1): number | null {
   const p = pendingGift();
   if (!p) return null;
   const g = p.gift;
-  save.petals += (g.petals ?? 0) * times;
-  save.hints += (g.hints ?? 0) * times;
-  save.shuffles += (g.shuffles ?? 0) * times;
+  save.petals += g.petals * times;
   let card: number | null = null;
   if (g.card) card = drawCard();
   save.gift.day = (save.gift.day + 1) % GIFTS.length;

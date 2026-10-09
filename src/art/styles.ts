@@ -34,7 +34,7 @@ export const DECK_STYLES: CosmeticDef[] = [
   { id: 'moonlit', name: 'Moonlit', ko: '달밤', ja: '月夜', blurb: 'Indigo night paper with silver lines.' },
   { id: 'celadon', name: 'Celadon', ko: '청자', ja: '青磁', blurb: 'The jade-green glaze of Goryeo celadon.' },
   { id: 'woodblock', name: 'Woodblock', ko: '목판', ja: '木版', blurb: 'Bold printed blocks of colour, like an old print.' },
-  { id: 'gilded', name: 'Gold leaf', ko: '금박', ja: '金箔', blurb: 'Every card edged and flecked with gold.' },
+  { id: 'gilded', name: 'Gold leaf', ko: '금박', ja: '金箔', blurb: 'Every card edged with gold and banded with gold mist.' },
 ];
 
 export const CARD_BACKS: CosmeticDef[] = [
@@ -64,48 +64,6 @@ let groundSet: Set<string> | null = null;
 /** Paper and panel tints: the "ground" every style repaints as its paper. */
 const grounds = () => (groundSet ??= new Set([CARD_PAPER, ...MONTH_TINTS]));
 
-/** Seeded scatter of small gold flecks (kirikane squares and strips), as path data. */
-function flecks(seed: number, n: number, zone: (r: () => number) => [number, number], size: [number, number]): string {
-  const r = rng(seed);
-  let d = '';
-  for (let i = 0; i < n; i++) {
-    const [x, y] = zone(r);
-    const s = size[0] + r() * (size[1] - size[0]);
-    const a = r() * Math.PI;
-    const strip = r() < 0.25;
-    const w = strip ? s * 0.32 : s;
-    const h = strip ? s * 1.8 : s * (0.7 + r() * 0.4);
-    const c = Math.cos(a);
-    const sn = Math.sin(a);
-    const pts = [
-      [-w / 2, -h / 2],
-      [w / 2, -h / 2],
-      [w / 2, h / 2],
-      [-w / 2, h / 2],
-    ].map(([px, py]) => `${f(x + px * c - py * sn)} ${f(y + px * sn + py * c)}`);
-    d += `M${pts.join('L')}Z`;
-  }
-  return d;
-}
-
-/** Edge-weighted position inside the panel (flecks keep off the centre). */
-const edgeZone = (r: () => number): [number, number] => {
-  const band = r();
-  if (band < 0.36) return [7 + r() * 86, 7 + r() * 20];
-  if (band < 0.72) return [7 + r() * 86, 112 + r() * 22];
-  return [r() < 0.5 ? 6 + r() * 9 : 85 + r() * 9, 26 + r() * 88];
-};
-
-/** Like edgeZone, but never on the corner chip or the kanji tag. */
-const clearZone = (r: () => number): [number, number] => {
-  for (;;) {
-    const [x, y] = edgeZone(r);
-    if (x < 23 && y < 25) continue;
-    if (x > 70 && y > 112) continue;
-    return [x, y];
-  }
-};
-
 const LOOKS: Record<string, DeckLook> = {
   classic: {},
 
@@ -130,17 +88,15 @@ const LOOKS: Record<string, DeckLook> = {
     color: (hex, [L, C, h], ground) => {
       if (hex === CARD_PAPER) return '#1b2140';
       if (ground) return lchToHex(0.285 + (L - 0.93) * 0.8, 0.034 + C * 0.45, mixHue(h, 274, 0.72));
+      // Near-black ink (the hills of Silver grass, a magpie's coat) stays a night
+      // silhouette, a shade deeper than the paper; everything else lifts to silver.
+      if (L < 0.34 && C < 0.04) return lchToHex(0.1 + L * 0.2, 0.03, 272);
       return lchToHex(clamp(0.47 + L * 0.51, 0, 0.985), C * 0.4, mixHue(h, 258, 0.14));
     },
     defs: () =>
       '<radialGradient id="ds-moon-glow" cx=".72" cy=".08" r=".85"><stop offset="0" stop-color="#C9D0EE" stop-opacity=".22"/><stop offset=".6" stop-color="#C9D0EE" stop-opacity="0"/></radialGradient>',
     look: {
-      under: (id) => {
-        const r = rng(id * 7 + 3);
-        let d = '';
-        for (let i = 0; i < 9; i++) d += `M${f(8 + r() * 84)} ${f(8 + r() * 60)}h.01`;
-        return `<rect x="4" y="4" width="92" height="132" rx="6" fill="url(#ds-moon-glow)"/><path d="${d}" stroke="#E6E8F4" stroke-width=".8" stroke-linecap="round" opacity=".55"/>`;
-      },
+      under: () => `<rect x="4" y="4" width="92" height="132" rx="6" fill="url(#ds-moon-glow)"/>`,
       over: () => '<rect x="5.6" y="5.6" width="88.8" height="128.8" rx="5" fill="none" stroke="#B9C0DD" stroke-opacity=".38" stroke-width=".35"/>',
       chip: { paper: '#141A33', ink: '#EEEBF6', edge: '#8E96BC' },
     },
@@ -240,10 +196,10 @@ const LOOKS: Record<string, DeckLook> = {
       '<linearGradient id="ds-gold-mist" x1="0" y1="0" x2="1" y2=".3"><stop offset="0" stop-color="#D6AE55" stop-opacity=".25"/><stop offset=".3" stop-color="#E8C877" stop-opacity=".85"/><stop offset=".55" stop-color="#C99A3E" stop-opacity=".75"/><stop offset=".8" stop-color="#F0D891" stop-opacity=".85"/><stop offset="1" stop-color="#C99A3E" stop-opacity=".3"/></linearGradient>',
     look: {
       under: (id) => {
-        // suyari-gasumi: long rounded bars of gold mist, plus scattered flecks
+        // suyari-gasumi: long rounded bars of gold mist (no flecks), placed a little differently per card
         const bar = (x0: number, x1: number, y: number, hh: number) => `M${x0 + hh / 2} ${y}H${x1 - hh / 2}A${hh / 2} ${hh / 2} 0 0 1 ${x1 - hh / 2} ${y + hh}H${x0 + hh / 2}A${hh / 2} ${hh / 2} 0 0 1 ${x0 + hh / 2} ${y}Z`;
-        const fl = flecks(100 + id, 18, clearZone, [0.8, 2.2]);
-        return `<g clip-path="url(#card-clip)"><path d="${bar(-4, 58, 6, 6) + bar(30, 104, 14.6, 5) + bar(-4, 46, 123, 6) + bar(54, 104, 130.4, 5)}" fill="url(#ds-gold-mist)"/><path d="${fl}" fill="url(#ds-gold)" opacity=".95"/></g>`;
+        const k = (id * 7) % 5;
+        return `<g clip-path="url(#card-clip)"><path d="${bar(-4, 54 + k * 2, 6, 6) + bar(28 + k, 104, 14.6, 5) + bar(-4, 44 + k * 2, 123, 6) + bar(52 + k, 104, 130.4, 5)}" fill="url(#ds-gold-mist)"/></g>`;
       },
       over: () =>
         '<rect x="1.7" y="1.7" width="96.6" height="136.6" rx="7.7" fill="none" stroke="url(#ds-gold)" stroke-width="2.4"/>' +
@@ -356,26 +312,17 @@ export function foilDefs(): string {
 let foilStatic: string | null = null;
 let foilCount = 0;
 /**
- * Gold-leaf overlay for foil editions (100×140 box): a gilded frame, sparse
- * kirikane flecks and sunago dust, two glints and a slow diagonal sheen
+ * Gold-leaf overlay for foil editions (100×140 box): a gilded frame, tapered
+ * bands of gold-leaf mist from two corners, two glints and a slow diagonal sheen
  * (animated in cards-extra.css). It references the `foil-*` defs in the card
  * sprite, so it never adds ids of its own and can be repeated freely.
  */
 export function foilOverlay(): string {
   if (!foilStatic) {
-    const r = rng(404);
-    let dust = '';
-    // sunago: two soft drifts of gold dust, top-right and bottom-left
-    for (let i = 0; i < 70; i++) {
-      const top = i % 2 === 0;
-      const a = r() * Math.PI * 2;
-      const d = Math.sqrt(r()) * 26;
-      const x = (top ? 78 : 22) + Math.cos(a) * d * 1.2;
-      const y = (top ? 14 : 126) + Math.sin(a) * d * 0.5;
-      if (x < 5 || x > 95 || y < 5 || y > 135 || (x < 23 && y < 25) || (x > 70 && y > 112)) continue;
-      dust += `M${f(x)} ${f(y)}h.01`;
-    }
-    const leaf = flecks(405, 22, clearZone, [1, 2.6]);
+    // suyari-gasumi: tapered bands of gold leaf drifting in from two corners
+    const band = (x0: number, y: number, len: number, w: number, dir: 1 | -1) =>
+      `M${x0} ${y}C${f(x0 + dir * len * 0.3)} ${f(y - w)} ${f(x0 + dir * len * 0.7)} ${f(y - w * 0.9)} ${f(x0 + dir * len)} ${f(y - 0.3)}C${f(x0 + dir * len * 0.7)} ${f(y + w * 0.55)} ${f(x0 + dir * len * 0.3)} ${f(y + w * 0.6)} ${x0} ${y}Z`;
+    const leaf = band(98, 15, 40, 3.4, -1) + band(98, 23, 24, 2.4, -1) + band(2, 125, 40, 3.4, 1) + band(2, 117.6, 22, 2.2, 1);
     const corner = 'M6.8 15.4V9.8Q6.8 6.8 9.8 6.8H15.4M9.4 13.4V11.2Q9.4 9.4 11.2 9.4H13.4';
     // two corner fittings on the diagonal that the chip and the tag leave free
     const corners = ['translate(100 0) scale(-1 1)', 'translate(0 140) scale(1 -1)']
@@ -384,8 +331,7 @@ export function foilOverlay(): string {
     const star = (x: number, y: number, s: number) => `M${x} ${f(y - s)}Q${x} ${y} ${f(x + s * 0.7)} ${y}Q${x} ${y} ${x} ${f(y + s)}Q${x} ${y} ${f(x - s * 0.7)} ${y}Q${x} ${y} ${x} ${f(y - s)}Z`;
     foilStatic =
       '<rect width="100" height="140" rx="9" fill="url(#foil-warm)"/>' +
-      `<path d="${dust}" stroke="#e2bd62" stroke-width=".75" stroke-linecap="round" opacity=".7"/>` +
-      `<path d="${leaf}" fill="url(#foil-leaf)" opacity=".92"/>` +
+      `<g clip-path="url(#foil-clip)"><path d="${leaf}" fill="url(#foil-leaf)" opacity=".8"/></g>` +
       '<rect x="1.6" y="1.6" width="96.8" height="136.8" rx="7.8" fill="none" stroke="#5c4113" stroke-opacity=".35" stroke-width="3.2"/>' +
       '<rect x="1.6" y="1.6" width="96.8" height="136.8" rx="7.8" fill="none" stroke="url(#foil-gold)" stroke-width="2.5"/>' +
       '<rect x="4.25" y="4.25" width="91.5" height="131.5" rx="5.9" fill="none" stroke="url(#foil-gold)" stroke-width=".75"/>' +
@@ -417,13 +363,8 @@ const instance = (tpl: string) => {
 };
 
 const previewCache = new Map<string, string>();
-/**
- * Standalone preview of one card painted in any deck style (for the Market),
- * independent of the sprite currently installed. Every call gets fresh ids, so
- * previews never collide with each other or with the sprite.
- */
-export function cardPreviewSvg(id: number, styleId: string): string {
-  const style = LOOKS[styleId] ? styleId : 'classic';
+/** Standalone markup (fresh ids per call): used where there's no document to hold a sprite. */
+function standalonePreview(id: number, style: string): string {
   const key = `${style}:${id}`;
   let tpl = previewCache.get(key);
   if (tpl === undefined) {
@@ -436,6 +377,56 @@ export function cardPreviewSvg(id: number, styleId: string): string {
     previewCache.set(key, tpl);
   }
   return instance(tpl);
+}
+
+/**
+ * The preview sprite: a hidden <svg> holding, per deck style, the painted
+ * defs, motifs and faces that previews have asked for (ids `pv-<style>-…`).
+ * Previews are then a two-node `<use>`: the motifs (10–40 KB each) are parsed
+ * once instead of once per preview. Built lazily, one symbol at a time.
+ */
+const PV_SPRITE = 'pv-sprite';
+const pvHave = new Set<string>();
+function previewSprite(): Element | null {
+  if (typeof document === 'undefined' || !document.body) return null;
+  const found = document.getElementById(PV_SPRITE);
+  if (found) return found;
+  const sprite = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  sprite.id = PV_SPRITE;
+  sprite.setAttribute('aria-hidden', 'true');
+  sprite.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+  document.body.prepend(sprite);
+  pvHave.clear();
+  return sprite;
+}
+
+/** Make sure the preview sprite holds card `id` in `style`; false if there's no document. */
+function ensurePreview(id: number, style: string): boolean {
+  const sprite = previewSprite();
+  if (!sprite) return false;
+  const want = [style, id < 48 ? `${style}:m${id >> 2}` : '', `${style}:c${id}`].filter((k) => k && !pvHave.has(k));
+  if (!want.length) return true;
+  const b = buildLook(style);
+  let markup = '';
+  for (const k of want) {
+    if (k === style) markup += `<defs>${b.paint(spriteDefs().replace(/^<defs>|<\/defs>$/g, ''))}${b.defs}</defs>`;
+    else if (k.includes(':m')) markup += `<symbol id="motif-${id >> 2}" viewBox="0 0 100 140">${b.paint(motifMarkup(id >> 2))}</symbol>`;
+    else markup += `<symbol id="card-${id}" viewBox="0 0 100 140">${b.paint(cardInner(id, b.look))}</symbol>`;
+    pvHave.add(k);
+  }
+  sprite.insertAdjacentHTML('beforeend', markup.replace(ID_RX, `$1pv-${style}-`));
+  return true;
+}
+
+/**
+ * Preview of one card painted in any deck style (for the Market), independent
+ * of the deck currently installed in the card sprite. In the app it's a `<use>`
+ * of the preview sprite; without a document it's standalone markup with fresh ids.
+ */
+export function cardPreviewSvg(id: number, styleId: string): string {
+  const style = LOOKS[styleId] ? styleId : 'classic';
+  if (!ensurePreview(id, style)) return standalonePreview(id, style);
+  return `<svg class="card-art" viewBox="0 0 100 140" aria-hidden="true"><use href="#pv-${style}-card-${id}"/></svg>`;
 }
 
 const backPreviewCache = new Map<string, string>();

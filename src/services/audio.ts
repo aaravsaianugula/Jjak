@@ -18,8 +18,22 @@ export function audioContext(): AudioContext | null {
     master.gain.value = 0.55;
     master.connect(ctx.destination);
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  // Never restart the stream while the app is hidden (a late timer's sound); resumeAudio() does it on return.
+  if (ctx.state === 'suspended' && !document.hidden) void ctx.resume();
   return ctx;
+}
+
+/**
+ * App hidden: stop the audio stream itself, not just its volume, so the phone's audio
+ * hardware can sleep. resumeAudio() restarts it when the app is in front again.
+ */
+export function suspendAudio(): void {
+  if (ctx?.state === 'running') void ctx.suspend();
+}
+
+/** App in front again: restart the stream (if a gesture ever started it), music or not. */
+export function resumeAudio(): void {
+  if (ctx?.state === 'suspended') void ctx.resume();
 }
 
 function ac(): AudioContext | null {
@@ -29,6 +43,9 @@ function ac(): AudioContext | null {
 
 /** Call from the first user gesture so iOS/Android webviews unlock audio. */
 export const unlockAudio = () => void audioContext();
+
+/** True once audio has been unlocked by a gesture (ambient sounds wait for this). */
+export const audioReady = () => ctx?.state === 'running';
 
 function tone(freq: number, start: number, dur: number, type: OscillatorType, vol: number, glideTo?: number) {
   const c = ctx!;
@@ -135,13 +152,13 @@ export const sfx = {
     tone(f * 5.4, t, 0.4, 'sine', 0.01);
     tone(f * 1.5, t + 0.32, 1.6, 'sine', 0.03);
   },
-  /** Bamboo fountain: a hollow wooden clack. */
-  clack() {
+  /** Bamboo fountain: a hollow wooden clack (`vol` < 1 for the distant, ambient one). */
+  clack(vol = 1) {
     const c = ac();
     if (!c) return;
     const t = c.currentTime;
-    noise(t, 0.04, 900, 0.5);
-    tone(420, t, 0.09, 'triangle', 0.18, 300);
-    tone(840, t, 0.05, 'sine', 0.06);
+    noise(t, 0.04, 900, 0.5 * vol);
+    tone(420, t, 0.09, 'triangle', 0.18 * vol, 300);
+    tone(840, t, 0.05, 'sine', 0.06 * vol);
   },
 };

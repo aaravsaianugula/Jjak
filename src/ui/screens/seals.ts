@@ -1,4 +1,4 @@
-import { SEALS, checkSeals, sealDone } from '../../services/achievements';
+import { SEALS, checkSeals, sealDone, sealToast } from '../../services/achievements';
 import { formatTime } from '../../engine/session';
 import { liveStreak } from '../../services/progress';
 import { save } from '../../services/storage';
@@ -21,7 +21,7 @@ const GLYPH: Record<string, string> = {
 export function sealsScreen(): Screen {
   // Award anything completed outside a board (e.g. from older saves).
   const fresh = checkSeals();
-  if (fresh.length) setTimeout(() => toast(`Seal earned: ${fresh.map((f) => f.title).join(', ')}`), 300);
+  if (fresh.length) setTimeout(() => toast(sealToast(fresh)), 300);
   const earnedSeals = SEALS.filter((s) => save.seals.includes(s.id));
   const earned = earnedSeals.length;
   const fromSeals = earnedSeals.reduce((a, s) => a + s.reward, 0);

@@ -17,3 +17,5 @@ dist-demo/
 
 # Agent worktrees (temporary)
 .claude/worktrees/
+qa-device/
+qa-shots/

@@ -51,6 +51,8 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 | **Board papers** | Weeks | Completing all four cards of a flower unlocks that flower's paper (tinted backdrop with a faint motif), equipped in the Market. 12 to collect, plus 6 to buy. |
 | **Flower Road map** | Any time | A winding route through all 50 places with blossoms and stamps; open a place to replay any of its levels. |
 | **Zen** | Any time | Endless, untimed, no stars. |
+| **Practice room 연습 · 稽古** | Any time | Every idea met on the road (its intro seen, or its first board behind you) with its animated intro to watch again and 3 gentle boards: the Director's tier-0, solver-proven bank boards for the first levels that feature it. From Settings (and How to play there). Practice never counts: no blossoms, petals, level, missions, skill rating or tier pins, and no hints or shuffles spent. Built from the mechanic registry, so new mechanics join on their own. |
+| **Your play style 기풍 · 棋風** | Any time | A calm read-out of the on-device player model, from Settings: up to five plain sentences (strengths, habits, a growth edge) that appear only once their evidence clears a confidence floor (else "play a few more boards"); a comparison (one path shape over another, a mechanic against the overall rating) is named only when the gap clears 1.5 / 1 times the ratings' combined deviation, both signals agree, and a mechanic edge was played lately, which holds false claims under 5 % for players whose skill is the same everywhere (tests/insights-null.test.ts), an ink line of the skill rating over recent rated boards (a capped trail in the save), a learning / steady / at home band per idea met, and best runs from the records the save already keeps. Encouraging wording only; nothing leaves the phone. Rules: `src/director/insights.ts`. |
 | **Rush** | Minutes | 60-second score attack: pairs add time, cleared boards add more, boards grow. Personal best, plus an optional rewarded "keep going +20 s" once per run. |
 | **Fever** | Seconds | A ×5 combo starts 6 s of 만개 · 満開 "full bloom": double points and a glowing board. |
 | **Card sets on the board** | Per board | Clearing every card of a real Go-Stop / Koi-Koi set (yaku) within one board scores a named bonus: 고도리 Godori +700, 猪鹿蝶 +700, 홍단/청단/초단 +500, 月見酒/花見酒 +400, 삼광 Three brights +900, 오광 Five brights +2000. The intro card hints when a board holds one. |
@@ -59,27 +61,85 @@ Capacitor. **Business model:** free with fair ads. Research basis: [`RESEARCH.md
 ## 4. Level curve
 
 Levels 1–6 teach the basics (unchanged); from level 7 the Journey follows the
-Flower Road (`src/data/route.ts`, `journeyLevel` in `src/engine/levels.ts`).
+Flower Road (`src/data/route.ts`). The grammar lives in the Level Director's plan
+(`levelPlan` in `src/director/plan.ts`; `journeyLevel` returns its middle tier), and
+the board each player gets comes from the offline-built bank at their tier
+(`src/director/bank.ts`, `npm run bank`; audit in `docs/level-audit.md`).
 
 | Levels | Board | Variants | Teaches |
 |---|---|---|---|
 | 1 | 4×4 | identical | Tapping pairs, path bends |
 | 2–5 | 4×4 → 6×5 | identical | Scanning bigger boards |
-| 6 | 6×4 | **4 per flower** | "Match the flower, not the picture" (tip with a tap-the-pair practice) |
+| 6 | 7×6 | **4 per flower** | "Match the flower, not the picture" (animated intro, then a your-turn pair) |
 | Chapter 1 (levels 1–12) | up to 8×6 | yes | Full 48-card boards |
 | Chapter 2 | | yes | **Stones** block paths |
 | Chapter 3 | | yes | **Falling leaves**: cards drop to fill gaps after each pair |
 | Chapter 4 | | yes | **First snow**: some cards start face-down and turn over when a neighbour clears |
 | Chapter 5 | | yes | **Lucky cards**: a bonus pair (보너스패) worth +500 points and +10 petals |
-| Chapter 7 | | yes | **Knots (매듭)**: a tied card can't be picked until a card beside it clears (tip with practice) |
-| Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair (tip with practice) |
-| Chapters 10–50 | | yes | Each place features one idea or a mix |
-| 601+ (Wanderer) | | yes | The same road, fuller boards, slightly tighter par |
+| Chapter 7 | | yes | **Knots (매듭)**: a tied card can't be picked until a card beside it clears |
+| Chapter 9 | | yes | **Wind**: cards drift left, right or up after each pair |
+| Chapter 11 | | yes | **Gates (門)**: a gate opens when its flower is paired |
+| Chapter 14 | | yes | **Fences (울타리)**: paths can't cross a bamboo fence |
+| Chapter 23 (Miyajima) | | yes | **Torii (鳥居)**: a path that enters one torii comes out of its twin heading the same way; the jump costs no bend, the 2-bend rule holds over the whole path, and a path can't bend on a torii. One twin pair, two on roomy boards: the first vermilion, the second plain wood (白木), each with a bold plaque mark (一 / 二); selecting a card makes each pair's twins lift together for a moment |
+| Chapter 25 (Yeosu) | | yes | **Streams (개울 · 小川)**: paths cross water (or run along it) only in a straight line; they never bend on a water cell. Two to six water cells in runs of 2–3 |
+| Chapter 31 (Takayama) | | yes | **Seals (도장 · 印)**: two to four pairs carry a numbered vermilion seal on both cards; a sealed card can be picked only once every lower seal has left the board (it may pair with any card of its flower). Unsealed cards are free. Tapping one too soon gives a calm "not yet" shake and the seal that goes first answers; no penalty |
+| Chapter 35 (Jeonju) | | yes | **Wet ink (먹 · 墨)**: two blots (four on roomy boards) of wet ink sit on cells with no card and block paths like stones; each dries after its own count of pairs (3–6), lightening a shade with every pair, then the cell is open. All blots are laid at the start; none appear later |
+| Chapters 6–50 | | yes | Each place features one idea or a mix; level goals on about one board in four |
+| 601+ (Wanderer) | | yes | Hidden until level 600 is cleared, then revealed ("The road goes on"). Each level is generated live for this player in a Web Worker, with the same validators |
 
 **Inside every chapter** the 12 slots follow a rhythm: a warm-up, the chapter's idea, a
 plain board, a mix, a smaller breather in the middle, a peak, and the **festival board**
-(8×6 with +15 s par). Boards never exceed 8×6 so cards stay tappable on phones. Snow never
-shares a board with falling leaves or wind.
+(8×6 with +15 s par; 8×7 for peaks and festivals from place 20). Boards never exceed
+8 rows × 7 columns, so cards stay tappable at 360 px wide. Designed difficulty is a
+tension → peak → breather sawtooth inside each chapter (the open and rest boards are the
+two dips, the peak stands clear of every other board, the festival sits high but below
+it) on a road that climbs from about 0.25 (middle tier, first places) to about 0.7 (last
+places; the top tier near 0.9). Wanderer years carry on from exactly there (the road
+never steps down at a year's start) and level off towards 0.70, leaving the knobs room
+for the endless road's variety. If the endless search ever finds nothing in time, the
+board served is still solver-proven: the bank's board for the same place and slot
+(`src/director/endless-fallback.ts`). Partner ideas and goals come from bag randomisers
+so neighbours don't repeat (the bag holds each idea once, so an idea that keeps clashing
+can't pile up and bury the newer ones). Snow, fences, torii, streams, seals and ink never
+share a board with falling leaves or wind (terrain can't move, cards can't slide over it,
+and sliding would scramble the seals' order); seals also keep off snowy and knotted cards
+(one lock per card).
+
+**Harder by arrangement, never by smaller cards.** Late and high-tier boards get a tricky
+*arrangement* (`arrangeOf` in plan.ts, the generator's `arrange`): pairs placed far apart
+(long two-bend reads), look-alike cards of one flower side by side (blocked decoys and
+tempting wrong matches that lead to a dead end), and on the hardest boards the rim filled
+first so the opening moves sit inside the board. Board sizes are unchanged.
+
+**Fun, measured** (`src/director/metrics.ts`, folded into the search's fitness), each
+read off the human-like scanner's games at its calibrated pace (1.1 s a pair plus 0.3 s
+per card looked at): an **early foothold** (the scanner makes its first easy 0–1 bend
+pair inside 10 s of play; the validators separately insist on at least one easy pair at
+the start), a **mid-board crunch** (most games hit a tight spot in the middle third: at
+most two legal pairs while five or more are still on the board), a **combo finish** (the
+last six pairs, or the whole board if smaller, each come with a choice of pairs and
+inside the 4 s combo window, so the top combo is reached and held; it weighs most in the
+fitness), and **variety** (a different shape, mechanics or goal from the level before).
+The audit reports each mark's pass rate per tier and the distribution of each measure.
+
+**Show, don't tell.** New players get an animated first minute instead of a rules
+screen: the brush pairs two cards and the 0/1/2-bend rule draws itself, the player
+makes a pair, a blocked pair is crossed out, and quick pairs build a combo. Every
+new idea arrives the same way: a 2–4 s demo on a mini board stepped through the real
+rules, then the player does it once (`src/ui/demo.ts`, scripts in `src/ui/demos.ts`).
+
+**Adaptive difficulty (the Level Director).** The place, role, shape, mechanics, goal and
+par of a level are the same for everyone; the board inside it comes from one of five
+skill tiers, chosen on the device from how this player plays (time vs par, think time,
+first taps, misreads, hints and quits) with relief boards after a struggle and stretch
+boards after an easy streak. Inside the tier, the bank keeps up to two other measured,
+solver-proven boards per level that read differently; the Director picks the one that
+leans on the player's blind spot (key pairs where they look last, the path shape they
+read slowest, believable decoys for a player who rushes, more of a weaker mechanic the
+level already has), rotating so no blind spot is leaned on more than three levels in
+eight, and never on teaching, rest or relief boards. A hint never earns a harder board.
+A level's tier and its pick are pinned so a retry or replay is the same board.
+See `docs/EXPANSION_PLAN.md` §C1.
 
 **Mechanic safety nets** (never the player's fault, never a penalty): if snow or knots are
 the only reason a board is stuck, they clear for free; if a board is still stuck it
@@ -109,8 +169,8 @@ which is why the Daily is identical worldwide.
 
 | Item | Source | Sink |
 |---|---|---|
-| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board, lanterns, Rush, lucky pairs, missions, rank rewards, chests, garden visitors. Simulated at **≈ 315 per hour** of steady play (`tests/economy.test.ts`) | Hint (20), Shuffle (15), the Market (≈ 12,200 of cosmetics and garden pieces) |
-| **Hints/Shuffles** | 3 / 2 at start, +1 each per chapter finished, rewarded ad (+1) | Using them |
+| **Petals** 🌸 | 5 per *new* blossom (no replay farming), 15 per Daily, 3 per Zen board, lanterns, Rush, lucky pairs, missions, rank rewards, chests, garden visitors. Simulated at **≈ 460 per hour** of steady play (`tests/economy.test.ts`) | Hint (20), Shuffle (15), the Market (≈ 12,200 of cosmetics and garden pieces) |
+| **Hints/Shuffles** | 5 / 5 at start; then only a rewarded ad (+1) or the petal price. Rewards that once gave a tool give its price in petals (20 a hint, 15 a shuffle) | Using them |
 | **Album cards** | First clear of each level, each Daily, optional rewarded "draw one more" | — |
 
 **Ads** (all IDs in `src/config.ts`):

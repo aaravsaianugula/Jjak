@@ -2,19 +2,19 @@
  * Flower Path: rank curve, rewards, missions, chests, gold leaf, purchases,
  * and Warm tea (streak freeze) consumption.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BONUS_IDS } from '../src/data/deck';
 import {
   MAX_RANK, MISSIONS, PATH_EXCLUSIVES, TITLES, rankInfo, rankOf, rankReward, xpForRank, xpToNext,
 } from '../src/data/meta';
-import { dailyLevel, journeyLevel, localDateKey, zenLevel } from '../src/engine/levels';
+import { dailyLevel, journeyLevel, localDateKey, rushLevel, zenLevel } from '../src/engine/levels';
 import { Session } from '../src/engine/session';
 import { emit } from '../src/services/events';
 import {
   boardReport, claimChest, claimMission, claimRank, drawMissions, grant, grantPouch, grantSupporter, missions, pending,
-  ranksToClaim, rerollMission, starChests,
+  ranksToClaim, rerollMission, rushReport, starChests,
 } from '../src/services/meta';
-import { liveStreak, recordClear, teaToBridge } from '../src/services/progress';
+import { liveStreak, recordClear, recordRush, teaToBridge } from '../src/services/progress';
 import { defaultSave, save } from '../src/services/storage';
 import { checkSeals, SEALS } from '../src/services/achievements';
 
@@ -143,6 +143,70 @@ describe('missions', () => {
   });
 });
 
+describe('pair handler', () => {
+  // A fixed day (October: its cards are 36 plain, 37 plain, 38 ribbon, 39 animal) so the month mission is stable.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 7, 12));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  type Pair = { cards: [number, number]; combo: number; yaku?: string[]; fever?: number; finish?: boolean };
+  /** Two brights, an animal + ribbon at ×4, October plains with a set at Full bloom, the lucky pair at ×4, October ribbon + animal. */
+  const PAIRS: Pair[] = [
+    { cards: [3, 11], combo: 1 },
+    { cards: [7, 2], combo: 4 },
+    { cards: [36, 37], combo: 5, yaku: ['akadan'], fever: 1 },
+    { cards: [BONUS_IDS[0], BONUS_IDS[1]], combo: 4, fever: 2 },
+    { cards: [38, 39], combo: 1, finish: true },
+  ];
+
+  /** Play PAIRS with these three missions open; returns each mission's progress. */
+  function play(ids: string[], mode: 'journey' | 'rush'): { n: number; done: boolean }[] {
+    save.meta.missions = { date: localDateKey(), list: ids.map((id) => ({ id, n: 0, done: false, claimed: false, rerolled: false })) };
+    const s = new Session(mode === 'rush' ? rushLevel('pin', 0) : journeyLevel(9), 0);
+    emit('start', { session: s });
+    for (const p of PAIRS) {
+      if (p.fever) s.feverCount = p.fever;
+      if (p.finish) s.finishedAt = 30_000;
+      emit('pair', { mode, cards: p.cards, combo: p.combo, fever: !!p.fever, yaku: p.yaku ?? [], session: s });
+    }
+    return save.meta.missions.list.map(({ n, done }) => ({ n, done }));
+  }
+
+  it('advances every pair-driven mission by exactly what the pairs held (pinned)', () => {
+    expect(play(['brights6', 'animals8', 'ribbons8'], 'journey')).toEqual([{ n: 2, done: false }, { n: 2, done: false }, { n: 2, done: false }]);
+    expect(play(['month8', 'combo4x3', 'yaku1'], 'journey')).toEqual([{ n: 4, done: false }, { n: 2, done: false }, { n: 1, done: true }]);
+    expect(play(['lucky1', 'fever3', 'pairs40'], 'journey')).toEqual([{ n: 1, done: true }, { n: 2, done: false }, { n: 5, done: false }]);
+    expect(play(['rushPairs60', 'boards3', 'pairs100'], 'rush')).toEqual([{ n: 5, done: false }, { n: 1, done: false }, { n: 5, done: false }]);
+    expect(play(['rushPairs60', 'boards3', 'pairs100'], 'journey')).toEqual([{ n: 0, done: false }, { n: 0, done: false }, { n: 5, done: false }]);
+  });
+
+  it('gives a point of XP per pair, counts finished missions toward the week, and collects the lucky cards once', () => {
+    play(['brights6', 'animals8', 'ribbons8'], 'journey');
+    expect(save.meta.xp).toBe(PAIRS.length);
+    play(['month8', 'combo4x3', 'yaku1'], 'journey');
+    play(['lucky1', 'fever3', 'pairs40'], 'journey');
+    expect(save.meta.week.count).toBe(2);
+    expect(save.meta.stats.missions).toBe(2);
+    expect(save.meta.bonus).toEqual([...BONUS_IDS]);
+    expect(save.meta.xp).toBe(3 * PAIRS.length);
+  });
+
+  it('a new day mid-board draws fresh missions before the next pair counts', () => {
+    play(['pairs40', 'zen2', 'pairs200'], 'journey');
+    const s = new Session(journeyLevel(9), 0);
+    emit('start', { session: s });
+    vi.setSystemTime(new Date(2026, 9, 8, 0, 0, 5));
+    emit('pair', { mode: 'journey', cards: [0, 1], combo: 1, fever: false, yaku: [], session: s });
+    expect(save.meta.missions.date).toBe('2026-10-08');
+    const pairs = save.meta.missions.list.filter((m) => missionsMetric(m.id) === 'pairs');
+    for (const m of pairs) expect(m.n).toBe(1);
+  });
+});
+
+const missionsMetric = (id: string) => MISSIONS.find((m) => m.id === id)?.metric;
+
 describe('XP from play', () => {
   it('gives XP for pairs, clears, blossoms and first clears, and reports it for the result sheet', () => {
     const s = cleared(journeyLevel(8));
@@ -156,11 +220,58 @@ describe('XP from play', () => {
     expect(save.meta.xp).toBe(rep.xp);
   });
 
+  it('a replay that adds no blossoms earns only its pairs, so easy boards cannot be ground for ranks', () => {
+    const play = () => {
+      const s = cleared(journeyLevel(8));
+      emit('start', { session: s });
+      emit('pair', { mode: 'journey', cards: [0, 1], combo: 1, fever: false, yaku: [], session: s });
+      const summary = recordClear(s);
+      emit('clear', { session: s, summary });
+      return boardReport(s)!.xp;
+    };
+    const first = play();
+    const again = play(); // same stars as before
+    expect(first).toBeGreaterThan(20);
+    expect(again).toBeLessThan(5);
+  });
+
   it('counts the lucky cards and collects them for the Album', () => {
     const s = new Session(zenLevel('z'), 0);
     emit('pair', { mode: 'zen', cards: [BONUS_IDS[0], BONUS_IDS[1]], combo: 1, fever: false, yaku: [], session: s });
     expect(save.meta.bonus.sort()).toEqual([48, 49]);
     expect(boardReport(s)!.bonus.length).toBe(2);
+  });
+
+  it('reports a whole Rush run across rounds, and a "Keep going" continuation tops it up without a second run', () => {
+    save.rush.best = 5000;
+    const r0 = new Session(rushLevel('rush-t', 0), 0);
+    emit('start', { session: r0 });
+    emit('pair', { mode: 'rush', cards: [0, 1], combo: 1, fever: false, yaku: [], session: r0 });
+    // The next round is a new Session without a 'start' event; the run report still covers it.
+    const r1 = new Session(rushLevel('rush-t', 1), 0);
+    emit('pair', { mode: 'rush', cards: [4, 5], combo: 1, fever: false, yaku: [], session: r1 });
+    const petals0 = save.petals;
+    const first = recordRush(4000, 2, 2, 1);
+    emit('rush', { score: 4000, rounds: 2, pairs: 2, bestCombo: 1 });
+    const rep = rushReport()!;
+    expect(rep.xp).toBe(save.meta.xp);
+    expect(rep.xp).toBeGreaterThanOrEqual(2 + 20);
+    expect(save.rush.runs).toBe(1);
+    expect(first.newBest).toBe(false);
+    const xp1 = save.meta.xp;
+    // Continued: 8000 points in all. Only the difference is added; it's still one run.
+    const second = recordRush(8000, 3, 5, 2, { score: 4000, pairs: 2, bestBefore: 5000 });
+    emit('rush', { score: 8000, rounds: 3, pairs: 5, bestCombo: 2, extends: 4000 });
+    expect(save.rush.runs).toBe(1);
+    expect(second.newBest).toBe(true);
+    expect(save.stats.pairs).toBe(5);
+    expect(save.petals - petals0).toBe(first.petals + second.petals);
+    expect(first.petals + second.petals).toBe(Math.min(25, Math.floor(8000 / 800)));
+    expect(save.meta.xp - xp1).toBe(20);
+    expect(rushReport()!.xp).toBe(save.meta.xp);
+    // A new board that isn't Rush ends the run report.
+    emit('start', { session: new Session(zenLevel('z'), 0) });
+    expect(rushReport()).toBeNull();
   });
 });
 

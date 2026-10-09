@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GARDEN_ITEMS, GARDEN_SPOTS, GARDEN_VISITORS, gardenItemSvg, gardenSvg, gardenVisitorSvg, placedItems, seasonOf } from '../src/art/garden';
+import { GARDEN_ITEMS, GARDEN_SPOTS, GARDEN_VISITORS, gardenItemSvg, gardenItemSvgCached, gardenSvg, gardenVisitorSvg, placedItems, seasonOf } from '../src/art/garden';
 import { hydrateGarden } from '../src/services/save-garden';
 
 const ALL = GARDEN_ITEMS.map((i) => i.id);
@@ -40,6 +40,25 @@ describe('garden art', () => {
     const page = gardenSvg(2, ALL) + gardenSvg(2, ['pond']) + ALL.map((id) => gardenItemSvg(id, 2)).join('');
     const list = ids(page);
     expect(new Set(list).size).toBe(list.length);
+  });
+
+  it('reuses a built vignette with fresh ids for every copy', () => {
+    const scoped = (svg: string) => svg.replace(/gi\d+-/g, 'gi#-');
+    for (const id of ALL) {
+      const a = gardenItemSvgCached(id, 1);
+      const b = gardenItemSvgCached(id, 1);
+      // Same picture as the uncached builder, apart from its id scope.
+      expect(scoped(a), id).toBe(scoped(gardenItemSvg(id, 1)));
+      expect(scoped(b), id).toBe(scoped(a));
+      // Two copies can share one page: no id is repeated and every reference resolves in its own copy.
+      const both = ids(a + b);
+      expect(new Set(both).size, id).toBe(both.length);
+      for (const svg of [a, b]) {
+        const own = new Set(ids(svg));
+        for (const r of refs(svg)) expect(own.has(r), `${id}: #${r}`).toBe(true);
+      }
+    }
+    expect(scoped(gardenItemSvgCached('pond', 0))).not.toBe(scoped(gardenItemSvgCached('pond', 2)));
   });
 
   it('draws a vignette for each item and visitor', () => {

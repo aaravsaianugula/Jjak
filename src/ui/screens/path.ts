@@ -8,13 +8,15 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { cardSvg } from '../../art/cards';
+import { artInline } from '../../art/market-art';
+import { pathArt } from '../../art/path-art';
 import { IAP } from '../../config';
 import { cardDef, monthDef } from '../../data/deck';
 import {
-  MAX_RANK, PATH_EXCLUSIVES, type RankTitle, type Reward, TITLES, WEEKLY, exclusiveName, isTitleRank, nextTitle, rankReward, titleFor,
+  MAX_RANK, PATH_EXCLUSIVES, type RankTitle, type Reward, TITLES, WEEKLY, exclusiveName, isTitleRank, nextTitle, rankInfo, rankReward, titleFor,
 } from '../../data/meta';
 import { routeOf } from '../../data/route';
-import { CHAPTERS, LEVELS_PER_CHAPTER, dailyLevel, journeyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
+import { CHAPTERS, LEVELS_PER_CHAPTER, dailyLevel, localDateKey, rushLevel, zenLevel } from '../../engine/levels';
 import {
   type BoardReport, type Granted, claimChest, claimMission, claimRank, claimWeekly, missions, missionsDone, pending, rank,
   ranksToClaim, rerollMission, starChests, weekly,
@@ -22,39 +24,30 @@ import {
 import { formatCountdown, msToNextDaily } from '../../services/progress';
 import { save } from '../../services/storage';
 import { store } from '../../services/store';
+import { openRemoveAds } from '../remove-ads';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { type Screen } from '../app';
-import { esc, frag, h, toast } from '../dom';
+import { esc, fmt, frag, h, toast, wait } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
 import { nav } from '../nav';
+import { petalBump, reducedMotion, retrigger } from '../motion';
 
 type Tab = 'path' | 'missions' | 'chests';
-
-const reducedMotion = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt = (n: number) => n.toLocaleString('en-US');
-
-const ICON_TEA =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5h12v3.2a5.3 5.3 0 0 1-5.3 5.3h-1.4a5.3 5.3 0 0 1-5.3-5.3z" fill="currentColor" fill-opacity=".14"/><path d="M16.5 11.5h1.2a2.3 2.3 0 0 1 0 4.6h-1.9"/><path d="M8.5 3.8c-.9 1.1.9 1.9 0 3.4M12.3 3.8c-.9 1.1.9 1.9 0 3.4"/></svg>';
-/** A small lidded box, drawn like the lantern: line art with a soft fill. */
-const ICON_CHEST =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5h16v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z" fill="currentColor" fill-opacity=".14"/><path d="M4 10.5V9a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1.5"/><path d="M10.5 10.5v3h3v-3M4 14h6.5M13.5 14H20"/></svg>';
 
 const TIER_LABEL = { 1: 'Light', 2: 'Steady', 3: 'Long' } as const;
 
 /** The rank seal: a vermilion square with the rank number, like a dojang. */
 const rankSeal = (r: number, cls = '') => `<span class="fp-seal ${cls}" aria-hidden="true"><b>${r}</b></span>`;
 
-function chips(r: Reward, small = false): string {
+function chips(r: Reward): string {
   const out: string[] = [];
   const c = (cls: string, icon: string, text: string, label: string) =>
     `<span class="chip chip--${cls}" title="${esc(label)}">${icon}<span>${text}</span></span>`;
   if (r.xp) out.push(c('xp', '', `+${fmt(r.xp)} XP`, `${r.xp} XP`));
   if (r.petals) out.push(c('petals', ICONS.petal, String(r.petals), `${r.petals} petals`));
-  if (r.hints) out.push(c('tool', ICONS.hint, small ? `${r.hints}` : `${r.hints} hint${r.hints > 1 ? 's' : ''}`, `${r.hints} hint${r.hints > 1 ? 's' : ''}`));
-  if (r.shuffles) out.push(c('tool', ICONS.shuffle, small ? `${r.shuffles}` : `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`, `${r.shuffles} shuffle${r.shuffles > 1 ? 's' : ''}`));
-  if (r.tea) out.push(c('tea', ICON_TEA, 'Warm tea', 'Warm tea: keeps your Daily streak through a missed day'));
+  if (r.tea) out.push(c('tea', pathArt('i-tea', 'chip__art'), 'Warm tea', 'Warm tea: keeps your Daily streak through a missed day'));
   if (r.foil) out.push(c('foil', '<i class="chip__foil" aria-hidden="true">金</i>', 'Gold leaf', 'A gold-leaf edition of a card in your album'));
   for (const k of r.items ?? []) out.push(c('ex', '<i class="chip__ex" aria-hidden="true">珍</i>', esc(exclusiveName(k)), `${exclusiveName(k)} (Flower Path exclusive)`));
   return out.join('');
@@ -87,6 +80,47 @@ export function pathStrip(): string {
   </button>`;
 }
 
+/** A bar's fill at `pct`: a full-width fill slid left, so it moves with a transform. */
+const barAt = (pct: number) => `translateX(${((Math.max(pct, 0.04) - 1) * 100).toFixed(1)}%)`;
+const BAR_EASE = 'cubic-bezier(0.3, 0.7, 0.2, 1)';
+
+/**
+ * Fill the Home strip's bar from `fromXp` to the XP now (rolling over on a
+ * rank-up), sliding the fill with a transform. Nothing to do when no XP came in.
+ */
+export function fillStrip(strip: HTMLElement | null, fromXp: number, delay = 0): void {
+  if (!strip || fromXp >= save.meta.xp || reducedMotion()) return;
+  const bar = strip.querySelector<HTMLElement>('.fp-bar i');
+  const seal = strip.querySelector<HTMLElement>('.fp-seal');
+  if (!bar) return;
+  const before = rankInfo(fromXp);
+  const after = rank();
+  const up = after.rank > before.rank;
+  bar.style.width = '100%';
+  bar.style.minWidth = '0';
+  bar.style.transform = barAt(before.pct);
+  if (up && seal) seal.querySelector('b')!.textContent = String(before.rank);
+  const go = (pct: number, ms: number) => {
+    bar.style.transition = `transform ${ms}ms ${BAR_EASE}`;
+    bar.style.transform = barAt(pct);
+  };
+  setTimeout(() => {
+    if (!bar.isConnected) return;
+    if (!up) return go(after.pct, 900);
+    go(1, 600);
+    setTimeout(() => {
+      bar.style.transition = 'none';
+      bar.style.transform = barAt(0);
+      if (seal) {
+        seal.querySelector('b')!.textContent = String(after.rank);
+        retrigger(seal, 'is-up');
+      }
+      void bar.offsetWidth;
+      go(after.pct, 700);
+    }, 640);
+  }, delay);
+}
+
 // ───────────────────────────── Result sheet ─────────────────────────────
 
 /** Flower Path block for the result sheet: XP gained, a filling rank bar, mission ticks. */
@@ -105,7 +139,7 @@ export function pathResult(rep: BoardReport, at = 0): HTMLElement {
     el.append(frag(`<ul class="fp-res__ticks">${rep.missions.map((m, i) => `<li style="--i:${i}">${ICONS.check}<span>Mission complete · ${esc(m)}</span></li>`).join('')}</ul>`));
   }
   if (rep.tea) {
-    el.append(frag(`<p class="fp-res__tea">${ICON_TEA}<span>Warm tea kept your streak${rep.tea > 1 ? ` (${rep.tea} cups)` : ''}.</span></p>`));
+    el.append(frag(`<p class="fp-res__tea">${pathArt('i-tea', 'chip__art')}<span>Warm tea kept your streak${rep.tea > 1 ? ` (${rep.tea} cups)` : ''}.</span></p>`));
   }
   if (rep.foil != null) {
     el.append(frag(`<div class="fp-res__foil"><span class="fp-res__card">${cardSvg(rep.foil, 'card-art', { foil: true })}</span><span><b>A gold-leaf card</b><br><span class="muted">${esc(cardName(rep.foil))} · now gilded in your Album</span></span></div>`));
@@ -121,16 +155,19 @@ export function pathResult(rep: BoardReport, at = 0): HTMLElement {
   const bar = el.querySelector<HTMLElement>('.fp-bar i')!;
   const seal = el.querySelector<HTMLElement>('.fp-seal')!;
   const sub = el.querySelector<HTMLElement>('[data-sub]')!;
+  bar.style.width = '100%';
+  bar.style.minWidth = '0';
+  bar.style.transform = barAt(rep.before.pct);
   const go = (pct: number, ms: number) => {
-    bar.style.transition = `width ${ms}ms cubic-bezier(0.3, 0.7, 0.2, 1)`;
-    bar.style.width = `${Math.round(pct * 100)}%`;
+    bar.style.transition = `transform ${ms}ms ${BAR_EASE}`;
+    bar.style.transform = barAt(pct);
   };
   setTimeout(() => {
     if (!up) return go(rep.after.pct, 900);
     go(1, 650);
     setTimeout(() => {
       bar.style.transition = 'none';
-      bar.style.width = '0%';
+      bar.style.transform = barAt(0);
       seal.querySelector('b')!.textContent = String(rep.after.rank);
       seal.classList.add('is-up');
       sub.textContent = `${titleFor(rep.after.rank).en} · rank ${rep.after.rank}`;
@@ -148,7 +185,7 @@ export function rankUpMoment(rep: BoardReport): void {
   const newTitle = TITLES.some((x) => x.rank > rep.before.rank && x.rank <= r && x.rank > 1);
   const reward = rankReward(Math.max(1, save.meta.claimed) + 1);
   const content = frag(`<div class="fp-up">
-    <div class="fp-up__stage">${rankSeal(r, 'fp-seal--xl fp-stamp-in')}${petalBurstHtml(10)}</div>
+    <div class="fp-up__stage fp-up__stage--rank">${rankSeal(r, 'fp-seal--xl fp-seal-settle')}${petalBurstHtml(6, RANK_UP_REACH)}</div>
     <div class="detail__kind">Rank up · <span lang="ko">승급</span> · <span class="ja" lang="ja">昇級</span></div>
     <h2>Rank ${r}${newTitle ? ` · ${esc(t.en)}` : ''}</h2>
     ${newTitle ? `<p class="fp-up__native"><span lang="ko" class="serif">${t.ko}</span> · <span class="ja" lang="ja">${t.ja}</span></p><p class="muted">${esc(t.line)}</p>` : '<p class="muted">A new step on the Flower Path.</p>'}
@@ -157,7 +194,8 @@ export function rankUpMoment(rep: BoardReport): void {
   const actions = h('div', { class: 'sheet__actions' });
   content.append(actions);
   const sheet = openSheet(content, { center: true, label: `Rank ${r}` });
-  if (!reducedMotion()) setTimeout(() => sfx.stamp(), 120);
+  // The stamp sounds as the seal meets the paper.
+  if (!reducedMotion()) setTimeout(() => sfx.stamp(), RANK_UP_LAND_MS);
   haptic.success();
   if (ranksToClaim()) {
     actions.append(
@@ -187,17 +225,15 @@ function announceClaims(list: RankClaimLite[]): void {
   const sum = list.reduce(
     (a, c) => ({
       petals: a.petals + c.granted.petals,
-      hints: a.hints + c.granted.hints,
-      shuffles: a.shuffles + c.granted.shuffles,
       tea: a.tea + c.granted.tea,
       foil: [...a.foil, ...c.granted.foil],
       items: [...a.items, ...c.granted.items],
     }),
-    { petals: 0, hints: 0, shuffles: 0, tea: 0, foil: [] as number[], items: [] as string[] },
+    { petals: 0, tea: 0, foil: [] as number[], items: [] as string[] },
   );
   const title = [...list].reverse().find((c) => c.title)?.title ?? null;
   if (title || sum.foil.length || sum.items.length) revealSheet(title, sum.foil, sum.items);
-  const parts = [sum.petals && `+${sum.petals} petals`, sum.hints && `+${sum.hints} hint${sum.hints > 1 ? 's' : ''}`, sum.shuffles && `+${sum.shuffles} shuffle${sum.shuffles > 1 ? 's' : ''}`, sum.tea && 'Warm tea'].filter(Boolean);
+  const parts = [sum.petals && `+${sum.petals} petals`, sum.tea && 'Warm tea'].filter(Boolean);
   toast(`Rank ${list[list.length - 1].rank} claimed${parts.length ? ` · ${parts.join(' · ')}` : ''}`);
 }
 
@@ -231,14 +267,36 @@ function revealSheet(title: RankTitle | null, foil: number[], items: string[]): 
   actions.append(h('button', { class: 'btn btn--primary btn--block', onclick: () => sheet.close() }, 'Lovely'));
 }
 
-const petalBurstHtml = (n: number) =>
+/** The rank-up seal reaches the paper this long into its settle (meta.css fp-seal-settle). */
+const RANK_UP_LAND_MS = 300;
+/** The rank-up petals only drift a little way from the seal. */
+const RANK_UP_REACH = 0.7;
+
+const petalBurstHtml = (n: number, reach = 1) =>
   reducedMotion()
     ? ''
     : `<span class="fp-burst" aria-hidden="true">${Array.from({ length: n }, (_, i) => {
         const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
-        const d = 46 + Math.random() * 34;
+        const d = (46 + Math.random() * 34) * reach;
         return `<i style="--dx:${Math.round(Math.cos(a) * d)}px;--dy:${Math.round(Math.sin(a) * d - 18)}px;--r:${Math.round(Math.random() * 300 - 150)}deg;--d:${120 + Math.round(Math.random() * 160)}ms"></i>`;
       }).join('')}</span>`;
+
+/**
+ * A mission card turns over (a short tilt away and back, transform only):
+ * `swap` changes it while it's edge-on and may return the card that replaces it.
+ */
+function turnOver(card: HTMLElement | null, swap: () => HTMLElement | null | void): void {
+  if (!card || reducedMotion()) {
+    swap();
+    return;
+  }
+  card.classList.add('is-turning');
+  setTimeout(() => {
+    const next = swap() || card;
+    next.classList.remove('is-turning');
+    retrigger(next, 'is-turned');
+  }, 170);
+}
 
 // ───────────────────────────── Screen ─────────────────────────────
 
@@ -267,13 +325,10 @@ export function pathScreen(): Screen {
   const pane = el.querySelector<HTMLElement>('.fp-pane')!;
   const petalsN = el.querySelector<HTMLElement>('.petals__n')!;
 
+  let shownPetals = save.petals;
   const refreshPetals = () => {
-    petalsN.textContent = String(save.petals);
-    petalsN.parentElement!.setAttribute('aria-label', `${save.petals} petals`);
-    const pill = petalsN.parentElement!;
-    pill.classList.remove('is-bump');
-    void pill.offsetWidth;
-    pill.classList.add('is-bump');
+    petalBump(petalsN.parentElement, shownPetals, save.petals);
+    shownPetals = save.petals;
   };
 
   function renderHero() {
@@ -352,7 +407,7 @@ export function pathScreen(): Screen {
             : state === 'next'
               ? `<span class="road__next">${Math.round(rank().pct * 100)}%</span>`
               : '';
-      rows.push(`<li class="road__step road__step--${state}${ex ? ' road__step--ex' : ''}${k % 10 === 0 ? ' road__step--ten' : ''}" data-rank="${k}">
+      rows.push(`<li class="road__step road__step--${state}${ex ? ' road__step--ex' : ''}${k % 10 === 0 ? ' road__step--ten' : ''}" data-rank="${k}"${state === 'next' ? ` style="--p:${Math.round(rank().pct * 100)}%"` : ''}>
         <span class="road__node" aria-hidden="true"><b>${k}</b></span>
         <span class="road__body">
           <span class="road__label">Rank ${k}${ex ? ' · <span class="road__exlabel">Flower Path exclusive</span>' : ''}</span>
@@ -373,8 +428,9 @@ export function pathScreen(): Screen {
     haptic.medium();
     if (row && !reducedMotion()) {
       const node = row.querySelector<HTMLElement>('.road__node')!;
-      node.insertAdjacentHTML('beforeend', `<span class="fp-seal fp-seal--node fp-stamp-in" aria-hidden="true"><b>${c.rank}</b></span>${petalBurstHtml(8)}`);
+      node.insertAdjacentHTML('beforeend', `<span class="fp-seal fp-seal--node fp-stamp-in" aria-hidden="true"><b>${c.rank}</b></span><i class="fp-ring" aria-hidden="true"></i>${petalBurstHtml(8)}`);
       row.classList.add('is-claiming');
+      if (!btn) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       const act = row.querySelector('.road__act');
       if (act) act.innerHTML = `<span class="road__done">${ICONS.check}</span>`;
     }
@@ -398,9 +454,9 @@ export function pathScreen(): Screen {
           ? `<button class="btn btn--accent mcard__claim" data-mclaim="${m.slot}">Claim</button>`
           : `${s.rerolled ? '' : `<button class="icon-btn mcard__reroll" data-reroll="${m.slot}" aria-label="Swap this mission for another (once today)">${ICONS.restart}</button>`}<button class="chip-btn mcard__go" data-mgo="${m.def.go}" data-mid="${m.def.id}">${ICONS.play}<span>Play</span></button>`;
       ul.append(
-        frag(`<li class="panel mcard${s.done ? ' is-done' : ''}${s.claimed ? ' is-claimed' : ''}">
+        frag(`<li class="panel mcard${s.done ? ' is-done' : ''}${s.claimed ? ' is-claimed' : ''}" data-slot="${m.slot}">
           <div class="mcard__top">
-            <span class="tier" data-tier="${m.def.tier}" aria-label="${TIER_LABEL[m.def.tier]}"><i></i><i></i><i></i></span>
+            <span class="mcard__badge">${pathArt(`m-${m.def.go}`, 'mcard__art')}<span class="tier" data-tier="${m.def.tier}" aria-label="${TIER_LABEL[m.def.tier]}"><i></i><i></i><i></i></span></span>
             <span class="mcard__text">${esc(m.text)}</span>
           </div>
           <div class="mcard__prog"><span class="fp-bar"><i style="width:${pct}%"></i></span><span class="mcard__n">${fmt(Math.min(s.n, m.target))}<span class="muted">/${fmt(m.target)}</span></span></div>
@@ -422,13 +478,13 @@ export function pathScreen(): Screen {
     wrap.append(
       frag(`<div class="panel wchest${w.ready ? ' is-ready' : ''}${w.claimed ? ' is-claimed' : ''}">
         <div class="wchest__head">
-          <span class="wchest__icon" aria-hidden="true">${ICON_CHEST}</span>
+          <span class="wchest__icon" aria-hidden="true">${pathArt(w.claimed ? 'bandaji-open' : 'bandaji', 'wchest__art')}</span>
           <span class="wchest__titles"><b>Weekly chest</b><span class="muted"><span lang="ko">주간 상자</span> · <span class="ja" lang="ja">週の箱</span></span></span>
           <span class="wchest__count"><b>${w.count}</b>/${w.target}</span>
         </div>
         <div class="wchest__pips" role="progressbar" aria-label="Weekly chest" aria-valuemin="0" aria-valuemax="${w.target}" aria-valuenow="${w.count}">${pips}</div>
         <p class="wchest__note muted">${w.claimed ? `Opened. A new chest starts in ${days} day${days > 1 ? 's' : ''}.` : 'Fills a little with every mission you complete this week (Monday to Sunday).'}</p>
-        <div class="wchest__foot"><span class="chips">${chips(WEEKLY.reward, true)}</span>${w.ready ? '<button class="btn btn--accent wchest__claim" data-wclaim>Open</button>' : ''}</div>
+        <div class="wchest__foot"><span class="chips">${chips(WEEKLY.reward)}</span>${w.ready ? '<button class="btn btn--accent wchest__claim" data-wclaim>Open</button>' : ''}</div>
       </div>`),
     );
     return wrap;
@@ -449,9 +505,9 @@ export function pathScreen(): Screen {
           const state = c.claimed ? 'claimed' : c.ready ? 'ready' : 'locked';
           const label = `${c.step} blossom chest: ${state === 'claimed' ? 'opened' : state === 'ready' ? 'ready to open' : `${ch.stars} of ${c.step}`}`;
           return `<button class="chest chest--${state}" data-chest="${ch.chapter}" data-step="${c.step}" aria-label="${esc(label)}"${state === 'ready' ? '' : ' aria-disabled="true"'}>
-            <span class="chest__icon" aria-hidden="true">${state === 'claimed' ? ICONS.check : ICON_CHEST}</span>
+            <span class="chest__icon" aria-hidden="true">${pathArt(state === 'claimed' ? 'chest-empty' : 'chest', 'chest__art')}${state === 'claimed' ? `<i class="chest__done">${ICONS.check}</i>` : ''}</span>
             <span class="chest__step">${ICONS.blossom}${c.step}</span>
-            <span class="chips chips--sm">${chips(c.reward, true)}</span>
+            <span class="chips chips--sm">${chips(c.reward)}</span>
             ${state === 'ready' ? '<span class="chest__open">Open</span>' : ''}
           </button>`;
         })
@@ -510,7 +566,7 @@ export function pathScreen(): Screen {
       do {
         const c = await claimOne(all ? null : claimBtn);
         if (c) got.push(c);
-        if (all && ranksToClaim()) await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 260));
+        if (all && ranksToClaim()) await wait(reducedMotion() ? 0 : 260);
       } while (all && ranksToClaim());
       refreshPetals();
       renderHero();
@@ -534,8 +590,12 @@ export function pathScreen(): Screen {
         sfx.stamp();
         haptic.medium();
         const card = mclaim.closest<HTMLElement>('.mcard');
-        if (card && !reducedMotion()) card.insertAdjacentHTML('beforeend', `<span class="mcard__stamp seal fp-stamp-in" aria-hidden="true">済</span>${petalBurstHtml(8)}`);
-        mclaim.replaceWith(frag(`<span class="mcard__claimed">${ICONS.check}Claimed</span>`));
+        const settle = () => {
+          card?.classList.add('is-claimed');
+          mclaim.replaceWith(frag(`<span class="mcard__claimed">${ICONS.check}Claimed</span>`));
+          if (card && !reducedMotion()) card.insertAdjacentHTML('beforeend', `<span class="mcard__stamp seal fp-stamp-in" aria-hidden="true">済</span>${petalBurstHtml(8)}`);
+        };
+        turnOver(card, settle);
         toast(`+${r.xp} XP${r.petals ? ` · +${r.petals} petals` : ''}`);
         refreshPetals();
         renderHero();
@@ -545,8 +605,12 @@ export function pathScreen(): Screen {
     }
     const reroll = t.closest<HTMLElement>('[data-reroll]');
     if (reroll) {
-      if (rerollMission(Number(reroll.dataset.reroll))) {
-        renderPane(true);
+      const slot = Number(reroll.dataset.reroll);
+      if (rerollMission(slot)) {
+        turnOver(reroll.closest<HTMLElement>('.mcard'), () => {
+          renderPane(true);
+          return pane.querySelector<HTMLElement>(`.mcard[data-slot="${slot}"]`);
+        });
         toast('A new mission for today');
       } else toast('No other mission fits right now');
       return;
@@ -558,7 +622,7 @@ export function pathScreen(): Screen {
       if (go === 'daily') nav.game(dailyLevel(localDateKey()));
       else if (go === 'rush') nav.game(rushLevel(`rush-${Date.now()}`, 0));
       else if (go === 'zen') nav.game(zenLevel(`zen-${Date.now()}`));
-      else nav.game(journeyLevel(save.level));
+      else nav.journey(save.level);
       return;
     }
     if (t.closest('[data-wclaim]')) {
@@ -568,7 +632,8 @@ export function pathScreen(): Screen {
         haptic.success();
         refreshPetals();
         renderAll();
-        revealChest('Weekly chest', g);
+        pane.querySelector('.wchest')?.classList.add('is-opened');
+        revealChest('Weekly chest', g, true);
       }
       return;
     }
@@ -584,6 +649,7 @@ export function pathScreen(): Screen {
       haptic.success();
       refreshPetals();
       renderAll();
+      pane.querySelector(`[data-chest="${chest.dataset.chest}"][data-step="${chest.dataset.step}"]`)?.classList.add('is-opened');
       revealChest(`${chest.dataset.step}-blossom chest`, g);
     }
   });
@@ -605,10 +671,10 @@ export function pathScreen(): Screen {
 }
 
 /** What came out of a chest. */
-function revealChest(name: string, g: Granted): void {
-  const reward: Reward = { xp: g.xp, petals: g.petals, hints: g.hints, shuffles: g.shuffles, tea: g.tea };
+function revealChest(name: string, g: Granted, weekly = false): void {
+  const reward: Reward = { xp: g.xp, petals: g.petals, tea: g.tea };
   const content = frag(`<div class="fp-reveal">
-    <div class="fp-up__stage"><span class="fp-chest-big fp-stamp-in" aria-hidden="true">${ICON_CHEST}</span>${petalBurstHtml(10)}</div>
+    <div class="fp-up__stage"><span class="fp-chest-big fp-rise-in${reducedMotion() ? ' is-still' : ''}" aria-hidden="true">${artInline(weekly ? 'bandaji-reveal' : 'chest-reveal', 'fp-chest-big__art')}</span>${petalBurstHtml(10)}</div>
     <div class="detail__kind">${esc(name)} · opened</div>
     <div class="chips chips--center">${chips(reward)}</div>
     ${
@@ -643,6 +709,14 @@ export function bundlesSection(): HTMLElement | null {
     const owned = save.meta.supporter;
     el.innerHTML = `
       <h2 class="section-label" id="bundles-h">Support Jjak <span>Optional</span></h2>
+      ${
+        save.adFree
+          ? ''
+          : `<div class="panel noads">
+        <span><b>Remove ads</b><span class="muted"> · one-time purchase</span><br><span class="muted">No ads between boards and no banners. Reward ads you choose stay optional.</span></span>
+        <button class="btn btn--ghost" data-noads${native ? '' : ' disabled'}>${native ? (store.available ? esc(store.price) : 'See more') : 'On Android'}</button>
+      </div>`
+      }
       <div class="bundles__grid">
         ${IAP.pouches
           .map(
@@ -690,6 +764,11 @@ export function bundlesSection(): HTMLElement | null {
       } else if (res === 'pending') toast('Payment pending. Your petals arrive as soon as it completes.');
       return;
     }
+    const noads = t.closest<HTMLButtonElement>('[data-noads]');
+    if (noads && !noads.disabled) {
+      if (await openRemoveAds()) render();
+      return;
+    }
     const sup = t.closest<HTMLButtonElement>('[data-supporter]');
     if (sup && !sup.disabled) {
       sup.disabled = true;
@@ -705,8 +784,10 @@ export function bundlesSection(): HTMLElement | null {
   render();
   if (native) {
     void store.ready.then(() => {
-      if (!store.extrasAvailable) el.remove();
-      else render();
+      if (store.extrasAvailable) return render();
+      // Pouches and the Supporter pack aren't on Play (yet): keep only the Remove ads card.
+      if (save.adFree) return el.remove();
+      el.querySelectorAll('.bundles__grid, .supporter, .bundles__fine').forEach((n) => n.remove());
     });
   }
   return el;

@@ -1,8 +1,18 @@
 #!/usr/bin/env node
 /**
- * Drives the web build through every screen and saves phone-size screenshots.
- *   npm run dev   (in another terminal)   then   npm run screens [baseUrl] [outDir]
- * Env: THEME=paper|ink, VIEW=390x844, SCALE=2 (store shots: SCALE=2.6214 VIEW=412x732)
+ * The eight Play Store screenshots, from the dev server:
+ *   npx vite --port 5173   (in another terminal)   then
+ *   SCALE=2.62 VIEW=412x732 npm run screens -- http://localhost:5173/ store/screenshots
+ * Env: THEME=paper|ink, VIEW=390x844, SCALE=2 (store shots: SCALE=2.62 VIEW=412x732)
+ *
+ *   01-home            Home, mid-journey with the Flower Path strip
+ *   02-gates           a Flower Road board with a mechanic (gates)
+ *   03-map             the Flower Road map with a place open
+ *   04-market-decks    the Market's Decks tab
+ *   05-garden-night    the Garden at night
+ *   06-flower-path     the Flower Path ranks
+ *   07-result-stamp    a festival result sheet with its passport stamp
+ *   08-fever           a ×5 combo: full bloom
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -16,158 +26,126 @@ mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium' });
 let page;
+const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const today = new Date();
+const daysAgo = (k) => key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - k));
 
-/** Fresh context whose localStorage already holds `data` (null = first launch). */
+/** Fresh context whose localStorage already holds `data`. */
 async function open(data) {
+  if (page) await page.context().close();
   const origin = new URL(base).origin;
-  const origins = data
-    ? [{ origin, localStorage: ['jjak.save.v1', 'CapacitorStorage.jjak.save.v1'].map((name) => ({ name, value: JSON.stringify(data) })) }]
-    : [];
+  const value = JSON.stringify(data);
   const ctx = await browser.newContext({
     viewport: { width: vw, height: vh },
     deviceScaleFactor: scale,
     hasTouch: true,
     colorScheme: theme === 'ink' ? 'dark' : 'light',
-    storageState: { cookies: [], origins },
+    storageState: { cookies: [], origins: [{ origin, localStorage: ['jjak.save.v1', 'CapacitorStorage.jjak.save.v1'].map((name) => ({ name, value })) }] },
   });
   page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror:', e.message));
   await page.goto(base);
-  await page.waitForTimeout(400);
-}
-const shot = async (name) => {
   await page.waitForTimeout(700);
+  // The dev panel (dev builds only) and the web banner placeholder stay out of store shots.
+  await page.addStyleTag({ content: '.devp, .dev-panel, .web-banner { display: none !important; } :root { --banner-h: 0px !important; }' });
+}
+const shot = async (name, settle = 700) => {
+  await page.waitForTimeout(settle);
   await page.screenshot({ path: `${out}/${name}.png` });
   console.log('saved', name);
 };
-/** Play `n` hinted pairs (or until the board/sheet changes). */
-async function playPairs(n, gap = 450) {
-  for (let k = 0; k < n; k++) {
-    if (await page.$('.sheet')) return;
-    await page.click('.tool[aria-label="Hint"]');
-    await page.waitForTimeout(100);
-    const cells = await page.$$eval('.card.is-hint', (els) => els.map((e) => e.getAttribute('data-cell')));
-    if (cells.length < 2) return;
-    await page.locator(`.card[data-cell="${cells[0]}"]`).dispatchEvent('pointerdown');
-    await page.locator(`.card[data-cell="${cells[1]}"]`).dispatchEvent('pointerdown');
-    await page.waitForTimeout(gap);
-  }
+/** Tap one legal pair through the dev hook (no hint glow, no assists). */
+async function pair() {
+  const m = await page.evaluate(() => window.__game?.session().findMove() ?? null);
+  if (!m) return false;
+  for (const c of m) await page.locator(`.card:not(.is-gone)[data-cell="${c}"]`).dispatchEvent('pointerdown');
+  return true;
 }
 
-const album = [0, 1, 2, 3, 4, 7, 8, 10, 11, 12, 15, 16, 19, 20, 22, 23, 24, 27, 28, 29, 30, 31, 32, 35, 36, 39, 40, 43, 44, 47];
-const today = new Date();
-const key = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const stars = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, i % 3 ? 3 : 2]));
+const album = Array.from({ length: 34 }, (_, i) => (i * 7) % 48);
 const results = {};
-for (const back of [1, 2, 3, 5]) results[key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - back))] = { ms: 98000, score: 4200, combo: 4, stars: 2 };
-const base17 = {
-  v: 1, onboarded: true, birthYear: null, level: 17, petals: 145, hints: 9, shuffles: 1,
-  stars: Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i + 1, 2 + (i % 2)])),
-  album,
-  daily: { streak: 3, best: 6, lastDate: key(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)), results },
-  settings: { sound: false, haptics: false, theme },
-  stats: { pairs: 412, clears: 21, bestCombo: 5, zenBoards: 2, cleanClears: 7, fastClears: 12, bestDailyMs: 83000 },
-  ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0 },
-  seenTips: ['variants', 'stones'],
+for (const back of [1, 2, 3, 5]) results[daysAgo(back)] = { ms: 98000, score: 4200, combo: 4, stars: 2 };
+const allTips = ['variants', 'stones', 'gravity', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'goal:combo', 'goal:clean', 'goal:bloom', 'goal:straight'];
+const garden = ['stones', 'lantern', 'pond', 'koi', 'bridge', 'bamboo', 'plum', 'maple', 'persimmon', 'wisteria', 'irises', 'wall', 'onggi', 'pavilion', 'teatable', 'chime', 'lanterns', 'fireflies'].map((g) => `garden:${g}`);
+const player = (over = {}) => ({
+  v: 1, onboarded: true, level: 125, petals: 1840, hints: 9, shuffles: 4,
+  stars: stars(124), album,
+  daily: { streak: 4, best: 9, lastDate: daysAgo(1), results },
+  settings: { sound: false, music: false, haptics: false, theme },
+  stats: { pairs: 2412, clears: 141, bestCombo: 5, zenBoards: 6, cleanClears: 88, fastClears: 97, bestDailyMs: 83000 },
+  seenTips: allTips,
   seals: ['first', 'combo3', 'combo5', 'spring', 'daily1', 'streak3', 'month', 'godori', 'tsukimi'],
-  paper: 'plain',
   gift: { day: 3, lastClaim: key(today) },
   rush: { best: 8400, runs: 6, bestRound: 5 },
-};
+  meta: { xp: 14800, claimed: 31 },
+  market: { owned: ['deck:classic', 'back:classic', ...garden], equip: {} },
+  journey: { stamps: Object.fromEntries(['gyeongju', 'kamakura', 'seoraksan', 'shirakawago', 'yoshino', 'boseong', 'kyoto', 'pyeongchang', 'jeju', 'yakushima'].map((id) => [id, '2026-09-20'])) },
+  ...over,
+});
 
-// 1. First launch
-await open(null);
-await shot('01-welcome');
-await page.click('[data-begin]');
-await page.waitForTimeout(500);
-await shot('02a-intro');
-await page.waitForTimeout(900);
-await shot('02-level1-tutorial');
+// 1. Home
+await open(player());
+await shot('01-home', 1600);
 
-// 2. Returning player
-await open(base17);
-await shot('03-home');
+// 2. A Flower Road board with gates
+await open(player({ level: 124, stars: stars(123) }));
 await page.click('[data-go="journey"]');
 await page.waitForSelector('.card');
-await page.waitForTimeout(1400);
-await shot('04-game');
-await playPairs(1, 700);
-await page.click('[aria-label="Pause"]');
-await shot('04b-pause');
-await page.click('[data-p="resume"]');
-await page.waitForTimeout(300);
-await playPairs(2, 120);
-await page.waitForTimeout(80);
-await page.screenshot({ path: `${out}/05-path.png` });
-console.log('saved 05-path');
+await page.waitForTimeout(2200);
+await pair();
+await shot('02-gates', 1300);
 
-// 3. Result sheet with a new card draw + seal
-await open({ ...base17, level: 2, stars: {}, hints: 99, seals: [] });
-await page.click('[data-go="journey"]');
-await page.waitForSelector('.card');
-await page.waitForTimeout(1400);
-await playPairs(40, 380);
-await page.waitForSelector('.sheet', { timeout: 6000 });
-await page.waitForTimeout(3200); // let the blossoms bloom and the new card turn over
-await shot('06-result');
-
-// 4. Journey map, seals, album
-await open(base17);
+// 3. The map, with the current place open
+await open(player());
 await page.click('[data-go="map"]');
-await shot('07-map');
-await open(base17);
-await page.click('[data-go="seals"]');
-await page.waitForTimeout(3600); // let the 'seal earned' toast clear
-await shot('08-seals');
-await open(base17);
-await page.click('[data-go="album"]');
-await shot('09-album');
-await page.click('.month__cards button[data-id="31"]');
-await shot('10-card-detail');
+await shot('03-map', 1500);
 
-// 5. New mechanics (tips dismissed), with a board paper
-await open({ ...base17, level: 29, seenTips: ['variants', 'stones', 'gravity', 'snow'], paper: '7', hints: 99 });
-await page.click('[data-go="journey"]');
-await page.waitForSelector('.card');
-await page.waitForTimeout(1400);
-await shot('11-falling-leaves');
-await open({ ...base17, level: 38, seenTips: ['variants', 'stones', 'gravity'], hints: 99, paper: '2' });
-await page.click('[data-go="journey"]');
-await page.waitForSelector('.card');
-await page.waitForTimeout(1400);
-await shot('12-snow-tip');
-await page.click('.sheet .btn');
-await shot('13-snow');
-
-// 6. Settings + paper picker, Daily
-await open(base17);
-await page.click('[data-go="settings"]');
-await shot('14-settings');
-await page.click('[data-act="paper"]');
-await shot('15-papers');
-await open(base17);
-await page.click('[data-go="daily"]');
-await page.waitForSelector('.card');
-await page.waitForTimeout(1400);
-await shot('16-daily');
-
-// 7. Daily gift, Rush, Fever
-await open({ ...base17, gift: { day: 3, lastClaim: null } });
+// 4. Market: Decks
+await open(player());
+await page.click('[data-go="market"]');
 await page.waitForTimeout(900);
-await shot('17-gift');
-await open({ ...base17, hints: 999 });
+await page.locator('[data-tab="decks"]').first().click();
+await shot('04-market-decks', 1500);
+
+// 5. Garden at night
+await open(player());
+await page.click('[data-go="garden"]');
+await page.waitForTimeout(1200);
+if ((await page.getAttribute('[data-time]', 'aria-pressed')) !== 'true') await page.click('[data-time]');
+await page.waitForTimeout(3400); // let the "new pieces" note fade
+await shot('05-garden-night', 400);
+
+// 6. Flower Path
+await open(player({ meta: { xp: 14800, claimed: 33 } }));
+await page.click('[data-go="path"]');
+await shot('06-flower-path', 1600);
+
+// 7. A festival board's result with its passport stamp (Jeju, level 108)
+await open(player({ level: 108, stars: stars(107), journey: { stamps: {} } }));
+await page.click('[data-go="journey"]');
+await page.waitForSelector('.card');
+await page.waitForTimeout(2200);
+for (let k = 0; k < 60 && !(await page.$('.sheet .result')); k++) {
+  if (!(await pair())) await page.waitForTimeout(300);
+  await page.waitForTimeout(260);
+}
+await page.waitForSelector('.sheet .result', { timeout: 20000 });
+await page.waitForTimeout(4600);
+await page.evaluate(() => document.querySelector('.passport')?.scrollIntoView({ block: 'center' }));
+await shot('07-result-stamp', 900);
+
+// 8. Fever: five quick pairs in Rush
+await open(player());
 await page.click('[data-go="rush"]');
 await page.waitForSelector('.card');
-await page.waitForTimeout(1400);
-await playPairs(6, 260); // quick pairs build a ×5 combo → Fever
-await page.waitForTimeout(150);
-await page.screenshot({ path: `${out}/18-fever.png` });
-console.log('saved 18-fever');
-await playPairs(30, 260); // finish the first board → next board
-await page.waitForTimeout(600);
-await shot('19-rush');
-if (process.env.RUSH_END) {
-  await page.waitForSelector('.rush-score', { timeout: 200000 });
-  await shot('20-rush-end');
+await page.waitForTimeout(1600);
+for (let k = 0; k < 5; k++) {
+  await pair();
+  await page.waitForTimeout(240);
 }
+await page.waitForTimeout(250);
+await page.screenshot({ path: `${out}/08-fever.png` });
+console.log('saved 08-fever');
 
 await browser.close();

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Jjak's two native looks: Paper (light) and Ink (dark, in values-night). -->
+    <color name="jjak_background">#F3ECDF</color>
+    <color name="jjak_ink">#2A2724</color>
+    <color name="colorPrimary">#C4472F</color>
+    <color name="colorPrimaryDark">#F3ECDF</color>
+    <color name="colorAccent">#C4472F</color>
+    <!-- Status and navigation bar icons dark on Paper, light on Ink. -->
+    <bool name="jjak_light_bars">true</bool>
+</resources>

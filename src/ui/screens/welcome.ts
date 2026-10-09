@@ -1,39 +1,105 @@
-import { journeyLevel } from '../../engine/levels';
 import { ads } from '../../services/ads';
 import { unlockAudio } from '../../services/audio';
 import { persist, save } from '../../services/storage';
 import { type Screen } from '../app';
-import { frag } from '../dom';
+import { DemoPlayer } from '../demo';
+import { BASIC_DEMOS } from '../demos';
+import { frag, h, wait } from '../dom';
 import { ICONS } from '../icons';
+import { FIRST_MINUTE } from '../launch-plan';
+import { openSheet } from '../modal';
 import { nav } from '../nav';
 
-/** First launch: one calm screen with the three rules, then straight into Level 1. */
+/**
+ * The first minute, shown instead of a page of rules. Four short beats on one
+ * mini board, almost wordless:
+ *   1. the brush pairs two cards and the path draws; then one bend, two bends
+ *   2. your turn: the player makes a pair (target: within ~20 s of the intro's Begin tap)
+ *   3. a blocked pair shakes; its three-bend path is crossed out; clear the way
+ *   4. three quick pairs: 짝 · 짝짝 · 짝짝짝, the combo
+ * Skippable from the first frame. The player's first pair is marked with
+ * performance.mark('jjak:first-pair') and measured from the Begin tap as
+ * 'jjak:begin-to-first-pair' (FIRST_MINUTE in launch-plan.ts).
+ */
+function firstMinute(opts: { replay: boolean; onDone: () => void }): { el: HTMLElement; destroy(): void } {
+  const player = new DemoPlayer(BASIC_DEMOS.bends, { size: 'stage' });
+  const el = frag(`<div class="first${opts.replay ? ' first--replay' : ''}">
+    <header class="first__top">
+      <span class="first__brand"><span class="seal" aria-hidden="true">짝</span><span>Jjak<small><span lang="ko">짝</span> means pair</small></span></span>
+      <button class="btn btn--quiet first__skip" data-first="skip">${opts.replay ? 'Close' : 'Skip'}</button>
+    </header>
+    <div class="first__demo"></div>
+    <footer class="first__foot">
+      <ol class="first__dots" aria-label="Intro progress">${[0, 1, 2, 3].map((i) => `<li data-dot="${i}"></li>`).join('')}</ol>
+      <button class="btn btn--primary btn--block first__go" data-first="go" hidden>${opts.replay ? 'Done' : `Play ${ICONS.play}`}</button>
+    </footer>
+  </div>`);
+  el.querySelector('.first__demo')!.append(player.el);
+  const go = el.querySelector<HTMLButtonElement>('.first__go')!;
+  const dots = [...el.querySelectorAll<HTMLElement>('[data-dot]')];
+  const stage = (n: number) =>
+    dots.forEach((d, i) => {
+      d.classList.toggle('is-on', i === n);
+      d.classList.toggle('is-done', i < n);
+    });
+
+  let ended = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    player.destroy();
+    opts.onDone();
+  };
+  el.addEventListener('click', (e) => {
+    const act = (e.target as HTMLElement).closest<HTMLElement>('[data-first]')?.dataset.first;
+    if (act) end();
+  });
+
+  void (async () => {
+    stage(0);
+    if (!(await player.play(1))) return;
+    stage(1);
+    await player.yourTurn({
+      hintAfter: 900,
+      onPair: (n) => {
+        if (n !== 1 || opts.replay) return;
+        performance.mark(FIRST_MINUTE.firstPairMark);
+        performance.measure(FIRST_MINUTE.measure, FIRST_MINUTE.beginMark, FIRST_MINUTE.firstPairMark);
+      },
+    });
+    await wait(900);
+    stage(2);
+    if (!(await player.swap(BASIC_DEMOS.blocked)) || !(await player.play(1))) return;
+    stage(3);
+    if (!(await player.swap(BASIC_DEMOS.combo)) || !(await player.play(1))) return;
+    dots.forEach((d) => d.classList.add('is-done'));
+    go.hidden = false;
+  })();
+
+  return { el, destroy: () => player.destroy() };
+}
+
+/** First launch, after the intro title's Begin: the first minute, then straight into Level 1. */
 export function welcomeScreen(): Screen {
-  const fan = [8, 20, 44, 28, 36]
-    .map((id, i) => `<svg viewBox="0 0 100 140" style="transform:rotate(${(i - 2) * 11}deg);animation-delay:${i * 60}ms" aria-hidden="true"><use href="#card-${id}"/></svg>`)
-    .join('');
-  const mini = (a: number, b: number) =>
-    `<span class="rule__cards" aria-hidden="true"><svg viewBox="0 0 100 140"><use href="#card-${a}"/></svg><svg viewBox="0 0 100 140"><use href="#card-${b}"/></svg></span>`;
-
-  const el = frag(`<section class="screen welcome">
-    <div class="welcome__brand"><span class="seal" aria-hidden="true">짝</span>Jjak</div>
-    <div class="welcome__fan" aria-hidden="true">${fan}</div>
-    <h1>Find the pairs.<br>Clear the seasons.</h1>
-    <p class="welcome__lede"><b>Jjak</b> (<span lang="ko">짝</span>) is Korean for “pair”. Match flowers from the 48-card deck that Korea and Japan share, and learn their names as you go.</p>
-    <ul class="panel rules" aria-label="Three rules">
-      <li class="rule">${mini(8, 11)}<span><b>Same flower, same number</b>Any two cards of one flower make a pair.</span></li>
-      <li class="rule"><span class="rule__glyph" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M8 32V12h24v14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="32" r="4" fill="var(--accent)"/><circle cx="32" cy="26" r="4" fill="var(--accent)"/></svg></span><span><b>Two bends at most</b>The line between them may turn twice and run around the edge.</span></li>
-      <li class="rule"><span class="rule__glyph serif" aria-hidden="true">짝짝</span><span><b>Keep the rhythm</b>Pairs made quickly build a combo.</span></li>
-    </ul>
-    <button class="btn btn--primary btn--block" data-begin>Begin ${ICONS.play}</button>
-  </section>`);
-
-  el.querySelector('[data-begin]')!.addEventListener('click', async () => {
+  const start = () => {
     unlockAudio();
     save.onboarded = true;
     persist();
     void ads.start();
-    nav.game(journeyLevel(1));
-  });
-  return { name: 'welcome', el };
+    nav.journey(1);
+  };
+  const flow = firstMinute({ replay: false, onDone: start });
+  const el = h('section', { class: 'screen welcome' }, flow.el);
+  return { name: 'welcome', el, destroy: flow.destroy };
+}
+
+/** Replay intro (How to Play): the same first minute over whatever is open, then back. */
+export function replayIntro(): void {
+  let close = () => {};
+  const flow = firstMinute({ replay: true, onDone: () => close() });
+  const sheet = openSheet(flow.el, { label: 'Intro', dismissible: true });
+  sheet.el.classList.add('sheet--full');
+  sheet.el.parentElement?.classList.add('scrim--full');
+  close = () => sheet.close();
+  void sheet.closed.then(flow.destroy);
 }

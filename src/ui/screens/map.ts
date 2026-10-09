@@ -4,18 +4,28 @@ import {
   type Focus,
   ROUTE,
   ROUTE_CHAPTERS,
+  ROUTE_LEVELS,
   ROUTE_LEVELS_PER_CHAPTER,
   SEASON_NAMES,
   chapterFirstLevel,
   festivalTitle,
   routeOf,
 } from '../../data/route';
-import { type LevelSpec, journeyLevel, windOf } from '../../engine/levels';
+import { type LevelSpec, windOf } from '../../engine/levels';
+import { shownSpec, shownYears } from '../../director';
+import { GOALS } from '../../engine/goals';
+import { MECHANICS } from '../../engine/mechanics';
+
+/** How far the fold's two panels overlap at their join (px). */
+const FOLD_SEAM_PX = 4;
+/** A small brushed ring: the mark of a level with a goal (its third blossom). */
+const GOAL_MARK = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8C5.8 2.8 2.8 6 2.8 10s3 7.2 7.2 7.2 7.2-3 7.2-7.2c0-3.2-1.8-5.6-4.6-6.7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
 import { levelsToLantern, syncStamps } from '../../services/progress';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
-import { esc, frag } from '../dom';
+import { esc, frag, h } from '../dom';
 import { ICONS } from '../icons';
+import { FLIP_EASE, FLIP_MS, flip, measure, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 /** What each chapter features, for the open chapter's note. */
@@ -27,6 +37,12 @@ const FOCUS_NOTE: Record<Focus, { en: string; native: string; note: string }> = 
   lucky: { en: 'Lucky cards', native: '복 · 福', note: 'A bonus pair hides on these boards. Pair it for petals.' },
   knots: { en: 'Knots', native: '매듭 · 結び', note: 'A tied card can’t be picked until a card beside it clears.' },
   wind: { en: 'Wind', native: '바람 · 風', note: 'After each pair, cards drift sideways or up with the wind.' },
+  gates: { en: 'Gates', native: '문 · 門', note: 'A gate opens when you pair the flower painted on it.' },
+  fences: { en: 'Fences', native: '울타리 · 垣', note: 'Paths can’t cross the bamboo fences between cards.' },
+  torii: { en: 'Torii', native: '토리이 · 鳥居', note: 'A path into one torii comes out of its twin, heading the same way.' },
+  streams: { en: 'Streams', native: '개울 · 小川', note: 'Paths cross water only in a straight line. No turning on it.' },
+  seals: { en: 'Seals', native: '도장 · 印', note: 'Sealed pairs go in order: clear seal 1, then 2, then 3.' },
+  ink: { en: 'Wet ink', native: '먹 · 墨', note: 'Wet ink blocks paths. It dries a little with every pair.' },
   mix: { en: 'A mix', native: '섞기 · 混', note: 'Everything you’ve met so far, side by side.' },
 };
 
@@ -37,11 +53,17 @@ function twistOf(spec: LevelSpec): { glyph: string; name: string } {
   if (w) return { glyph: '風', name: `wind ${w}` };
   if (spec.snow) return { glyph: '雪', name: 'first snow' };
   if (spec.knots) return { glyph: '結', name: 'knots' };
+  if (spec.gates) return { glyph: MECHANICS.gates.glyph, name: 'gates' };
+  if (spec.fences) return { glyph: MECHANICS.fences.glyph, name: 'fences' };
+  if (spec.torii) return { glyph: MECHANICS.torii.glyph, name: 'torii' };
+  if (spec.streams) return { glyph: MECHANICS.streams.glyph, name: 'streams' };
+  if (spec.seals) return { glyph: MECHANICS.seals.glyph, name: 'seals' };
+  if (spec.ink) return { glyph: MECHANICS.ink.glyph, name: 'wet ink' };
   if (spec.stones) return { glyph: '石', name: 'stones' };
   return { glyph: '', name: '' };
 }
 
-const YEAR_LABEL = (y: number) => (y === 0 ? 'The road' : `Wanderer ${y}`);
+const YEAR_LABEL = (y: number) => (y === 0 ? 'The road' : `Year ${y + 1}`);
 
 /**
  * The Flower Road: fifty places from Gyeongju to Okinawa, top to bottom. Each
@@ -53,7 +75,9 @@ export function mapScreen(): Screen {
   installStampDefs();
   const unlocked = save.level;
   const here = routeOf(unlocked);
-  const maxYear = here.year;
+  // Nothing past level 600 shows until the player has cleared it (the road reads as finished).
+  const endless = save.level > ROUTE_LEVELS;
+  const maxYear = shownYears(save.level);
   let year = maxYear;
   let open: number | null = here.index;
 
@@ -73,7 +97,7 @@ export function mapScreen(): Screen {
         <div><b>${unlocked}</b><span>Level</span></div>
       </div>
       ${
-        maxYear > 0
+        endless && maxYear > 0
           ? `<div class="road__years" role="tablist" aria-label="Journey year">${Array.from({ length: maxYear + 1 }, (_, y) => `<button role="tab" data-year="${y}" aria-selected="${y === year}">${YEAR_LABEL(y)}</button>`).join('')}</div>`
           : ''
       }
@@ -84,13 +108,18 @@ export function mapScreen(): Screen {
         <span><span class="ja" aria-hidden="true">雪</span>First snow</span>
         <span><span class="ja" aria-hidden="true">結</span>Knots</span>
         <span><span class="ja" aria-hidden="true">風</span>Wind</span>
+        <span><span class="ja" aria-hidden="true">${MECHANICS.gates.glyph}</span>Gates</span>
+        <span><span class="ja" aria-hidden="true">${MECHANICS.fences.glyph}</span>Fences</span>
+        <span><span class="goal-key" aria-hidden="true">${GOAL_MARK}</span>Level goal</span>
         <span><span class="ja lucky-key" aria-hidden="true">福</span>Lucky cards</span>
         <span>${ICONS.lantern}Lantern gift</span>
       </div>
-      <p class="road__end">Past Okinawa the road begins again, as a Wanderer: the same fifty places, fuller boards.</p>
+      ${endless ? '<p class="road__end">Past Okinawa the road goes on: the fifty places again, in new seasons, with a stamp for every place each year.</p>' : ''}
     </div>
   </section>`);
   const list = el.querySelector<HTMLElement>('.road__stops')!;
+
+  const stampOf = (id: string, y: number): string | null => (y === 0 ? save.journey.stamps[id] : save.journey.yearStamps[`${id}@${y}`]) ?? null;
 
   const chapterStars = (first: number) => {
     let got = 0;
@@ -103,16 +132,18 @@ export function mapScreen(): Screen {
     for (let n = first; n < first + ROUTE_LEVELS_PER_CHAPTER; n++) {
       const stars = save.stars[n] ?? 0;
       const isLocked = n > unlocked;
-      const spec = journeyLevel(n);
+      const spec = shownSpec(n);
       const tw = twistOf(spec);
       const fest = !!spec.festival;
       const lantern = n >= unlocked && levelsToLantern(n) === 0;
-      const extras = [tw.name, spec.lucky ? 'lucky cards' : '', fest ? 'festival board' : '', lantern ? 'lantern gift' : ''].filter(Boolean).join(', ');
+      const goal = spec.goal ? GOALS[spec.goal] : null;
+      const extras = [tw.name, goal ? `goal: ${goal.name.toLowerCase()}` : '', spec.lucky ? 'lucky cards' : '', fest ? 'festival board' : '', lantern ? 'lantern gift' : ''].filter(Boolean).join(', ');
       const label = `Level ${n}${n === unlocked ? ', next to play' : ''}${isLocked ? ', locked' : n < unlocked ? `, ${stars} of 3 blossoms` : ''}${extras ? `, ${extras}` : ''}`;
       cells += `<button class="lvl${n === unlocked ? ' lvl--now' : ''}${fest ? ' lvl--fest' : ''}" data-level="${n}" ${isLocked ? 'disabled' : ''} aria-label="${label}"${n === unlocked ? ' aria-current="step"' : ''}>
         <span class="lvl__n">${n}</span>
         <span class="lvl__stars" aria-hidden="true">${[0, 1, 2].map((k) => `<i class="${k < stars ? 'on' : ''}"></i>`).join('')}</span>
         ${tw.glyph ? `<span class="lvl__twist ja" aria-hidden="true">${tw.glyph}</span>` : ''}
+        ${goal ? `<span class="lvl__goal" aria-hidden="true">${GOAL_MARK}</span>` : ''}
         ${lantern ? `<span class="lvl__lan" aria-hidden="true">${ICONS.lantern}</span>` : spec.lucky ? '<span class="lvl__luck ja" aria-hidden="true">福</span>' : ''}
       </button>`;
     }
@@ -122,7 +153,7 @@ export function mapScreen(): Screen {
   function stopBody(i: number, first: number): string {
     const c = ROUTE[i];
     const focus = FOCUS_NOTE[year > 0 && c.focus === 'basics' ? 'mix' : c.focus];
-    const stamp = save.journey.stamps[c.id];
+    const stamp = stampOf(c.id, year);
     return `<div class="stop__body">
       <p class="stop__postcard">${esc(c.postcard)}</p>
       <p class="stop__focus"><b>${esc(focus.en)}</b> <span class="muted">${focus.native}</span> · ${esc(focus.note)}</p>
@@ -142,7 +173,7 @@ export function mapScreen(): Screen {
       const done = first + ROUTE_LEVELS_PER_CHAPTER - 1 < unlocked;
       const got = chapterStars(first);
       const max = ROUTE_LEVELS_PER_CHAPTER * 3;
-      const stamp = save.journey.stamps[c.id] ?? null;
+      const stamp = stampOf(c.id, year);
       const season = SEASON_NAMES[c.season];
       const country = COUNTRY_NAMES[c.country];
       const isOpen = open === i && !locked;
@@ -169,9 +200,41 @@ export function mapScreen(): Screen {
     list.innerHTML = html;
   }
 
+  let folding = false;
   function toggle(i: number) {
+    if (folding) return;
     const was = open;
     open = open === i ? null : i;
+    // Closing: the levels fade up and out first, then the road closes the gap.
+    const closing = was != null ? list.querySelector<HTMLElement>(`.stop[data-ch="${was}"] .stop__body`) : null;
+    if (closing && !reducedMotion()) {
+      folding = true;
+      closing.classList.remove('is-in');
+      closing.classList.add('is-out');
+      setTimeout(() => {
+        folding = false;
+        relayout(was);
+      }, 150);
+      return;
+    }
+    relayout(was);
+  }
+
+  function relayout(was: number | null) {
+    endFold?.();
+    // FLIP: the stops below the change glide to their new places (transforms
+    // only) while the opened chapter's levels fade in under them.
+    const foldCard = was == null ? null : list.querySelector<HTMLElement>(`.stop[data-ch="${was}"] .stop__card`);
+    const foldFrom = foldCard?.getBoundingClientRect().height ?? 0;
+    const from = Math.min(...[was, open].filter((k): k is number => k != null));
+    const sc = el.querySelector<HTMLElement>('.road__list')!;
+    const view = sc.getBoundingClientRect();
+    const below = [...list.querySelectorAll<HTMLElement>('.stop')].filter((li) => {
+      if (Number(li.dataset.ch) <= from) return false;
+      const r = li.getBoundingClientRect();
+      return r.top < view.bottom + 400 && r.bottom > view.top - 400;
+    });
+    const before = measure(below);
     for (const k of [was, open]) {
       if (k == null) continue;
       const li = list.querySelector<HTMLElement>(`.stop[data-ch="${k}"]`);
@@ -185,14 +248,50 @@ export function mapScreen(): Screen {
         const body = li.querySelector<HTMLElement>('.stop__body')!;
         body.classList.add('is-in');
         // Keep the opened stop in view without jumping the page around.
-        requestAnimationFrame(() => {
-          const sc = el.querySelector<HTMLElement>('.road__list')!;
-          const r = li.getBoundingClientRect();
-          const box = sc.getBoundingClientRect();
-          if (r.bottom > box.bottom - 8) sc.scrollBy({ top: Math.min(r.bottom - box.bottom + 16, r.top - box.top - 8), behavior: 'smooth' });
-        });
+        const r = li.getBoundingClientRect();
+        const box = sc.getBoundingClientRect();
+        if (r.bottom > box.bottom - 8) requestAnimationFrame(() => sc.scrollBy({ top: Math.min(r.bottom - box.bottom + 16, r.top - box.top - 8), behavior: 'smooth' }));
       }
     }
+    flip(before);
+    if (foldCard) settleFold(foldCard, foldFrom);
+  }
+
+  /**
+   * A closing card's own height settles with the stops below instead of
+   * snapping: its paint moves to two panels behind its content, the top and a
+   * rounded tail that slides up under it in step with the FLIP (transforms only).
+   */
+  let endFold: (() => void) | null = null;
+  function settleFold(card: HTMLElement, fromH: number): void {
+    const li = card.parentElement;
+    if (!li || reducedMotion()) return;
+    li.classList.add('is-folding');
+    const toH = card.offsetHeight;
+    const dy = fromH - toH;
+    if (dy < 1) {
+      li.classList.remove('is-folding');
+      return;
+    }
+    const r = parseFloat(getComputedStyle(card).borderBottomLeftRadius);
+    const top = card.offsetTop;
+    const tail = h('i', { class: 'stop__fold stop__fold--tail', 'aria-hidden': 'true' });
+    const upper = h('i', { class: 'stop__fold stop__fold--top', 'aria-hidden': 'true' });
+    // Each panel overlaps the other by FOLD_SEAM_PX and clips it away, so
+    // neither one's edge (or the current stop's inset ring) shows at the join.
+    Object.assign(tail.style, { top: `${top + toH - r - FOLD_SEAM_PX}px`, height: `${dy + r + FOLD_SEAM_PX}px`, clipPath: `inset(${FOLD_SEAM_PX}px -48px -48px -48px)` });
+    Object.assign(upper.style, { top: `${top}px`, height: `${toH - r + FOLD_SEAM_PX}px`, clipPath: `inset(-48px -48px ${FOLD_SEAM_PX}px -48px)` });
+    li.append(tail, upper);
+    const anim = tail.animate([{ transform: 'none' }, { transform: `translateY(${-dy}px)` }], { duration: FLIP_MS, easing: FLIP_EASE, fill: 'forwards' });
+    const done = () => {
+      anim.cancel();
+      tail.remove();
+      upper.remove();
+      li.classList.remove('is-folding');
+      if (endFold === done) endFold = null;
+    };
+    endFold = done;
+    anim.onfinish = done;
   }
 
   render();
@@ -202,7 +301,7 @@ export function mapScreen(): Screen {
     const t = e.target as HTMLElement;
     const lvl = t.closest<HTMLButtonElement>('[data-level]');
     if (lvl && !lvl.disabled) {
-      nav.game(journeyLevel(Number(lvl.dataset.level)));
+      nav.journey(Number(lvl.dataset.level));
       return;
     }
     const head = t.closest<HTMLButtonElement>('[data-open]');

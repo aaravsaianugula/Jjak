@@ -2,6 +2,8 @@ import { APP_VERSION, LINKS } from '../../config';
 import { applyCosmetics, paperName } from '../../services/market';
 import { ads } from '../../services/ads';
 import { store } from '../../services/store';
+import { Capacitor } from '@capacitor/core';
+import { openRemoveAds } from '../remove-ads';
 import { music } from '../../services/music';
 import { REMINDER_TIMES, disableReminder, enableReminder } from '../../services/reminders';
 import { resetSave, save, persist, type Theme } from '../../services/storage';
@@ -10,6 +12,12 @@ import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { choose, openSheet } from '../modal';
 import { nav } from '../nav';
+import { slidePill } from '../motion';
+import { MECHANIC_IDS, MECHANICS } from '../../engine/mechanics';
+import { DemoPlayer } from '../demo';
+import { type DemoScript, BASIC_DEMOS, GOAL_DEMOS, MECHANIC_DEMOS, VARIANTS_DEMO } from '../demos';
+import { practiceMet } from './practice';
+import { replayIntro } from './welcome';
 
 export function settingsScreen(): Screen {
   const row = (icon: string, title: string, sub = '') => `<span class="row__icon" aria-hidden="true">${icon}</span><span class="row__text">${title}${sub ? `<small>${sub}</small>` : ''}</span>`;
@@ -48,12 +56,14 @@ export function settingsScreen(): Screen {
       <div class="list list--icons" role="group" aria-labelledby="set-support">
         ${save.adFree
           ? `<div class="row row--feature">${row(ICONS.heart, 'Ads removed', 'Thank you for supporting Jjak. Optional reward ads stay available.')}<span class="row__end" style="color:var(--good-text)" aria-hidden="true">${ICONS.check}</span></div>`
-          : `<button class="row row--feature" data-act="buy">${row(ICONS.heart, 'Remove ads', 'No ads between boards and no banners. Rewards you choose stay optional.')}<span class="price${store.available ? '' : ' price--off'}">${store.available ? esc(store.price) : 'Android'}</span></button>`}
+          : `<button class="row row--feature" data-act="buy">${row(ICONS.heart, 'Remove ads', 'No ads between boards and no banners. Rewards you choose stay optional.')}${store.available ? `<span class="price">${esc(store.price)}</span>` : Capacitor.isNativePlatform() ? chevron : '<span class="price price--off">Android</span>'}</button>`}
         <button class="row" data-act="restore">${row(ICONS.restart, 'Restore purchase', 'Already bought it on another device?')}${chevron}</button>
       </div>
       <h2 class="section-label" id="set-help">Help &amp; privacy</h2>
       <div class="list list--icons" role="group" aria-labelledby="set-help">
         <button class="row" data-act="how">${row(ICONS.help, 'How to play')}${chevron}</button>
+        ${practiceMet().length ? `<button class="row" data-act="practice">${row(ICONS.play, 'Practice', 'Intros and gentle boards for ideas you’ve met')}${chevron}</button>` : ''}
+        <button class="row" data-act="playstyle">${row(ICONS.style, 'Your play style', 'Strengths, growth edges and best runs')}${chevron}</button>
         ${ads.privacyOptionsRequired ? `<button class="row" data-act="consent">${row(ICONS.shield, 'Ad privacy choices', 'Change your consent')}${chevron}</button>` : ''}
         <a class="row" href="${esc(LINKS.privacy)}" target="_blank" rel="noopener">${row(ICONS.doc, 'Privacy policy')}<span class="row__end" aria-hidden="true">${ICONS.external}</span><span class="sr-only">(opens in browser)</span></a>
         <button class="row row--danger" data-act="reset">${row(ICONS.trash, 'Reset progress', 'Clears levels, petals and album')}${chevron}</button>
@@ -76,6 +86,7 @@ export function settingsScreen(): Screen {
       b.setAttribute('aria-checked', String(save.settings[k]));
     });
     el.querySelectorAll<HTMLElement>('[data-set-theme]').forEach((b) => b.setAttribute('aria-pressed', String(save.settings.theme === b.dataset.setTheme)));
+    el.querySelectorAll<HTMLElement>('.seg').forEach(slidePill);
   };
   sync();
 
@@ -107,13 +118,12 @@ export function settingsScreen(): Screen {
       return;
     }
     const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
-    if (act === 'how') showHowToPlay();
+    if (act === 'how') showHowToPlay({ practice: true });
+    if (act === 'practice') nav.practice();
+    if (act === 'playstyle') nav.playstyle();
     if (act === 'buy') {
-      if (!store.available) return toast('Remove ads is available in the Android app from Google Play.');
-      if (await store.buyRemoveAds()) {
-        toast('Ads removed. Thank you!');
-        nav.settings();
-      }
+      if (!Capacitor.isNativePlatform()) return toast('Remove ads is available in the Android app from Google Play.');
+      if (await openRemoveAds()) nav.settings();
     }
     if (act === 'restore') {
       const owned = await store.restore();
@@ -139,23 +149,74 @@ export function settingsScreen(): Screen {
   return { name: 'settings', el };
 }
 
-export function showHowToPlay(): void {
-  const content = frag(`<div>
+/**
+ * How to play: short and visual. Small looping demo tiles (the pair rule,
+ * bends, combos, every mechanic, goals), one line each for the Market, Garden
+ * and Flower Path, and Replay intro.
+ */
+export function showHowToPlay(opts: { practice?: boolean } = {}): void {
+  const tiles: { label: string; script: DemoScript; wide?: boolean }[] = [
+    { label: 'Same flower', script: VARIANTS_DEMO },
+    { label: 'Up to two bends', script: BASIC_DEMOS.bends },
+    { label: 'Never three', script: BASIC_DEMOS.blocked },
+    { label: 'Combos · Fever', script: BASIC_DEMOS.fever },
+    ...MECHANIC_IDS.map((m) => ({ label: MECHANICS[m].name, script: MECHANIC_DEMOS[m] })),
+    { label: 'Level goals', script: GOAL_DEMOS.straight, wide: true },
+  ];
+  const players = tiles.map((t) => new DemoPlayer(t.script, { size: 'tile' }));
+  const content = frag(`<div class="howto">
     <div class="sheet__head">
       <div class="detail__kind">How to play · <span lang="ko">방법</span></div>
       <h2>Make a jjak</h2>
     </div>
-    <ol class="howto">
-      <li><span><b>Tap two cards of the same flower.</b>Every card shows its month number in the corner. Matching numbers always pair.</span></li>
-      <li><span><b>Mind the path.</b>The two cards must connect with a line of up to three straight strokes (two turns) that crosses only empty space. The line may travel around the outside of the board.</span></li>
-      <li><span><b>Chain combos.</b>Make your next pair within four seconds to build a combo: 짝짝, 짝짝짝…</span></li>
-      <li><span><b>Three blossoms per board.</b>Clear it, use no hints or shuffles, and beat the par time.</span></li>
-      <li><span><b>Stuck?</b>If no pairs are possible the board reshuffles itself. Hints and shuffles are there when you want them.</span></li>
-    </ol>
-    <p class="howto__foot">Daily Jjak gives everyone in the world the same board each day. Zen has no clock at all.</p>
+    <div class="howto__tiles"></div>
+    <ul class="howto__more">
+      <li><span class="howto__glyph ja" aria-hidden="true">市</span><span><b>Market</b>Petals buy papers, brushes and garden pieces.</span></li>
+      <li><span class="howto__glyph ja" aria-hidden="true">庭</span><span><b>Garden</b>Place your pieces; a visitor calls each day.</span></li>
+      <li><span class="howto__glyph ja" aria-hidden="true">道</span><span><b>Flower Path</b>Every board earns rank, missions and chests.</span></li>
+    </ul>
   </div>`);
-  const btn = h('button', { class: 'btn btn--primary btn--block', style: 'margin-top:16px' }, 'Got it');
-  content.append(btn);
+  const grid = content.querySelector('.howto__tiles')!;
+  tiles.forEach((t, i) => {
+    const fig = h('figure', { class: `howto__tile${t.wide ? ' howto__tile--wide' : ''}` }, players[i].el, h('figcaption', {}, t.label));
+    grid.append(fig);
+  });
+  const replay = h('button', { class: 'btn btn--ghost btn--block', html: `${ICONS.play}<span>Replay intro</span>` });
+  const btn = h('button', { class: 'btn btn--primary btn--block' }, 'Got it');
+  // The Practice room, once there's something in it (not from a board: leaving would quit it).
+  const practice = opts.practice && practiceMet().length ? h('button', { class: 'btn btn--ghost btn--block', html: `${ICONS.play}<span>Practice room</span>` }) : null;
+  content.append(h('div', { class: 'sheet__actions' }, ...(practice ? [practice] : []), replay, btn));
   const s = openSheet(content, { label: 'How to play', close: true });
   btn.addEventListener('click', () => s.close());
+  practice?.addEventListener('click', () => {
+    s.close();
+    nav.practice();
+  });
+  replay.addEventListener('click', () => replayIntro());
+
+  // Loop only the tiles on screen.
+  const running = new Set<number>();
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const i = Number((e.target as HTMLElement).dataset.tile);
+        if (e.isIntersecting && !running.has(i)) {
+          running.add(i);
+          void players[i].play(Infinity, { fresh: true });
+        } else if (!e.isIntersecting && running.has(i)) {
+          running.delete(i);
+          players[i].load(tiles[i].script);
+        }
+      }
+    },
+    { root: s.el, threshold: 0.4 },
+  );
+  players.forEach((p, i) => {
+    p.el.dataset.tile = String(i);
+    io.observe(p.el);
+  });
+  void s.closed.then(() => {
+    io.disconnect();
+    players.forEach((p) => p.destroy());
+  });
 }

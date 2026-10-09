@@ -13,8 +13,8 @@
   --g-urgent: rgba(196, 71, 47, 0.4);
   --g-lift: 0 16px 22px -12px rgba(60, 40, 20, 0.55), 0 4px 8px -4px rgba(60, 40, 20, 0.3);
   --g-hairline: color-mix(in srgb, var(--line) 75%, transparent);
-  --g-ease-spring: cubic-bezier(0.3, 1.45, 0.5, 1);
-  --g-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --g-ease-spring: var(--ease-settle);
+  --g-ease-out: var(--ease-out);
   --g-wash: 1;
 }
 @media (prefers-color-scheme: dark) {
@@ -155,10 +155,10 @@
   white-space: nowrap;
   pointer-events: none;
   transform: translateY(-50%);
-  animation: g-banner-in 520ms var(--g-ease-spring) both;
+  animation: g-banner-in 440ms var(--g-ease-spring) 80ms both;
 }
 .game__top .banner.is-out {
-  animation: g-banner-out 260ms ease-in both;
+  animation: g-banner-out 240ms var(--ease-in) both;
 }
 .game__top .banner::before {
   content: '';
@@ -204,7 +204,7 @@
 @keyframes g-banner-in {
   0% {
     opacity: 0;
-    transform: translateY(-30%) scale(0.86);
+    transform: translateY(-36%) scale(0.95);
   }
   100% {
     opacity: 1;
@@ -371,12 +371,21 @@
   opacity: 0;
   transform: translateX(-6px);
   animation: none;
-  transition: max-width 260ms var(--g-ease-out), opacity 220ms ease, transform 260ms var(--g-ease-out);
+  /* Width never animates (no layout per frame): it opens at once while the text is
+     still invisible, and closes only after the text has faded. */
+  transition:
+    opacity 200ms ease,
+    transform 260ms var(--g-ease-out),
+    max-width 0s linear 220ms;
 }
 .game .combo.is-on {
   max-width: 260px;
   opacity: 1;
   transform: none;
+  transition:
+    opacity 220ms ease,
+    transform 300ms var(--g-ease-out),
+    max-width 0s;
 }
 .game .combo b {
   display: inline-block;
@@ -398,11 +407,11 @@
 }
 @keyframes g-combo-pop {
   0% {
-    transform: scale(0.8);
-    opacity: 0.4;
+    transform: scale(0.9);
+    opacity: 0.5;
   }
   45% {
-    transform: scale(1.14);
+    transform: scale(1.06);
     opacity: 1;
   }
 }
@@ -425,24 +434,9 @@
   border-radius: 3px;
   background: var(--gold);
 }
-/* The window drains; near the end it cools from gold to ash — keep the rhythm. */
-.game .combo-bar.on i {
-  animation:
-    combo-drain var(--combo-ms, 4s) linear forwards,
-    g-ember var(--combo-ms, 4s) linear forwards;
-}
-@keyframes g-ember {
-  0%,
-  62% {
-    background-color: var(--gold);
-  }
-  100% {
-    background-color: var(--muted);
-  }
-}
+/* The drain and its gold-to-ash cooling run as Web Animations (game.ts restartComboBar). */
 .game.is-fever .combo-bar i {
   background: var(--accent);
-  animation-name: combo-drain;
 }
 .fever-tag {
   position: relative;
@@ -457,7 +451,14 @@
   color: var(--accent-ink);
   white-space: nowrap;
   opacity: 0;
-  transition: max-width 300ms var(--g-ease-out), padding 300ms var(--g-ease-out), opacity 200ms ease;
+  transform: scale(0.92);
+  transform-origin: center;
+  /* As with the combo: only opacity and transform move; the size changes while hidden. */
+  transition:
+    opacity 200ms ease,
+    transform 260ms var(--g-ease-out),
+    max-width 0s linear 220ms,
+    padding 0s linear 220ms;
 }
 .fever-tag b {
   font-family: var(--font-serif);
@@ -485,10 +486,14 @@
   max-width: 90px;
   padding: 3px 10px 5px;
   opacity: 1;
+  transform: none;
+  transition:
+    opacity 220ms ease,
+    transform 320ms var(--g-ease-spring),
+    max-width 0s,
+    padding 0s;
 }
-.fever-tag.is-on::after {
-  animation: combo-drain var(--fever-ms, 6s) linear forwards;
-}
+/* .fever-tag::after drains via a Web Animation (game.ts startFever). */
 
 /* ───────────────────────────── Stage + board ───────────────────────────── */
 .game .stage {
@@ -501,6 +506,8 @@
 }
 .game .board {
   z-index: 1;
+  /* Pause blur eases both ways (the transition lives on the base, not only the paused state). */
+  transition: filter 300ms ease;
 }
 .game .board.is-swap {
   animation: g-swap 420ms var(--g-ease-out);
@@ -577,9 +584,13 @@
 .game .card svg {
   border-radius: inherit;
 }
-/* Falling leaves: keep main.css's slide (this file's base transition would replace it). */
-.game .card.is-falling {
-  transition: top 300ms cubic-bezier(0.3, 0.7, 0.35, 1.15), transform 160ms ease;
+/* Falling leaves and wind: moved cards glide on `translate` (set from JS, FLIP-style)
+   and settle with the faintest give; no top/left animation, so no layout per frame. */
+.game .card.is-sliding {
+  transition:
+    translate 380ms var(--ease-settle),
+    transform 240ms var(--g-ease-spring),
+    opacity 200ms ease;
 }
 /* Lift shadow: only painted for the lifted cards. */
 .game .card::before {
@@ -610,6 +621,37 @@
   z-index: 4;
 }
 
+/* ───────────── Stones: river stones and a small cairn (돌탑), moss on their shoulders ─────────────
+   Painted as SVG (matte planes that follow the form, brushed strata, a moss
+   cushion fading into the rock, an ink edge, a contact shadow) and set as the
+   stone's background; three shapes alternate across the board. Generated art:
+   edit the shapes, not the encoding. */
+.game .stone {
+  border-radius: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cdefs%3E%3CradialGradient id='cs'%3E%3Cstop offset='0' stop-opacity='.4'/%3E%3Cstop offset='.55' stop-opacity='.16'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='sh' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='.45' stop-color='%231e1b18' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%231e1b18' stop-opacity='.42'/%3E%3C/linearGradient%3E%3ClinearGradient id='m' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2393a95c'/%3E%3Cstop offset='.5' stop-color='%236c8743'/%3E%3Cstop offset='1' stop-color='%2355703a' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='ml' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23b9cc7e'/%3E%3Cstop offset='1' stop-color='%2393ab5c' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='g' x1='.2' y1='0' x2='.55' y2='1'%3E%3Cstop offset='0' stop-color='%23a8a196'/%3E%3Cstop offset='1' stop-color='%236b655c'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cellipse cx='50' cy='128' rx='46' ry='9.5' fill='url(%23cs)'/%3E%3Cpath d='M10 121C7 112 6 98 7 86C8 70 13 56 21 44L31 30C39 22 49 17 60 17C69 17 77 20 83 26C90 34 93 46 94 58C96 74 96 92 93 106C91 115 88 121 83 125C70 133 26 134 10 121Z' fill='url(%23g)'/%3E%3Cpath d='M31 30C39 22 49 17 60 17C69 17 77 20 83 26C76 28 66 31 56 31C46 31 38 31 31 30Z' fill='%23e6e0d3' opacity='0.35'/%3E%3Cpath d='M21 44L31 30C38 31 46 31 56 31C48 40 42 54 40 72C38 88 38 104 40 122C26 120 14 118 10 121C7 112 6 98 7 86C8 70 13 56 21 44Z' fill='%23ddd6c8' opacity='0.14'/%3E%3Cpath d='M83 26C90 34 93 46 94 58C96 74 96 92 93 106C91 115 88 121 83 125C78 110 76 92 74 74C72 56 70 40 83 26Z' fill='%232e2a26' opacity='0.3'/%3E%3Cpath d='M10 121C7 112 6 98 7 86C8 70 13 56 21 44L31 30C39 22 49 17 60 17C69 17 77 20 83 26C90 34 93 46 94 58C96 74 96 92 93 106C91 115 88 121 83 125C70 133 26 134 10 121Z' fill='url(%23sh)'/%3E%3Cpath d='M12 74Q30 66 50 70Q30 68.4 12 74Z' fill='%23433e38' opacity='0.3'/%3E%3Cpath d='M44 62Q62 56 80 60Q62 58 44 62Z' fill='%23433e38' opacity='0.25'/%3E%3Cpath d='M14 98Q40 90 70 96Q40 92.6 14 98Z' fill='%23efe9dd' opacity='0.22'/%3E%3Cpath d='M46 108Q66 102 88 106Q66 104.2 46 108Z' fill='%23433e38' opacity='0.28'/%3E%3Cpath d='M62 34Q66 48 64 64Q66 49.6 62 34Z' fill='%2336322d' opacity='0.32'/%3E%3Cpath d='M18 84Q28 80 40 83Q28 81.2 18 84Z' fill='%23efe9dd' opacity='0.3'/%3E%3Cpath d='M56 84Q70 79 86 82Q70 80.4 56 84Z' fill='%23433e38' opacity='0.22'/%3E%3Cpath d='M22 114Q34 110 48 113Q34 111.4 22 114Z' fill='%23433e38' opacity='0.25'/%3E%3Cpath d='M70 72Q80 68 90 72Q80 69.1 70 72Z' fill='%23efe9dd' opacity='0.2'/%3E%3Cpath d='M24 42C28 33 36 26 46 23C54 20 64 19 72 21C78 23 83 26 85 30C81 32 78 36 76 41C72 38 66 39 63 44C58 40 51 41 48 47C43 43 36 44 33 50C30 46 26 44 24 42Z' fill='url(%23m)'/%3E%3Cpath d='M34 32C40 27 48 24 56 23C64 22 71 23 76 26C69 26 62 28 57 31C50 29 42 30 34 32Z' fill='url(%23ml)' opacity='.85'/%3E%3Cpath d='M10 121C7 112 6 98 7 86C8 70 13 56 21 44L31 30C39 22 49 17 60 17C69 17 77 20 83 26C90 34 93 46 94 58C96 74 96 92 93 106C91 115 88 121 83 125C70 133 26 134 10 121Z' fill='none' stroke='%232b2824' stroke-width='1.1' stroke-linejoin='round' opacity='.6'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+.game .stone:nth-child(3n + 1) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cdefs%3E%3CradialGradient id='cs'%3E%3Cstop offset='0' stop-opacity='.4'/%3E%3Cstop offset='.55' stop-opacity='.16'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='sh' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='.45' stop-color='%231e1b18' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%231e1b18' stop-opacity='.42'/%3E%3C/linearGradient%3E%3ClinearGradient id='m' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2393a95c'/%3E%3Cstop offset='.5' stop-color='%236c8743'/%3E%3Cstop offset='1' stop-color='%2355703a' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='ml' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23b9cc7e'/%3E%3Cstop offset='1' stop-color='%2393ab5c' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='g' x1='.2' y1='0' x2='.55' y2='1'%3E%3Cstop offset='0' stop-color='%23aeb1ac'/%3E%3Cstop offset='1' stop-color='%23646966'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cellipse cx='50' cy='129' rx='48' ry='9' fill='url(%23cs)'/%3E%3Cpath d='M7 113C5 99 16 84 36 80C46 78 58 78 68 79C84 81 96 93 94 110C93 124 76 132 52 133C28 134 9 127 7 113Z' fill='url(%23g)'/%3E%3Cpath d='M12 104C16 92 26 85 40 82C32 90 26 98 24 110C20 108 15 106 12 104Z' fill='%23e9ebe6' opacity='.3'/%3E%3Cpath d='M94 110C93 124 76 132 52 133C70 126 84 116 88 98C92 102 94 106 94 110Z' fill='%232a2d2b' opacity='.34'/%3E%3Cpath d='M7 113C5 99 16 84 36 80C46 78 58 78 68 79C84 81 96 93 94 110C93 124 76 132 52 133C28 134 9 127 7 113Z' fill='url(%23sh)'/%3E%3Cpath d='M14 112Q46 104 86 110Q46 106.6 14 112Z' fill='%233e4240' opacity='.26'/%3E%3Cpath d='M7 113C5 99 16 84 36 80C46 78 58 78 68 79C84 81 96 93 94 110C93 124 76 132 52 133C28 134 9 127 7 113Z' fill='none' stroke='%23272928' stroke-width='1.1' opacity='.6'/%3E%3Cpath d='M19 71C16 57 26 44 44 41C56 39 68 41 76 48C83 54 84 64 80 71C75 78 62 80 50 80C34 80 21 78 19 71Z' fill='url(%23g)'/%3E%3Cpath d='M23 63C26 52 34 46 46 44C38 50 33 57 31 66C28 65 25 64 23 63Z' fill='%23e9ebe6' opacity='.3'/%3E%3Cpath d='M80 71C75 78 62 80 50 80C62 74 72 66 76 52C80 56 82 64 80 71Z' fill='%232a2d2b' opacity='.34'/%3E%3Cpath d='M19 71C16 57 26 44 44 41C56 39 68 41 76 48C83 54 84 64 80 71C75 78 62 80 50 80C34 80 21 78 19 71Z' fill='url(%23sh)'/%3E%3Cpath d='M24 70Q50 64 78 66Q50 66.2 24 70Z' fill='%233e4240' opacity='.26'/%3E%3Cpath d='M19 71C16 57 26 44 44 41C56 39 68 41 76 48C83 54 84 64 80 71C75 78 62 80 50 80C34 80 21 78 19 71Z' fill='none' stroke='%23272928' stroke-width='1.1' opacity='.6'/%3E%3Cpath d='M34 37C32 27 40 18 52 17C63 16 70 23 68 32C66 38 56 40 48 40C41 40 35 40 34 37Z' fill='url(%23g)'/%3E%3Cpath d='M38 29C40 23 45 20 51 19C46 23 43 27 42 32Z' fill='%23e9ebe6' opacity='.3'/%3E%3Cpath d='M68 32C66 38 56 40 48 40C56 36 63 30 66 24C68 26 68 29 68 32Z' fill='%232a2d2b' opacity='.34'/%3E%3Cpath d='M34 37C32 27 40 18 52 17C63 16 70 23 68 32C66 38 56 40 48 40C41 40 35 40 34 37Z' fill='url(%23sh)'/%3E%3Cpath d='M38 35Q52 31 66 32Q52 32.4 38 35Z' fill='%233e4240' opacity='.26'/%3E%3Cpath d='M34 37C32 27 40 18 52 17C63 16 70 23 68 32C66 38 56 40 48 40C41 40 35 40 34 37Z' fill='none' stroke='%23272928' stroke-width='1.1' opacity='.6'/%3E%3Cpath d='M7 114C9 104 16 99 24 100C30 96 38 98 41 104C44 101 49 101 52 104C46 106 40 110 36 116C28 113 16 113 7 114Z' fill='url(%23m)'/%3E%3Cpath d='M12 104C16 100 22 99 27 100C24 102 21 104 19 107C17 105 14 104 12 104Z' fill='url(%23ml)' opacity='.85'/%3E%3Cpath d='M66 80C70 77 77 77 82 81C86 84 88 88 88 92C84 90 79 90 76 93C74 88 70 84 66 80Z' fill='url(%23m)'/%3E%3Cpath d='M70 79C74 78 78 79 81 81C77 81 74 82 72 84Z' fill='url(%23ml)' opacity='.85'/%3E%3C/svg%3E");
+}
+.game .stone:nth-child(3n + 2) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140'%3E%3Cdefs%3E%3CradialGradient id='cs'%3E%3Cstop offset='0' stop-opacity='.4'/%3E%3Cstop offset='.55' stop-opacity='.16'/%3E%3Cstop offset='1' stop-opacity='0'/%3E%3C/radialGradient%3E%3ClinearGradient id='sh' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='.45' stop-color='%231e1b18' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%231e1b18' stop-opacity='.42'/%3E%3C/linearGradient%3E%3ClinearGradient id='m' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%2393a95c'/%3E%3Cstop offset='.5' stop-color='%236c8743'/%3E%3Cstop offset='1' stop-color='%2355703a' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='ml' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23b9cc7e'/%3E%3Cstop offset='1' stop-color='%2393ab5c' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='g' x1='.2' y1='0' x2='.55' y2='1'%3E%3Cstop offset='0' stop-color='%23b3a894'/%3E%3Cstop offset='1' stop-color='%236f6556'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cellipse cx='52' cy='128' rx='45' ry='9.5' fill='url(%23cs)'/%3E%3Cpath d='M17 124C11 108 11 86 15 66C18 50 24 36 33 26C40 18 48 14 57 15C68 16 78 24 84 36C90 48 91 66 90 84C89 100 87 114 82 124C68 134 30 135 17 124Z' fill='url(%23g)'/%3E%3Cpath d='M33 26C40 18 48 14 57 15C50 22 45 34 42 50C40 66 40 84 42 104C34 102 24 108 17 124C11 108 11 86 15 66C18 50 24 36 33 26Z' fill='%23ece3d2' opacity='0.24'/%3E%3Cpath d='M84 36C90 48 91 66 90 84C89 100 87 114 82 124C78 108 74 90 72 72C70 56 74 44 84 36Z' fill='%23302a23' opacity='0.3'/%3E%3Cpath d='M17 124C11 108 11 86 15 66C18 50 24 36 33 26C40 18 48 14 57 15C68 16 78 24 84 36C90 48 91 66 90 84C89 100 87 114 82 124C68 134 30 135 17 124Z' fill='url(%23sh)'/%3E%3Cpath d='M13 95Q46 70 90 62Q46 74.2 13 95Z' fill='%23f3ece0' opacity='0.5'/%3E%3Cpath d='M30 84Q56 70 80 66Q56 71.2 30 84Z' fill='%23f8f3ea' opacity='0.35'/%3E%3Cpath d='M18 82Q30 76 42 78Q30 77.2 18 82Z' fill='%23433b31' opacity='0.22'/%3E%3Cpath d='M56 92Q70 86 86 88Q70 87.4 56 92Z' fill='%23433b31' opacity='0.22'/%3E%3Cpath d='M20 112Q50 104 84 106Q50 106.4 20 112Z' fill='%23433b31' opacity='0.26'/%3E%3Cpath d='M46 40Q62 34 78 40Q62 35.8 46 40Z' fill='%23433b31' opacity='0.22'/%3E%3Cpath d='M22 70Q36 62 52 64Q36 63.8 22 70Z' fill='%23433b31' opacity='0.2'/%3E%3Cpath d='M56 16C66 16 75 22 81 31C86 39 88 46 86 50C82 47 77 47 75 51C72 45 66 44 63 47C61 41 57 38 52 38C51 30 52 22 56 16Z' fill='url(%23m)'/%3E%3Cpath d='M60 19C67 20 73 25 77 31C72 30 67 30 63 32C62 27 61 23 60 19Z' fill='url(%23ml)' opacity='.85'/%3E%3Cpath d='M17 124C11 108 11 86 15 66C18 50 24 36 33 26C40 18 48 14 57 15C68 16 78 24 84 36C90 48 91 66 90 84C89 100 87 114 82 124C68 134 30 135 17 124Z' fill='none' stroke='%232d2823' stroke-width='1.1' stroke-linejoin='round' opacity='.6'/%3E%3C/svg%3E");
+}
+.game .stone::after {
+  content: none;
+}
+/* On ink paper the stones sit a little deeper in the dusk. */
+:root[data-theme='ink'] .game .stone,
+:root[data-theme='dark'] .game .stone {
+  filter: brightness(0.86);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .game .stone {
+    filter: brightness(0.86);
+  }
+}
+/* end stones */
+
 /* Deal-in cascade */
 .game .stone.is-deal,
 .game .card.is-deal {
@@ -635,10 +677,10 @@
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent),
     0 0 16px 2px color-mix(in srgb, var(--gold) 38%, transparent);
-  animation: g-hint-breathe 1.6s ease-in-out infinite;
+  animation: g-hint-breathe 2.4s ease-in-out infinite;
 }
 .game .card.is-hint:not(.is-deal):not(.is-selected) {
-  animation: g-hint-bob 1.6s ease-in-out infinite;
+  animation: g-hint-bob 2.4s ease-in-out infinite;
 }
 .game .card.is-hint.is-ping {
   animation: g-ping 520ms var(--g-ease-spring);
@@ -655,7 +697,7 @@
 }
 @keyframes g-ping {
   40% {
-    transform: translateY(-6px) scale(1.06);
+    transform: translateY(-5px) scale(1.04);
   }
 }
 
@@ -668,16 +710,16 @@
 }
 @keyframes g-shake {
   15% {
-    transform: translateX(-5px) rotate(-1deg);
+    transform: translateX(-4px) rotate(-0.8deg);
   }
   35% {
-    transform: translateX(4px) rotate(0.8deg);
+    transform: translateX(3px) rotate(0.6deg);
   }
   55% {
-    transform: translateX(-3px);
+    transform: translateX(-2px);
   }
   75% {
-    transform: translateX(1.5px);
+    transform: translateX(1px);
   }
 }
 @keyframes g-miss-ring {
@@ -695,7 +737,7 @@
 .game .card.is-selected {
   z-index: 3;
   transform: translateY(-5px) scale(1.05);
-  animation: g-select 300ms var(--g-ease-spring);
+  animation: g-select 280ms var(--g-ease-spring);
 }
 .game .card.is-selected::before {
   opacity: 1;
@@ -708,10 +750,7 @@
 }
 @keyframes g-select {
   0% {
-    transform: translateY(1px) scale(0.97);
-  }
-  55% {
-    transform: translateY(-7px) scale(1.065);
+    transform: translateY(1px) scale(0.98);
   }
   100% {
     transform: translateY(-5px) scale(1.05);
@@ -953,7 +992,7 @@
   border: 2px solid var(--accent);
   border-radius: 20%;
   opacity: 0;
-  animation: g-stamp-ring 900ms ease-out 260ms forwards;
+  animation: g-stamp-ring 900ms ease-out 230ms forwards;
 }
 @keyframes g-stamp-ring {
   0% {
@@ -1145,12 +1184,19 @@
   height: 56px;
   font-size: 28px;
   transform: rotate(-6deg);
-  animation: g-seal 560ms cubic-bezier(0.2, 1.4, 0.4, 1) 60ms both;
+  animation: g-seal 460ms linear 120ms both;
 }
+/* A seal pressed onto paper: it drops, meets the page a hair small, and settles. */
 @keyframes g-seal {
   0% {
     opacity: 0;
-    transform: scale(1.7) rotate(-16deg);
+    transform: scale(1.35) rotate(-12deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.96) rotate(-6deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   100% {
     opacity: 1;
@@ -1207,7 +1253,7 @@
 }
 .result .star.on svg {
   color: var(--gold);
-  animation: g-bloom-in 620ms cubic-bezier(0.2, 1.5, 0.4, 1) var(--at, 0ms) both;
+  animation: g-bloom-in 560ms var(--g-ease-spring) var(--at, 0ms) both;
 }
 /* A ring of light where each blossom opens. */
 .result .star.on::before {
@@ -1236,7 +1282,7 @@
 @keyframes g-bloom-in {
   0% {
     opacity: 0;
-    transform: scale(0.2) rotate(-50deg);
+    transform: scale(0.45) rotate(-30deg);
   }
   100% {
     opacity: 1;
@@ -1262,6 +1308,7 @@
   }
 }
 .result .statline {
+  animation: g-reward 420ms var(--g-ease-out) var(--at, 0ms) both;
   margin-top: 14px;
   padding: 12px 0 10px;
   border: 0;
@@ -1422,19 +1469,28 @@
   transform: skewX(-14deg);
   opacity: 0;
 }
+:root[data-theme='ink'] .draw__glint::after,
+:root[data-theme='dark'] .draw__glint::after {
+  background: linear-gradient(100deg, transparent, rgba(255, 245, 225, 0.28), transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='paper']):not([data-theme='light']) .draw__glint::after {
+    background: linear-gradient(100deg, transparent, rgba(255, 245, 225, 0.28), transparent);
+  }
+}
 .draw.is-shown .draw__glint::after {
   animation: g-glint 900ms ease-out 220ms both;
 }
 @keyframes g-glint {
   0% {
-    left: -70%;
+    transform: translateX(0) skewX(-14deg);
     opacity: 0;
   }
   25% {
     opacity: 1;
   }
   100% {
-    left: 130%;
+    transform: translateX(445%) skewX(-14deg);
     opacity: 0;
   }
 }
@@ -1560,7 +1616,7 @@
 .result--rush .rush-score b {
   font-size: 58px;
   letter-spacing: -0.01em;
-  animation: g-score-in 620ms cubic-bezier(0.2, 1.3, 0.4, 1) 120ms both;
+  animation: g-score-in 560ms var(--g-ease-spring) 120ms both;
 }
 @keyframes g-score-in {
   0% {
@@ -1579,7 +1635,7 @@
   background: var(--accent);
   color: var(--accent-ink);
   transform: rotate(-2deg);
-  animation: g-seal 520ms cubic-bezier(0.2, 1.4, 0.4, 1) 520ms both;
+  animation: g-seal 460ms linear 520ms both;
 }
 
 /* ───────────────────────────── Pause + tips ───────────────────────────── */
@@ -1597,52 +1653,6 @@
   font-weight: 400;
   color: var(--muted);
 }
-.tip > p.muted {
-  line-height: 1.55;
-}
-.tip__cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 18px 6px 10px;
-}
-.tip__cards > div {
-  animation: g-tip-card 520ms cubic-bezier(0.2, 0.9, 0.3, 1.15) calc(160ms + var(--i, 0) * 90ms) both;
-}
-.tip__cards > div:nth-child(1) {
-  transform: rotate(-3deg) translateY(3px);
-}
-.tip__cards > div:nth-child(2) {
-  transform: rotate(-1deg);
-}
-.tip__cards > div:nth-child(3) {
-  transform: rotate(1deg);
-}
-.tip__cards > div:nth-child(4) {
-  transform: rotate(3deg) translateY(3px);
-}
-.tip__cards svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 7%/5%;
-  box-shadow: var(--card-shadow);
-}
-@keyframes g-tip-card {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.92);
-  }
-}
-.tip__caption {
-  text-align: center;
-  font-size: 14px;
-  color: var(--muted);
-}
-.tip .sheet__actions {
-  margin-top: 14px;
-}
-
 .pause__head h2 {
   margin-top: 2px;
 }
@@ -1744,182 +1754,5 @@
   .drift,
   .bloom-ring {
     display: none;
-  }
-}
-
-/* ───────────────── Level 6 rule tip: example family + mini-quiz ───────────────── */
-.tip__lead {
-  margin: 8px 0 0;
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--ink-soft);
-}
-.tip__lead b {
-  color: var(--ink);
-}
-.rule-family {
-  margin-top: 16px;
-  padding: 14px 12px 10px;
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-}
-.rule-family__cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-.rule-card {
-  position: relative;
-  margin: 0;
-  text-align: center;
-  animation: g-tip-card 520ms cubic-bezier(0.2, 0.9, 0.3, 1.15) calc(140ms + var(--i, 0) * 90ms) both;
-}
-.rule-card svg,
-.quiz__card svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-radius: 7%/5%;
-  box-shadow: var(--card-shadow);
-}
-.rule-card figcaption {
-  margin-top: 6px;
-  font-size: 11.5px;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-/* Circle around the month number chip (top-left of every card face). */
-.num-ring {
-  position: absolute;
-  left: 2.5%;
-  top: 2.4%;
-  width: 22%;
-  aspect-ratio: 1;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  pointer-events: none;
-  animation: g-ring 1.8s ease-in-out 900ms infinite;
-}
-@keyframes g-ring {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.18);
-    opacity: 0.55;
-  }
-}
-.rule-family .tip__caption {
-  margin: 10px 0 0;
-  line-height: 1.5;
-}
-.rule-family .tip__caption b {
-  color: var(--ink);
-}
-
-.quiz {
-  margin-top: 14px;
-  padding: 14px 12px 12px;
-  border-radius: 16px;
-  border: 1.5px dashed var(--line);
-  transition: border-color 200ms, background 200ms;
-}
-.quiz.is-solved {
-  border-style: solid;
-  border-color: var(--good);
-  background: color-mix(in srgb, var(--good) 8%, transparent);
-}
-.quiz__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 14.5px;
-}
-.quiz__step {
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.quiz__cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin: 18px 8px 8px;
-}
-.quiz__card {
-  position: relative;
-  border-radius: 9%/6%;
-  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.quiz__card .num-ring {
-  animation: none;
-  opacity: 0.55;
-}
-.quiz__card::after {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border-radius: 11%/8%;
-  border: 3px solid transparent;
-  transition: border-color 140ms;
-}
-.quiz__card.is-picked {
-  transform: translateY(-5px) scale(1.04);
-}
-.quiz__card.is-picked::after {
-  border-color: var(--accent);
-}
-.quiz__card.is-right::after {
-  border-color: var(--good);
-}
-.quiz__card.is-right .num-ring {
-  border-color: var(--good);
-  opacity: 1;
-}
-.quiz__card.is-right::before {
-  content: '✓';
-  position: absolute;
-  z-index: 2;
-  right: -8px;
-  top: -8px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--good);
-  color: #fff;
-  font-weight: 700;
-  font-size: 14px;
-  animation: pop 300ms both;
-}
-.quiz__card.is-wrong {
-  animation: shake 420ms;
-}
-.quiz__card.is-wrong::after {
-  border-color: #b5523a;
-}
-.quiz__feedback {
-  margin: 4px 0 0;
-  min-height: 3em;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: var(--ink-soft);
-  text-align: center;
-}
-.quiz__feedback b {
-  color: var(--ink);
-}
-@media (prefers-reduced-motion: reduce) {
-  .num-ring {
-    animation: none;
   }
 }

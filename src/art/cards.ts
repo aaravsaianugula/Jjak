@@ -199,7 +199,8 @@ const STYLES: MonthStyle[] = [
         limb([[57, 66], [66, 72], [76, 71]], 2.4, 0.9, bark, barkLt) +
         limb([[70, 58], [64, 47], [66, 36]], 2.4, 0.9, bark, barkLt) +
         S('M24 106L15 99M79 44L87 48.5M50 84L45 78', bark, 1.1) +
-        moss.map(([x, y], i) => C(x, y, i % 2 ? 0.8 : 1.1, i % 3 ? '#7d8a5c' : '#2b211b')).join('') +
+        // lichen crusts lying along the bark: short tapered strokes, not dots
+        P(moss.map(([x, y], i) => taper([[x - 1.6, y + 1.2], [x, y], [x + 1.8, y - 1.4]], blade(i % 2 ? 0.9 : 1.2, 0.45), 2)).join(''), '#7d8a5c', O(0.85)) +
         fl(20, 58, 10.5, 10) +
         fl(47, 85, 12.5, -8) +
         fl(69, 56, 11, 22) +
@@ -591,7 +592,14 @@ const STYLES: MonthStyle[] = [
         strand(34, 62, 56, -12, 6) +
         strand(30, 80, 40, 6, 7) +
         P('M4 124Q30 116 56 124T96 121L96 136L4 136Z', '#4c5a5f') +
-        S('M12 129h12M40 131h16M66 127.6h14M24 133.4h10', '#8a9ca8', 0.6) +
+        // light on the stream: tapered brush strokes rather than dashes
+        P(
+          taper([[10, 129.2], [18, 128.6], [26, 129.1]], blade(0.75, 0.45), 2) +
+            taper([[38, 131.3], [48, 130.6], [58, 131.2]], blade(0.85, 0.45), 2) +
+            taper([[64, 127.9], [72, 127.3], [82, 127.8]], blade(0.75, 0.45), 2) +
+            taper([[22, 133.7], [29, 133.2], [36, 133.6]], blade(0.55, 0.45), 2),
+          '#8a9ca8',
+        ) +
         E(30, 128.6, 2.4, 0.8, 'none', ' stroke="#a9b8c1" stroke-width=".4"') +
         E(74, 130, 3, 1, 'none', ' stroke="#a9b8c1" stroke-width=".4"')
       );
@@ -743,6 +751,69 @@ export interface CardLook {
   chip?: { paper: string; ink: string; edge: string };
 }
 
+/**
+ * A quiet backdrop for the plain cards, so they feel as finished as the
+ * specials without competing with the flower: a pool of light behind the
+ * motif, a far ridge washed in the month's own tone dissolving into a mist
+ * band, and a ground wash (or, for the iris, still water with brushed
+ * ripples). Each plain card of a month gets its own ridge, so pairs differ.
+ * Colours are lowercase hex, so deck styles repaint them with the motif.
+ * `null` = the motif already carries its own setting (silver grass, willow).
+ */
+const PLAIN_BACK: ({ ridge: string; ground: string; base: number; water?: boolean } | null)[] = [
+  { ridge: '#b9c7b4', ground: '#d4ddcc', base: 112 },
+  { ridge: '#d9bdbd', ground: '#e8d3d2', base: 116 },
+  { ridge: '#e2c3c9', ground: '#eed8db', base: 106 },
+  { ridge: '#cdc4dc', ground: '#ddd6e8', base: 118 },
+  { ridge: '#bfc8de', ground: '#cdd7e6', base: 108, water: true },
+  { ridge: '#dcc0bb', ground: '#e7d2cc', base: 114 },
+  { ridge: '#dcc6d2', ground: '#e8d8e0', base: 116 },
+  null,
+  { ridge: '#ddcfae', ground: '#e8dcc0', base: 114 },
+  { ridge: '#dfbfac', ground: '#ead2c4', base: 112 },
+  null,
+  { ridge: '#dcc58a', ground: '#e6d29c', base: 116 },
+];
+
+function plainBack(month: number, variant: number): string {
+  const pb = PLAIN_BACK[month];
+  if (!pb) return '';
+  const r = rng(month * 7 + variant * 131 + 5);
+  const p1 = 18 + r() * 30;
+  const p2 = 56 + r() * 30;
+  const h1 = 8 + r() * 10;
+  const h2 = 6 + r() * 12;
+  const pts: Pt[] = [];
+  for (let x = 0; x <= 100; x += 10) {
+    const y = pb.base - h1 * Math.exp(-(((x - p1) / 15) ** 2)) - h2 * Math.exp(-(((x - p2) / 18) ** 2)) + Math.sin(x / 9 + month) * 1.2;
+    pts.push([x, y]);
+  }
+  let ridge = `M${pts[0][0]} ${f(pts[0][1])}`;
+  for (let i = 1; i < pts.length - 1; i++) ridge += `Q${pts[i][0]} ${f(pts[i][1])} ${f((pts[i][0] + pts[i + 1][0]) / 2)} ${f((pts[i][1] + pts[i + 1][1]) / 2)}`;
+  ridge += `L100 ${f(pts[pts.length - 1][1])}V140H0Z`;
+  // dry-brush along the crest: one tapered stroke over the higher peak
+  const pk = h1 > h2 ? p1 : p2;
+  const crestY = (x: number) => pb.base - h1 * Math.exp(-(((x - p1) / 15) ** 2)) - h2 * Math.exp(-(((x - p2) / 18) ** 2)) + Math.sin(x / 9 + month) * 1.2;
+  const crest = taper([[pk - 14, crestY(pk - 14) + 0.4], [pk - 5, crestY(pk - 5) + 0.3], [pk + 4, crestY(pk + 4) + 0.3], [pk + 14, crestY(pk + 14) + 0.5]], blade(1.1, 0.4), 3);
+  let ground = '';
+  if (pb.water) {
+    ground =
+      P('M4 118Q30 115 52 117T96 116V136H4Z', pb.ground, O(0.75)) +
+      P(taper([[10, 123], [22, 122.4], [34, 123]], blade(0.9, 0.5), 3) + taper([[58, 128], [72, 127.4], [88, 128]], blade(0.9, 0.5), 3) + taper([[30, 132], [44, 131.5], [56, 132]], blade(0.7, 0.5), 3), '#ffffff', O(0.7));
+  } else {
+    ground = P(`M4 ${pb.base + 14}Q30 ${pb.base + 8} 54 ${pb.base + 12}T96 ${pb.base + 10}V136H4Z`, pb.ground, O(0.6));
+  }
+  return (
+    `<g clip-path="url(#card-clip)">` +
+    `<ellipse cx="50" cy="62" rx="40" ry="46" fill="url(#plain-glow)"/>` +
+    `<path d="${ridge}" fill="url(#plain-ridge-${month})"/>` +
+    P(crest, pb.ridge, O(0.55)) +
+    `<rect x="4" y="${pb.base - 4}" width="92" height="16" fill="url(#plain-mist)"/>` +
+    ground +
+    `</g>`
+  );
+}
+
 /** Full SVG markup (inner) for one card id. */
 export function cardInner(id: number, look?: CardLook): string {
   if (isBonus(id)) return bonusInner(id, look);
@@ -757,6 +828,10 @@ export function cardInner(id: number, look?: CardLook): string {
 
   // A second plain card is the mirror image, so pairs aren't pixel-identical.
   const plainAlt = def.kind === 'plain' && variant > 0;
+  if (def.kind === 'plain') {
+    const back = plainBack(month, variant);
+    bg += plainAlt ? `<g transform="translate(100 0) scale(-1 1)">${back}</g>` : back;
+  }
   const use = `<use href="#motif-${month}" width="100" height="140"/>`;
   const art = plainAlt
     ? `<g clip-path="url(#card-clip)"><g transform="translate(100 0) scale(-1 1)">${use}</g></g>`
@@ -800,46 +875,64 @@ function bonusInner(id: number, look?: CardLook): string {
   );
 }
 
-/** A card under snow (First snow levels): pale sky, soft drifts, one crystal. */
+/**
+ * A card under snow (First snow levels): a pale winter sky, three wind-carved
+ * drifts lit on their crests and shadowed blue under each lip, one dendrite
+ * crystal resting in the middle and two small crystals still falling.
+ */
 export function cardSnowInner(): string {
-  const r = rng(77);
-  let crystal = '';
-  for (let k = 0; k < 6; k++) {
-    const a = (k * Math.PI) / 3 - Math.PI / 2;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    crystal += `M50 54L${f(50 + ca * 15)} ${f(54 + sa * 15)}`;
-    for (const [d, l] of [[6, 4], [10, 3]] as const) {
-      const bx = 50 + ca * d;
-      const by = 54 + sa * d;
-      for (const s of [-1, 1]) {
-        const b = a + (s * Math.PI) / 3;
-        crystal += `M${f(bx)} ${f(by)}L${f(bx + Math.cos(b) * l)} ${f(by + Math.sin(b) * l)}`;
+  // A six-armed dendrite: tapered arms with two pairs of side branches each.
+  const crystal = (cx: number, cy: number, R: number, side: boolean) => {
+    let d = '';
+    for (let k = 0; k < 6; k++) {
+      const a = (k * Math.PI) / 3 - Math.PI / 2;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      d += taper([[cx + ca * R * 0.16, cy + sa * R * 0.16], [cx + ca * R, cy + sa * R]], lin(R * 0.13, R * 0.03), 2);
+      if (!side) continue;
+      for (const [t, l] of [[0.42, 0.3], [0.68, 0.22]] as const) {
+        const bx = cx + ca * R * t;
+        const by = cy + sa * R * t;
+        for (const sg of [-1, 1]) {
+          const b = a + (sg * Math.PI) / 3;
+          d += taper([[bx, by], [bx + Math.cos(b) * R * l, by + Math.sin(b) * R * l]], lin(R * 0.08, R * 0.02), 2);
+        }
       }
     }
-  }
+    return d;
+  };
   let hex = '';
   for (let k = 0; k <= 6; k++) {
     const a = (k * Math.PI) / 3 - Math.PI / 2;
-    hex += `${k ? 'L' : 'M'}${f(50 + Math.cos(a) * 3)} ${f(54 + Math.sin(a) * 3)}`;
+    hex += `${k ? 'L' : 'M'}${f(50 + Math.cos(a) * 3.6)} ${f(52 + Math.sin(a) * 3.6)}`;
   }
-  let flakes = '';
-  for (let i = 0; i < 26; i++) flakes += C(6 + r() * 88, 8 + r() * 86, 0.5 + r() * 1.1, '#ffffff', O(0.6 + r() * 0.4));
+  // Wind-lit crests and shadowed lips of the drifts, as brush strokes.
+  const lit = taper([[8, 97], [24, 90.5], [40, 92], [54, 96.5]], blade(1.6, 0.4)) + taper([[46, 114.5], [66, 108], [92, 110]], blade(1.8, 0.45));
+  const lips =
+    taper([[30, 101], [44, 99.4], [58, 103]], blade(1.5, 0.5)) +
+    taper([[56, 98.6], [72, 94.4], [90, 95.6]], blade(1.2, 0.5)) +
+    taper([[16, 121], [34, 117.6], [50, 120.5]], blade(1.6, 0.5));
   return (
     cardBase('#e6edf2') +
     `<g clip-path="url(#card-clip)">` +
     `<rect x="4" y="4" width="92" height="132" fill="url(#snow-sky)"/>` +
-    P('M4 92Q26 82 46 88T96 84L96 136L4 136Z', '#dbe4ec') +
-    flakes +
-    P('M4 100Q30 88 52 98T96 94L96 136L4 136Z', '#f6f9fb') +
-    S('M4 100Q30 88 52 98T96 94', '#ffffff', 1) +
-    P('M30 106Q52 100 70 108Q60 106 50 108Q40 106 30 106Z', '#d4dfe8', O(0.8)) +
-    P('M4 118Q36 106 64 116T96 114L96 136L4 136Z', '#ffffff') +
-    P('M4 136L4 126Q30 120 48 128Q30 126 4 136Z', '#dde6ee', O(0.7)) +
-    C(50, 54, 24, 'url(#snow-glow)') +
-    S(crystal, '#93a9bc', 1.1) +
-    S(hex, '#93a9bc', 0.6) +
-    C(50, 54, 1, '#93a9bc') +
+    // a far snowy ridge, its shaded flank and the snow line
+    P('M4 80Q18 70 30 74Q42 64 56 70Q72 62 96 72V136H4Z', '#dde6ee') +
+    P('M56 70Q64 72 70 80Q62 76 54 78Q58 74 56 70Z', '#c4d2df', O(0.7)) +
+    // drifts, back to front, each shading from a lit crest into a blue hollow
+    P('M4 98Q24 88 44 94Q62 99 96 90V136H4Z', 'url(#snow-drift)') +
+    P('M4 103Q28 96 46 101Q66 106 96 98V136H4Z', '#eef3f7') +
+    P(lips, '#b9c9d8', O(0.75)) +
+    P('M4 118Q30 110 52 116Q72 120 96 108V136H4Z', 'url(#snow-drift)') +
+    P('M4 124Q36 116 60 122Q80 126 96 120V136H4Z', '#ffffff') +
+    P(lit, '#ffffff', O(0.9)) +
+    // the resting crystal: a soft glow, a pale plate and the dendrite arms
+    C(50, 52, 26, 'url(#snow-glow)') +
+    P(hex + 'Z', '#dbe5ee') +
+    P(crystal(50, 52, 17, true), '#8ea6bb') +
+    S(hex, '#8ea6bb', 0.6) +
+    // two small crystals falling
+    P(crystal(23, 27, 4.2, false) + crystal(79, 74, 3.2, false), '#a9bccc', O(0.85)) +
     `</g>` +
     cardFinish
   );
@@ -877,10 +970,8 @@ export function cardBackInner(): string {
     arcs = '';
     arcs2 = '';
   }
-  // ink-wear specks inside the seal
-  const r = rng(5);
-  let wear = '';
-  for (let i = 0; i < 14; i++) wear += C(36 + r() * 28, 56 + r() * 28, 0.2 + r() * 0.5, PAPER, O(0.25 + r() * 0.3));
+  // ink wear inside the seal: a few dry streaks where the vermilion didn't take
+  const wear = P('M38 62q6 -1.2 12 -.2q-6 .8 -12 .2ZM52 79q5 -1 10 0q-5 .7 -10 0ZM41 74q3 -.6 6 -.1q-3 .5 -6 .1Z', PAPER, O(0.4));
   const corner = (x: number, y: number) => `M${x} ${y - 1.6}L${x + 1.6} ${y}L${x} ${y + 1.6}L${x - 1.6} ${y}Z`;
   return (
     `<rect width="100" height="140" rx="9" fill="#28334f"/>` +
@@ -913,13 +1004,20 @@ export function spriteDefs(): string {
     const l = 4 + r() * 8;
     fib += `M${f(x)} ${f(y)}q${f(Math.cos(a) * l * 0.5 + 1)} ${f(Math.sin(a) * l * 0.5 - 1)} ${f(Math.cos(a) * l)} ${f(Math.sin(a) * l)}`;
   }
-  let specks = '';
-  for (let i = 0; i < 7; i++) specks += `M${f(r() * 48)} ${f(r() * 48)}h.01`;
+  // warm fibres too (no specks): a paper texture that reads as washi, not grit
+  let warm = '';
+  for (let i = 0; i < 4; i++) {
+    const x = r() * 48;
+    const y = r() * 48;
+    const a = r() * Math.PI;
+    const l = 3 + r() * 5;
+    warm += `M${f(x)} ${f(y)}q${f(Math.cos(a) * l * 0.5)} ${f(Math.sin(a) * l * 0.5 + 0.8)} ${f(Math.cos(a) * l)} ${f(Math.sin(a) * l)}`;
+  }
   return (
     '<defs>' +
     '<clipPath id="card-clip"><rect x="4" y="4" width="92" height="132" rx="6"/></clipPath>' +
     `<clipPath id="curtain-clip"><path d="${CURTAIN_D}"/></clipPath>` +
-    `<pattern id="card-fiber" width="48" height="48" patternUnits="userSpaceOnUse"><path d="${fib}" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width=".3"/><path d="${specks}" stroke="#8a7458" stroke-opacity=".22" stroke-width=".7" stroke-linecap="round"/></pattern>` +
+    `<pattern id="card-fiber" width="48" height="48" patternUnits="userSpaceOnUse"><path d="${fib}" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width=".3"/><path d="${warm}" fill="none" stroke="#8a7458" stroke-opacity=".16" stroke-width=".3" stroke-linecap="round"/></pattern>` +
     '<linearGradient id="card-sheen" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".24"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#5a4630" stop-opacity=".07"/></linearGradient>' +
     '<radialGradient id="card-vig" cx=".5" cy=".46" r=".72"><stop offset=".62" stop-color="#5a4630" stop-opacity="0"/><stop offset="1" stop-color="#5a4630" stop-opacity=".13"/></radialGradient>' +
     '<linearGradient id="rib-red" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c24a3b"/><stop offset=".6" stop-color="#b23b2e"/><stop offset="1" stop-color="#912f22"/></linearGradient>' +
@@ -931,12 +1029,16 @@ export function spriteDefs(): string {
     '<linearGradient id="sky-storm" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f5a66" stop-opacity=".55"/><stop offset=".55" stop-color="#55606a" stop-opacity="0"/></linearGradient>' +
     '<linearGradient id="snow-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9e3eb"/><stop offset="1" stop-color="#eef3f6"/></linearGradient>' +
     '<radialGradient id="snow-glow"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="snow-drift" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbfdfe"/><stop offset=".3" stop-color="#e7eef4"/><stop offset="1" stop-color="#c9d6e2"/></linearGradient>' +
+    PLAIN_BACK.map((pb, m) => (pb ? `<linearGradient id="plain-ridge-${m}" gradientUnits="userSpaceOnUse" x1="0" y1="${pb.base - 22}" x2="0" y2="${pb.base + 16}"><stop offset="0" stop-color="${pb.ridge}" stop-opacity=".75"/><stop offset="1" stop-color="${pb.ridge}" stop-opacity="0"/></linearGradient>` : '')).join('') +
+    '<radialGradient id="plain-glow"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset=".6" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="plain-mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
     '<radialGradient id="back-glow" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#4a5d8f" stop-opacity=".35"/><stop offset=".6" stop-color="#28334f" stop-opacity="0"/><stop offset="1" stop-color="#0d1322" stop-opacity=".45"/></radialGradient>' +
     '</defs>'
   );
 }
 
-const SNOW_DEFS = /<(linearGradient|radialGradient) id="snow-(?:sky|glow)".*?<\/\1>/g;
+const SNOW_DEFS = /<(linearGradient|radialGradient) id="snow-(?:sky|glow|drift)".*?<\/\1>/g;
 
 /** The month motif markup (unpainted, cached). */
 export const motifMarkup = motif;

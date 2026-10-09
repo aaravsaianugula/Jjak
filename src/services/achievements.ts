@@ -107,3 +107,11 @@ export function checkSeals(): Seal[] {
   if (fresh.length) persist();
   return fresh;
 }
+
+/** "Seal earned: A" / "Seals earned: A and B" / "Seals earned: A, B and 5 more" — short enough for a toast. */
+export function sealToast(won: { title: string }[]): string {
+  const t = won.map((w) => w.title);
+  if (t.length <= 1) return `Seal earned: ${t[0] ?? ''}`;
+  if (t.length === 2) return `Seals earned: ${t[0]} and ${t[1]}`;
+  return `Seals earned: ${t[0]}, ${t[1]} and ${t.length - 2} more`;
+}

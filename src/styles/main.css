@@ -47,7 +47,16 @@
   --font-serif: 'Gowun Batang', 'Noto Serif KR', 'Noto Serif', Georgia, serif;
   --font-sans: 'Gowun Dodum', 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-ja: 'Zen Old Mincho', 'Noto Serif JP', serif;
+  /* Motion: ink, paper and wood. Soft ease-outs, small travel, a tiny settle at most. */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.45, 0, 0.85, 0.5);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.25, 1);
+  --ease-settle: cubic-bezier(0.25, 1.25, 0.45, 1); /* ~3% overshoot: a card set down on wood */
+  --dur-press: 80ms;
+  --dur-fast: 160ms;
+  --dur-base: 260ms;
+  --dur-slow: 380ms;
+  --dur-sheet: 380ms;
   --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
   --banner-h: 0px;
@@ -207,40 +216,61 @@ select:focus-visible,
   display: flex;
   flex-direction: column;
   padding: calc(var(--safe-top) + 8px) 16px calc(var(--safe-bottom) + var(--banner-h) + 12px);
-  animation: screen-in 300ms var(--ease-out) both;
+  /* The old screen fades first, then this one drifts in: little overlap, no ghosting. */
+  animation: screen-in 340ms var(--ease-out) 60ms both;
 }
 .screen--back {
   animation-name: screen-in-back;
 }
+/* Into a board: the table rises a little instead of sliding sideways. */
+.screen--rise {
+  animation-name: screen-rise;
+  animation-duration: 380ms;
+}
 .screen--leaving {
-  animation: screen-out 190ms ease-in both;
+  animation: screen-out 170ms ease-in both;
   pointer-events: none;
 }
 .screen--leaving-back {
   animation-name: screen-out-back;
 }
+.screen--leaving-sink {
+  animation-name: screen-sink;
+}
 @keyframes screen-in {
   from {
     opacity: 0;
-    transform: translateX(14px);
+    transform: translateX(18px);
   }
 }
 @keyframes screen-in-back {
   from {
     opacity: 0;
-    transform: translateX(-14px);
+    transform: translateX(-18px);
+  }
+}
+@keyframes screen-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
   }
 }
 @keyframes screen-out {
   to {
     opacity: 0;
-    transform: translateX(-8px);
+    transform: translateX(-10px);
   }
 }
 @keyframes screen-out-back {
   to {
     opacity: 0;
-    transform: translateX(8px);
+    transform: translateX(10px);
+  }
+}
+@keyframes screen-sink {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
   }
 }
 .scroll {
@@ -654,6 +684,9 @@ button.panel:active {
 .paths {
   position: absolute;
   inset: 0;
+  /* An absolutely placed <svg> keeps its 300×150 default unless sized. */
+  width: 100%;
+  height: 100%;
   overflow: visible;
   pointer-events: none;
   z-index: 5;
@@ -781,16 +814,19 @@ button.panel:active {
   height: 120px;
   font-size: 64px;
   z-index: 9;
-  animation: stamp 700ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  animation: stamp 520ms linear forwards;
 }
+/* The seal is pressed: it drops toward the paper, meets it a hair small, then settles. */
 @keyframes stamp {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(2) rotate(-14deg);
+    transform: translate(-50%, -50%) scale(1.5) rotate(-12deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
   }
-  60% {
+  45% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(0.94) rotate(-6deg);
+    transform: translate(-50%, -50%) scale(0.95) rotate(-6deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   100% {
     opacity: 1;
@@ -1018,7 +1054,7 @@ button.panel:active {
   display: grid;
   place-items: center;
   background: var(--bg-deep);
-  border-top: 1px dashed var(--line);
+  border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.12em;
@@ -1039,9 +1075,7 @@ button.panel:active {
   transform-origin: left;
   transform: scaleX(0);
 }
-.combo-bar.on i {
-  animation: combo-drain 4s linear forwards;
-}
+
 @keyframes combo-drain {
   from {
     transform: scaleX(1);
@@ -1083,9 +1117,6 @@ button.panel:active {
 }
 
 /* Falling leaves */
-.card.is-falling {
-  transition: top 300ms cubic-bezier(0.3, 0.7, 0.35, 1.15), transform 160ms;
-}
 .card.is-snow {
   filter: saturate(0.9);
 }
@@ -1095,7 +1126,7 @@ button.panel:active {
   margin-top: 14px;
   padding: 10px 14px;
   border-radius: 12px;
-  border: 1px dashed var(--gold);
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
   color: var(--ink-soft);
   font-size: 14px;
 }
@@ -1381,8 +1412,16 @@ button.panel:active {
   box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.5);
   animation: pop 260ms both;
 }
-.ad-break__card span:not(.seal) {
+.ad-break__card span:not(.seal),
+.ad-break__card small {
   color: var(--muted);
+}
+.ad-break__card small {
+  font-size: 12px;
+}
+.home__noads {
+  margin-top: -4px;
+  color: var(--text);
 }
 
 /* Card set (yaku) banner */
@@ -1481,6 +1520,54 @@ button.panel:active {
 .home::-webkit-scrollbar {
   display: none;
 }
+/* Entrance: the scene settles, then the strip, journey, Daily and tiles rise in
+   one after another. `backwards` so press states (transforms) work afterwards. */
+.home > * {
+  animation: home-rise 440ms var(--ease-out) backwards;
+}
+.home > .home__head {
+  animation-delay: 60ms;
+}
+.home > .fp-strip {
+  animation-delay: 110ms;
+}
+.home > .scene {
+  animation-name: home-fade;
+  animation-duration: 520ms;
+}
+.home > .journey {
+  animation-delay: 150ms;
+}
+.home > .daily {
+  animation-delay: 200ms;
+}
+.home > .tiles {
+  animation-delay: 250ms;
+}
+/* Coming back from a board: the same order, quicker. */
+.home.screen--back > * {
+  animation-duration: 340ms;
+}
+.home.screen--back > .journey {
+  animation-delay: 100ms;
+}
+.home.screen--back > .daily {
+  animation-delay: 130ms;
+}
+.home.screen--back > .tiles {
+  animation-delay: 160ms;
+}
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes home-fade {
+  from {
+    opacity: 0;
+  }
+}
 .home > .panel,
 .home > .tiles {
   flex-shrink: 0;
@@ -1553,13 +1640,102 @@ button.panel:active {
   width: 100%;
   height: 100%;
 }
-:root[data-theme='ink'] .scene__art,
-:root[data-theme='dark'] .scene__art {
-  filter: brightness(0.55) saturate(0.85);
+/* Ink theme: a night veil inside the painting dims it, while its lights
+   (windows, lanterns, fireflies, the moon) are drawn above the veil and keep
+   their glow. Cheaper than filtering the whole picture. */
+.scene__veil {
+  opacity: 0;
+}
+:root[data-theme='ink'] .scene__veil,
+:root[data-theme='dark'] .scene__veil {
+  opacity: 1;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='paper']):not([data-theme='light']) .scene__art {
-    filter: brightness(0.55) saturate(0.85);
+  :root:not([data-theme='paper']):not([data-theme='light']) .scene__veil {
+    opacity: 1;
+  }
+}
+
+/* Drifting petals, fireflies, leaves and snow: few, drawn as real shapes (CSS
+   masks), animated with transform and opacity only. */
+.scene__particles {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.pt {
+  position: absolute;
+  top: -8%;
+  width: var(--s);
+  height: var(--s);
+  opacity: 0;
+  animation: pt-drift var(--t) linear var(--d) infinite;
+  -webkit-mask: var(--pt-shape) center / contain no-repeat;
+  mask: var(--pt-shape) center / contain no-repeat;
+}
+.pt--petal {
+  --pt-shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -6 8 7'%3E%3Cpath d='M0 0C-3.2 -1 -3.6 -4.6 -1.4 -5.4Q-.6 -5.5 0 -4.7Q.6 -5.5 1.4 -5.4C3.6 -4.6 3.2 -1 0 0Z'/%3E%3C/svg%3E");
+}
+.pt--leaf {
+  --pt-shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 1l1.6 4.2 3.2-2-.6 4 4.4-.4-2.6 3.2 2.6 1.6-4.6 1.4.8 2.4-4-1.6-.2 4.6h-1.2l-.2-4.6-4 1.6.8-2.4-4.6-1.4 2.6-1.6-2.6-3.2 4.4.4-.6-4 3.2 2z'/%3E%3C/svg%3E");
+}
+.pt--snow {
+  --pt-shape: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-10 -10 20 20'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath id='a' d='M0 0V-8.5M0 -5L-2.2 -7M0 -5L2.2 -7'/%3E%3Cuse href='%23a' transform='rotate(60)'/%3E%3Cuse href='%23a' transform='rotate(120)'/%3E%3Cuse href='%23a' transform='rotate(180)'/%3E%3Cuse href='%23a' transform='rotate(240)'/%3E%3Cuse href='%23a' transform='rotate(300)'/%3E%3C/g%3E%3C/svg%3E");
+  background: #fbfcfd;
+  animation-name: pt-snow;
+}
+.pt--firefly {
+  width: 10px;
+  height: 10px;
+  -webkit-mask: none;
+  mask: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7c6 0 14%, rgba(246, 224, 122, 0.55) 30%, rgba(246, 224, 122, 0) 70%);
+  animation-name: pt-glow;
+}
+@keyframes pt-drift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  12%,
+  80% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-56px, 250px) rotate(300deg);
+  }
+}
+@keyframes pt-snow {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  15%,
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-18px, 240px) rotate(90deg);
+  }
+}
+@keyframes pt-glow {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  30% {
+    opacity: 0.95;
+    transform: translate(10px, -14px);
+  }
+  60% {
+    opacity: 0.45;
+    transform: translate(-6px, -26px);
   }
 }
 .scene__brand {
@@ -2073,34 +2249,103 @@ button.panel:active {
 .gday--now .gday__n {
   color: var(--accent-text);
 }
+/* Claimed: a small vermilion seal is pressed onto today's square. */
+.gday {
+  position: relative;
+}
+.gday__stamp {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+  transform: rotate(-8deg);
+  animation: gday-stamp 380ms linear both;
+}
+.gday.is-claimed .gday__icon,
+.gday.is-claimed .gday__label {
+  opacity: 0.35;
+  transition: opacity 200ms ease 140ms;
+}
+@keyframes gday-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.6) rotate(-16deg);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.55);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-8deg);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+.gift-btn.is-leaving {
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 220ms ease,
+    transform 240ms var(--ease-out);
+}
 
 /* ───────────────────────────── Sheets & dialogs ───────────────────────────── */
 .scrim {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: var(--scrim);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  animation: fade 220ms both;
-  transition: opacity 180ms ease-in;
+  isolation: isolate;
+}
+/* The dim lives on its own layer, so the sheet itself is never see-through while it moves. */
+.scrim::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--scrim);
+  animation: fade var(--dur-base) var(--ease-out) backwards; /* not "both": a held fill would swallow the closing transition */
+  transition: opacity 240ms var(--ease-out);
 }
 .scrim--center {
   align-items: center;
   padding: 16px;
 }
 .scrim.is-closing {
-  opacity: 0;
   pointer-events: none;
 }
+.scrim.is-closing::before {
+  opacity: 0;
+}
+/* Closing: the paper slides back down past the edge (it never fades). */
+.scrim.is-closing .sheet {
+  /* Drop the entrance animation's fill so the closing transition can run. */
+  animation: none;
+}
 .scrim--sheet.is-closing .sheet {
-  transform: translateY(28px);
-  transition: transform 200ms ease-in;
+  transform: translateY(calc(100% + 24px));
+  transition: transform 260ms var(--ease-in);
 }
 .scrim--center.is-closing .sheet {
-  transform: scale(0.97);
-  transition: transform 180ms ease-in;
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transition:
+    opacity 180ms ease-in,
+    transform 200ms var(--ease-in);
 }
 @keyframes fade {
   from {
@@ -2119,7 +2364,7 @@ button.panel:active {
   border-radius: 24px 24px 0 0;
   padding: 10px 20px calc(var(--safe-bottom) + 20px);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--raised) 70%, transparent), 0 -12px 40px rgba(20, 12, 4, 0.22);
-  animation: sheet-up 360ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation: sheet-up var(--dur-sheet) cubic-bezier(0.22, 0.75, 0.25, 1) backwards;
 }
 .sheet::-webkit-scrollbar {
   display: none;
@@ -2141,12 +2386,24 @@ button.panel:active {
   max-width: 400px;
   border-radius: 22px;
   padding: 24px 20px 20px;
-  animation: pop 260ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation: dialog-in var(--dur-base) var(--ease-out) backwards;
 }
+/* A sheet of paper slides up from the edge and settles by a hair. */
 @keyframes sheet-up {
+  0% {
+    transform: translateY(100%);
+  }
+  78% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes dialog-in {
   from {
-    transform: translateY(40%);
     opacity: 0;
+    transform: translateY(8px) scale(0.97);
   }
 }
 @keyframes pop {
@@ -2354,7 +2611,7 @@ button.panel:active {
 /* Locked: an empty slot in the album page with the faintest ghost of the card. */
 .month__cards button.locked {
   background: var(--surface-2);
-  outline: 1.5px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--muted) 28%, transparent);
   outline-offset: -1.5px;
 }
 .month__cards button.locked svg {
@@ -2415,6 +2672,20 @@ button.panel:active {
     opacity: 0;
     transform: translateY(14px) rotate(-3deg) scale(0.96);
   }
+}
+/* The album thumbnail in flight to the detail (motion.ts flyInto). */
+.fly-card {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.fly-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 18px rgba(40, 20, 5, 0.28));
 }
 .detail__card svg {
   display: block;
@@ -2674,7 +2945,7 @@ a.row:active {
   border-radius: 15px;
   background: var(--line);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.12);
-  transition: background 180ms;
+  transition: background 200ms ease;
 }
 .switch::before {
   content: '';
@@ -2691,7 +2962,7 @@ a.row:active {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
-  transition: transform 200ms var(--ease-out);
+  transition: transform 220ms var(--ease-settle);
 }
 .switch[aria-checked='true'] {
   background: var(--good);
@@ -2726,6 +2997,29 @@ a.row:active {
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(90, 64, 36, 0.06);
   font-weight: 700;
+}
+/* With a sliding pill (motion.ts slidePill) the pill carries the raised paper. */
+.seg.has-pill {
+  position: relative;
+}
+.seg__pill {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 9px;
+  background: var(--raised);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(90, 64, 36, 0.06);
+  transform-origin: 0 50%;
+  pointer-events: none;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.seg.has-pill button {
+  position: relative;
+}
+.seg.has-pill button[aria-pressed='true'] {
+  background: transparent;
+  box-shadow: none;
 }
 .price {
   flex: none;
@@ -2772,52 +3066,6 @@ a.row:active {
   color: var(--muted);
   max-width: 32em;
   margin: 0;
-}
-
-/* How to play */
-.howto {
-  list-style: none;
-  margin: 16px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  counter-reset: step;
-}
-.howto li {
-  display: grid;
-  grid-template-columns: 28px 1fr;
-  column-gap: 12px;
-  font-size: var(--fs-body);
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-.howto li::before {
-  counter-increment: step;
-  content: counter(step);
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
-  font-family: var(--font-serif);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--accent-text);
-  box-shadow: inset 0 0 0 1.25px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-.howto b {
-  display: block;
-  color: var(--ink);
-}
-.howto__foot {
-  margin-top: 16px !important;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: 14px;
-  color: var(--ink-soft);
 }
 
 /* Board paper picker */
@@ -3004,8 +3252,18 @@ a.row:active {
   font-weight: 600;
   line-height: 1;
   color: color-mix(in srgb, var(--muted) 55%, transparent);
-  outline: 1.5px dashed color-mix(in srgb, var(--muted) 45%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--muted) 28%, transparent);
   outline-offset: -1.5px;
+}
+/* Progress meters in the seal book fill in once as the page arrives. */
+.seals .sealrow__prog .meter i {
+  transform-origin: left center;
+  animation: meter-fill 640ms var(--ease-out) 220ms backwards;
+}
+@keyframes meter-fill {
+  from {
+    transform: scaleX(0);
+  }
 }
 .sealrow.is-done .sealmark {
   outline: 0;
@@ -3218,7 +3476,7 @@ a.row:active {
 .chapter.is-locked .chapter__glyph {
   background: transparent;
   box-shadow: none;
-  outline: 1.5px dashed color-mix(in srgb, var(--season) 45%, transparent);
+  outline: 1.5px solid color-mix(in srgb, var(--season) 30%, transparent);
   outline-offset: -1.5px;
 }
 .lvl-grid {
@@ -3246,7 +3504,7 @@ a.row:active {
 .lvl[disabled] {
   background: transparent;
   box-shadow: none;
-  outline: 1px dashed var(--line);
+  outline: 1px solid var(--line);
   outline-offset: -1px;
   color: var(--muted);
   cursor: default;
@@ -3325,159 +3583,6 @@ a.row:active {
   color: var(--accent-ink);
 }
 
-/* ───────────────────────────── Welcome ───────────────────────────── */
-.welcome {
-  justify-content: safe center;
-  align-items: stretch;
-  gap: 20px;
-  text-align: center;
-  overflow-y: auto;
-  scrollbar-width: none;
-  padding-top: calc(var(--safe-top) + 20px);
-}
-.welcome::-webkit-scrollbar {
-  display: none;
-}
-.welcome__brand {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-serif);
-  font-size: 20px;
-  font-weight: 700;
-}
-.welcome__brand .seal {
-  width: 34px;
-  height: 34px;
-  font-size: 18px;
-  transform: rotate(-5deg);
-}
-.welcome__fan {
-  position: relative;
-  flex: none;
-  height: 150px;
-}
-.welcome__fan svg {
-  position: absolute;
-  left: 50%;
-  top: 8px;
-  width: 88px;
-  height: 123px;
-  margin-left: -44px;
-  filter: drop-shadow(0 8px 12px rgba(40, 20, 5, 0.22));
-  transform-origin: 50% 140%;
-  animation: fan 760ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
-}
-@keyframes fan {
-  from {
-    transform: rotate(0deg);
-    opacity: 0;
-  }
-}
-.welcome h1 {
-  font-family: var(--font-serif);
-  font-size: 30px;
-  margin: 0;
-  line-height: 1.2;
-}
-.welcome__lede {
-  text-wrap: balance;
-  margin: -6px auto 0;
-  max-width: 34ch;
-  font-size: var(--fs-body);
-  line-height: 1.55;
-  color: var(--ink-soft);
-}
-.welcome__lede b {
-  color: var(--ink);
-}
-.rules {
-  list-style: none;
-  margin: 0;
-  padding: 4px 0;
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-.rule {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 16px 12px 12px;
-  font-size: 14px;
-  color: var(--ink-soft);
-  line-height: 1.4;
-}
-.rule + .rule::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 78px;
-  right: 0;
-  height: 1px;
-  background: var(--line-soft);
-}
-.rule b {
-  display: block;
-  font-size: var(--fs-body);
-  color: var(--ink);
-}
-.rule__cards,
-.rule__glyph {
-  flex: none;
-  width: 52px;
-  display: flex;
-  justify-content: center;
-  color: var(--ink-soft);
-}
-.rule__cards svg {
-  width: 24px;
-  height: 34px;
-  border-radius: 3px;
-  box-shadow: var(--card-shadow);
-}
-.rule__cards svg + svg {
-  margin-left: 3px;
-  transform: rotate(6deg);
-}
-.rule__cards svg:first-child {
-  transform: rotate(-4deg);
-}
-.rule__glyph svg {
-  width: 34px;
-  height: 34px;
-}
-.rule__glyph.serif {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--accent-text);
-}
-.welcome .btn {
-  flex: none;
-}
-@media (max-height: 760px) {
-  .welcome {
-    gap: 14px;
-  }
-  .welcome__fan {
-    height: 124px;
-  }
-  .welcome__fan svg {
-    width: 72px;
-    height: 101px;
-    margin-left: -36px;
-  }
-  .welcome h1 {
-    font-size: 26px;
-  }
-  .rule {
-    padding-top: 10px;
-    padding-bottom: 10px;
-  }
-}
-
 /* Legacy year picker (kept for older builds) */
 .year {
   appearance: none;
@@ -3542,8 +3647,56 @@ a.row:active {
     transform: translate(-50%, 4px);
   }
 }
+/* A newer toast arrived: this one sinks away quickly underneath it. */
+.toast.is-out {
+  animation: toast-out 160ms var(--ease-in) forwards;
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
 
 /* ───────────────────────────── Motion & layout guards ───────────────────────────── */
+/* ───────────────────────────── Press states ─────────────────────────────
+   One feel everywhere: the press lands quickly, the release eases back. */
+.gd-visit,
+.road__fold-btn {
+  transition: transform 160ms var(--ease-out), background 160ms;
+}
+.gd-visit:active,
+.road__fold-btn:active {
+  transform: scale(0.985);
+}
+.road__fold-btn:active {
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--ink));
+}
+.btn:active,
+.icon-btn:active,
+.chip-btn:active,
+button.panel:active,
+button.row:active,
+.seg button:active,
+.tool:active,
+.mk-tile:active,
+.mk-tab:active,
+.gd-piece:active,
+.gd-visit:active,
+.gd-time:active,
+.fp-strip:active,
+.chest:active,
+.lvl:not([disabled]):active,
+.stop__head:not([disabled]):active,
+.month__cards button:active,
+.road__fold-btn:active {
+  transition-duration: 70ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -3559,6 +3712,52 @@ a.row:active {
   }
   .gift-btn i {
     animation: none !important;
+  }
+  /* Instead of travelling, the big surfaces cross-fade briefly (no movement). */
+  .screen,
+  .scrim::before,
+  .scrim .sheet {
+    animation: rm-in 160ms ease-out both !important;
+  }
+  .screen--leaving {
+    animation: rm-out 140ms ease-in both !important;
+  }
+  .scrim.is-closing .sheet {
+    animation: rm-out 140ms ease-in both !important;
+    transform: none !important;
+  }
+  .scrim.is-closing::before {
+    animation: rm-out 140ms ease-in both !important;
+  }
+  /* Toasts must stay readable: they fade in, hold, and fade out in place. */
+  .toast {
+    animation: toast-rm var(--toast-ms, 2400ms) linear both !important;
+  }
+  .toast.is-out {
+    animation: rm-out 120ms ease-in both !important;
+    transform: translateX(-50%);
+  }
+}
+@keyframes rm-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rm-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes toast-rm {
+  0% {
+    opacity: 0;
+  }
+  6%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
 
@@ -3587,4 +3786,313 @@ a.row:active {
 }
 .chapter__name {
   margin: 0;
+}
+
+/* ── Practice room (연습 · 稽古): ideas met on the road, their intros and gentle boards ── */
+.practice__note {
+  margin: 2px 4px 14px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.practice__empty {
+  margin: 24px 4px;
+  text-align: center;
+}
+.practice__row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  animation: practice-rise 420ms var(--ease-settle) calc(var(--i, 0) * 45ms) backwards;
+}
+.practice__row + .practice__row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 74px;
+  right: 0;
+  height: 1px;
+  background: var(--line-soft);
+}
+@keyframes practice-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.practice__mark {
+  margin-top: 2px;
+  color: var(--accent-text);
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: rotate(-4deg);
+}
+.practice__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.practice__title {
+  font-weight: 700;
+  font-size: var(--fs-body);
+  line-height: 1.3;
+}
+.practice__native {
+  margin-left: 4px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.practice__rule {
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: var(--muted);
+}
+.practice__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 8px;
+}
+.practice__boards {
+  display: inline-flex;
+  gap: 8px;
+}
+.practice__board {
+  min-width: 40px;
+  justify-content: center;
+  padding: 0 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Your play style (기풍 · 棋風): insights, skill line, mastery and best runs ── */
+.style__insight {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 16px 14px;
+  animation: practice-rise 420ms var(--ease-settle) calc(var(--i, 0) * 45ms) backwards;
+}
+.style__insight + .style__insight::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  height: 1px;
+  background: var(--line-soft);
+}
+.style__kind {
+  font-size: var(--fs-cap);
+  font-weight: 700;
+  letter-spacing: var(--track-cap);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.style__insight--strength .style__kind {
+  color: var(--good-text);
+}
+.style__insight--edge .style__kind {
+  color: var(--accent-text);
+}
+.style__say {
+  font-family: var(--font-serif);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+}
+.style__note,
+.style__chart-empty {
+  margin: 10px 4px 0;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--muted);
+}
+.style__chart-empty {
+  margin: 0;
+  padding: 18px 16px;
+}
+.style__chart {
+  margin: 0;
+  padding: 16px 16px 12px;
+  animation: practice-rise 480ms var(--ease-settle) 120ms backwards;
+}
+.style__chart svg {
+  display: block;
+  width: 100%;
+  height: 112px;
+  overflow: visible;
+}
+.style__base {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.style__line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.style__caption {
+  margin-top: 10px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.style__mech {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  animation: practice-rise 420ms var(--ease-settle) calc(var(--i, 0) * 45ms) backwards;
+}
+.style__mech + .style__mech::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 74px;
+  right: 0;
+  height: 1px;
+  background: var(--line-soft);
+}
+.style__seal {
+  color: var(--accent-text);
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: rotate(-4deg);
+}
+.style__mech-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.style__mech-name {
+  font-weight: 700;
+  font-size: var(--fs-body);
+  line-height: 1.3;
+}
+/* the band: one ink stroke on a soft track, a third, two thirds or the whole way */
+.style__band {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.style__band i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--ink-soft);
+  transform-origin: left center;
+  transform: scaleX(0);
+  animation: meter-fill 640ms var(--ease-settle) 240ms backwards;
+}
+.style__band--learning i {
+  transform: scaleX(0.34);
+}
+.style__band--steady i {
+  transform: scaleX(0.67);
+}
+.style__band--home i {
+  transform: scaleX(1);
+  background: var(--good-text);
+}
+.style__band-word {
+  flex: none;
+  min-width: 64px;
+  text-align: right;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.style__runs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.style__run {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 13px 16px 14px;
+  min-width: 0;
+}
+.style__run:nth-child(2n)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 1px;
+  background: var(--line-soft);
+}
+.style__run:nth-child(n + 3) {
+  border-top: 1px solid var(--line-soft);
+}
+.style__run-label {
+  font-size: var(--fs-cap);
+  font-weight: 700;
+  letter-spacing: var(--track-cap);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.style__run b {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.style__run small {
+  font-size: var(--fs-sm);
+  line-height: 1.35;
+  color: var(--muted);
+}
+.style__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 40px 12px 8px;
+  text-align: center;
+  animation: practice-rise 480ms var(--ease-settle) backwards;
+}
+.style__empty p {
+  margin: 0;
+  line-height: 1.5;
+}
+.style__empty-seal {
+  margin-bottom: 10px;
+  color: var(--accent-text);
+  outline-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  transform: rotate(-4deg);
+}
+.style__empty-title {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.style__privacy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 28px 4px 12px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.style__privacy svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
 }

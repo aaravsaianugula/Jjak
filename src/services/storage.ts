@@ -4,6 +4,8 @@ import { type JourneySave, defaultJourney, hydrateJourney } from './save-journey
 import { type GardenSave, defaultGarden, hydrateGarden } from './save-garden';
 import { type MarketSave, defaultMarket, hydrateMarket } from './save-market';
 import { type MetaSave, defaultMeta, hydrateMeta } from './save-meta';
+import { type AnalyticsSave, defaultAnalytics, hydrateAnalytics } from './save-analytics';
+import { type AdOfferSave, defaultAdOffer, hydrateAdOffer } from './ad-offer';
 
 export type Theme = 'auto' | 'paper' | 'ink';
 
@@ -63,6 +65,8 @@ export interface SaveData {
   yakuSeen: string[];
   /** owns the one-time "Remove ads" purchase */
   adFree: boolean;
+  /** when the player was last asked to remove ads, and whether they said "Don't ask again" */
+  adOffer: AdOfferSave;
   rush: { best: number; runs: number; bestRound: number };
   /** 7-day gift calendar: next day index (0–6) and the date it was last claimed */
   gift: { day: number; lastClaim: string | null };
@@ -72,6 +76,8 @@ export interface SaveData {
   garden: GardenSave;
   market: MarketSave;
   meta: MetaSave;
+  /** on-device play analytics for the Level Director (never leaves the device) */
+  analytics: AnalyticsSave;
 }
 
 const KEY = 'jjak.save.v1';
@@ -94,6 +100,7 @@ export const defaultSave = (): SaveData => ({
   paper: 'plain',
   ads: { clearsSinceInterstitial: 0, lastInterstitialAt: 0, lastRewardedAt: 0, interstitialsShown: 0, rewardedWatched: 0, lastUpsell: null },
   adFree: false,
+  adOffer: defaultAdOffer(),
   yakuSeen: [],
   reminder: { hour: null, asked: false },
   rush: { best: 0, runs: 0, bestRound: 0 },
@@ -103,6 +110,7 @@ export const defaultSave = (): SaveData => ({
   garden: defaultGarden(),
   market: defaultMarket(),
   meta: defaultMeta(),
+  analytics: defaultAnalytics(),
 });
 
 /** Merge stored data over defaults so new fields appear after app updates. */
@@ -121,10 +129,12 @@ function hydrate(raw: unknown): SaveData {
     rush: { ...base.rush, ...(r.rush ?? {}) },
     gift: { ...base.gift, ...(r.gift ?? {}) },
     reminder: { ...base.reminder, ...(r.reminder ?? {}) },
+    adOffer: hydrateAdOffer(r.adOffer),
     journey: hydrateJourney(r.journey),
     garden: hydrateGarden(r.garden),
     market: hydrateMarket(r.market),
     meta: hydrateMeta(r.meta),
+    analytics: hydrateAnalytics(r.analytics),
   };
 }
 
@@ -176,8 +186,9 @@ export async function flush(): Promise<void> {
 }
 
 export async function resetSave(): Promise<void> {
-  // A purchase is never lost by resetting progress.
-  const keep = { onboarded: save.onboarded, settings: save.settings, adFree: save.adFree };
+  // A purchase is never lost by resetting progress. The Remove ads asks are kept too:
+  // "Don't ask again" is a preference, and a reset is not a first start.
+  const keep = { onboarded: save.onboarded, settings: save.settings, adFree: save.adFree, adOffer: save.adOffer };
   // Purchase receipts survive too, so a restore can't grant one-time petals twice.
   const paid = { supporter: save.meta.supporter, iapTokens: save.meta.iapTokens };
   save = { ...defaultSave(), ...keep };

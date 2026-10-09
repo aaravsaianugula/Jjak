@@ -48,12 +48,11 @@ function addXp(n: number): void {
   if (n <= 0) return;
   save.meta.xp += Math.round(n);
   if (board) board.xp += Math.round(n);
+  if (run) run.xp += Math.round(n);
 }
 
 export interface Granted {
   petals: number;
-  hints: number;
-  shuffles: number;
   tea: number;
   /** card ids newly gilded */
   foil: number[];
@@ -63,7 +62,7 @@ export interface Granted {
 
 /** Give a reward to the player. Tea over the cap and foil with nothing left to gild turn into petals. */
 export function grant(r: Reward): Granted {
-  const out: Granted = { petals: r.petals ?? 0, hints: r.hints ?? 0, shuffles: r.shuffles ?? 0, tea: 0, foil: [], items: [], xp: r.xp ?? 0 };
+  const out: Granted = { petals: r.petals ?? 0, tea: 0, foil: [], items: [], xp: r.xp ?? 0 };
   for (let i = 0; i < (r.tea ?? 0); i++) {
     if (save.streakFreezes < MAX_TEA) {
       save.streakFreezes++;
@@ -80,8 +79,6 @@ export function grant(r: Reward): Granted {
     out.items.push(key);
   }
   save.petals += out.petals;
-  save.hints += out.hints;
-  save.shuffles += out.shuffles;
   addXp(out.xp);
   persist();
   return out;
@@ -240,14 +237,34 @@ export function claimMission(slot: number): { xp: number; petals: number } | nul
   return r;
 }
 
-/** Advance every open mission that tracks `metric`. */
-function bump(metric: MissionMetric, amount = 1): void {
-  if (amount <= 0) return;
+interface MissionTicker {
+  /** advance every open mission that tracks `metric` */
+  bump: (metric: MissionMetric, amount?: number) => void;
+  /** does an open mission track `metric`? (skip work no mission will count) */
+  tracks: (metric: MissionMetric) => boolean;
+}
+
+/**
+ * Today's open missions, looked up once per game event (a pair, a clear, a Rush
+ * run) rather than once per metric. The caller persists once when it's done.
+ */
+function missionTicker(): MissionTicker {
   ensureToday();
-  const best = BEST_METRICS.includes(metric);
-  for (const s of save.meta.missions.list) {
+  const open = save.meta.missions.list.flatMap((s) => {
     const def = missionDef(s.id);
-    if (!def || def.metric !== metric || s.done) continue;
+    return def && !s.done ? [{ s, def }] : [];
+  });
+  const tracks = (metric: MissionMetric) => open.some(({ s, def }) => def.metric === metric && !s.done);
+  const bump = (metric: MissionMetric, amount = 1) => {
+    if (amount > 0) advance(open, metric, amount);
+  };
+  return { bump, tracks };
+}
+
+function advance(open: { s: MissionState; def: MissionDef }[], metric: MissionMetric, amount: number): void {
+  const best = BEST_METRICS.includes(metric);
+  for (const { s, def } of open) {
+    if (def.metric !== metric || s.done) continue;
     s.n = best ? Math.max(s.n, amount) : s.n + amount;
     if (s.n >= def.target) {
       s.n = def.target;
@@ -256,10 +273,10 @@ function bump(metric: MissionMetric, amount = 1): void {
       ensureWeek();
       save.meta.week.count++;
       if (board) board.missions.push(missionText(def));
+      if (run) run.missions.push(missionText(def));
       notify(`Mission complete · ${missionText(def)}`);
     }
   }
-  persist();
 }
 
 export function weekly(): { count: number; target: number; claimed: boolean; ready: boolean; reward: Reward } {
@@ -361,6 +378,19 @@ interface BoardTrack {
 }
 let board: BoardTrack | null = null;
 
+/**
+ * A whole Rush run (every round is its own Session, so the per-board tracker
+ * can't see the run). Starts on the run's 'start' event, ends when another
+ * board starts; a "Keep going" continuation stays in the same run.
+ */
+interface RunTrack {
+  xp: number;
+  xpBefore: number;
+  missions: string[];
+  bonus: number[];
+}
+let run: RunTrack | null = null;
+
 function track(session: Session): BoardTrack {
   if (!board || board.session !== session) {
     const n = session.spec.mode === 'journey' ? session.spec.number : 0;
@@ -401,6 +431,23 @@ export function boardReport(session: Session): BoardReport | null {
     tea,
   };
 }
+
+/** What the Rush run added to the Flower Path so far (call after the run is recorded). */
+export function rushReport(): BoardReport | null {
+  if (!run) return null;
+  return {
+    xp: run.xp,
+    before: rankInfo(run.xpBefore),
+    after: rankInfo(save.meta.xp),
+    missions: run.missions.slice(),
+    foil: null,
+    bonus: run.bonus.slice(),
+    tea: 0,
+  };
+}
+
+/** Rush XP for a run score (capped). */
+const rushXp = (score: number) => Math.min(XP.rushCap, Math.floor(score / XP.rushPointsPerXp));
 
 /** Warm tea cups waiting to be announced (consumes the notice). */
 export function takeTeaNotice(): number {
@@ -444,12 +491,14 @@ export function grantSupporter(): boolean {
 
 on('start', ({ session }) => {
   track(session);
+  run = session.spec.mode === 'rush' ? { xp: 0, xpBefore: save.meta.xp, missions: [], bonus: [] } : null;
   ensureToday();
 });
 
 on('pair', (e) => {
   const b = track(e.session);
   addXp(XP.pair);
+  const { bump, tracks } = missionTicker();
   bump('pairs');
   if (e.mode === 'rush') bump('rushPairs');
   if (e.combo === 4) bump('combo4');
@@ -458,18 +507,23 @@ on('pair', (e) => {
     b.fever = e.session.feverCount;
   }
   if (e.yaku.length) bump('yaku', e.yaku.length);
-  const kinds = e.cards.filter((id) => !isBonus(id)).map((id) => cardDef(id).kind);
-  bump('brights', kinds.filter((k) => k === 'bright').length);
-  bump('animals', kinds.filter((k) => k === 'animal').length);
-  bump('ribbons', kinds.filter((k) => k === 'ribbon').length);
-  const month = monthFor(save.meta.missions.date ?? today()).index;
-  bump('monthCards', e.cards.filter((id) => !isBonus(id) && id >> 2 === month).length);
+  if (tracks('brights') || tracks('animals') || tracks('ribbons')) {
+    const kinds = e.cards.filter((id) => !isBonus(id)).map((id) => cardDef(id).kind);
+    bump('brights', kinds.filter((k) => k === 'bright').length);
+    bump('animals', kinds.filter((k) => k === 'animal').length);
+    bump('ribbons', kinds.filter((k) => k === 'ribbon').length);
+  }
+  if (tracks('monthCards')) {
+    const month = monthFor(save.meta.missions.date ?? today()).index;
+    bump('monthCards', e.cards.filter((id) => !isBonus(id) && id >> 2 === month).length);
+  }
   if (e.cards.some(isBonus)) {
     bump('lucky');
     const fresh = BONUS_IDS.filter((id) => !save.meta.bonus.includes(id));
     if (fresh.length) {
       save.meta.bonus.push(...fresh);
       b.bonus.push(...fresh);
+      if (run) run.bonus.push(...fresh);
       persist();
       notify('Lucky cards added to your Album');
     }
@@ -483,9 +537,15 @@ on('clear', ({ session, summary }) => {
   const spec = session.spec as SpecX;
   const st = session.stars();
   const mode = spec.mode;
+  const { bump } = missionTicker();
   if (mode === 'zen') {
     addXp(XP.zenClear);
     bump('zen');
+  } else if (mode === 'journey' && !summary.firstClear) {
+    // A replay earns XP only for blossoms it adds (like petals), so an easy board
+    // can't be ground for ranks; its pairs still count.
+    const gained = Math.max(0, summary.stars - b.prevStars);
+    if (gained) addXp(XP.clear + gained * XP.perStar);
   } else {
     addXp(XP.clear + summary.stars * XP.perStar);
     if (summary.firstClear) addXp(XP.firstClear);
@@ -516,12 +576,17 @@ on('clear', ({ session, summary }) => {
   if (spec.stones > 0) bump('stones');
   if (spec.knots) bump('knots');
   if (mx.wind) bump('wind');
+  if (spec.gates) bump('gates');
+  if (spec.fences) bump('fences');
+  if (spec.goal && st.goal) bump('goal');
   persist();
 });
 
 on('rush', (e) => {
-  addXp(Math.min(XP.rushCap, Math.floor(e.score / XP.rushPointsPerXp)));
-  bump('rushRuns');
+  // A "Keep going" continuation tops the run up to its new score; it isn't a new run.
+  addXp(rushXp(e.score) - (e.extends != null ? rushXp(e.extends) : 0));
+  const { bump } = missionTicker();
+  if (e.extends == null) bump('rushRuns');
   bump('rushBest', e.score);
   persist();
 });

@@ -10,14 +10,26 @@
 import { Capacitor } from '@capacitor/core';
 import {
   AdMob,
+  AdmobConsentDebugGeography,
   AdmobConsentStatus,
   BannerAdPluginEvents,
   BannerAdPosition,
   BannerAdSize,
+  InterstitialAdPluginEvents,
   MaxAdContentRating,
+  RewardAdPluginEvents,
 } from '@capacitor-community/admob';
+import { FullScreenGate, playFullScreenAd } from './ad-show';
 import { AD_POLICY, AD_UNITS, ADS_TEST_MODE } from '../config';
 import { music } from './music';
+
+/**
+ * QA builds only: `VITE_UMP_DEBUG_DEVICE=<hashed device id> npx vite build --mode qa`
+ * (UMP logs the id as addTestDeviceHashedId("…")) makes that phone appear to be in
+ * the EEA, so the consent form can be tested. Any other build mode ignores it, so a
+ * stray .env value can't reach a release bundle.
+ */
+const UMP_DEBUG_DEVICE: string = import.meta.env.MODE === 'qa' ? (import.meta.env.VITE_UMP_DEBUG_DEVICE ?? '') : '';
 import { persist, save } from './storage';
 
 const native = Capacitor.isNativePlatform();
@@ -25,14 +37,35 @@ const native = Capacitor.isNativePlatform();
 /**
  * Jjak's Play Console target audience is 13+, so it is not in the Families
  * programme: no age gate, no child-directed tagging. Ads are capped at
- * Parental Guidance so they stay in keeping with an "Everyone"-rated game
- * played by teens.
+ * General audiences (G), the strictest rating, so they stay calm and in keeping with
+ * an "Everyone"-rated game. Category blocking and display-only interstitials are set
+ * in the AdMob console (docs/PLAY_STORE_RELEASE.md §2).
  */
 const AD_PROFILE = {
   child: false,
   underConsent: false,
-  rating: MaxAdContentRating.ParentalGuidance,
+  rating: MaxAdContentRating.General,
 };
+
+/** Back in the app with no close event from the ad: after this grace, the ad counts as closed. */
+const RETURN_GRACE_MS = 1500;
+
+/** Fires (after the grace) when the app is in front again after something covered it. */
+function onReturn(fn: () => void): Promise<{ remove: () => Promise<void> }> {
+  let away = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const watch = () => {
+    if (document.hidden) away = true;
+    else if (away) timer = setTimeout(fn, RETURN_GRACE_MS);
+  };
+  document.addEventListener('visibilitychange', watch);
+  return Promise.resolve({
+    remove: async () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', watch);
+    },
+  });
+}
 
 class AdService {
   private ready = false;
@@ -40,6 +73,7 @@ class AdService {
   private bannerVisible = false;
   private interstitialLoaded = false;
   private rewardedLoaded = false;
+  private readonly fullScreen = new FullScreenGate();
   privacyOptionsRequired = false;
   /** Set by the UI to show a placeholder strip on the web demo. */
   onWebBanner: ((visible: boolean) => void) | null = null;
@@ -56,7 +90,10 @@ class AdService {
 
   private async doStart() {
     const p = AD_PROFILE;
-    let info = await AdMob.requestConsentInfo({ tagForUnderAgeOfConsent: p.underConsent });
+    let info = await AdMob.requestConsentInfo({
+      tagForUnderAgeOfConsent: p.underConsent,
+      ...(UMP_DEBUG_DEVICE ? { debugGeography: AdmobConsentDebugGeography.EEA, testDeviceIdentifiers: [UMP_DEBUG_DEVICE] } : {}),
+    });
     if (info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) {
       info = await AdMob.showConsentForm();
     }
@@ -158,23 +195,39 @@ class AdService {
     save.ads.clearsSinceInterstitial++;
     persist();
     if (!this.interstitialDue(journeyLevelCleared)) return false;
-    if (native && (!this.ready || !this.interstitialLoaded)) return false;
+    if (native && (!this.ready || !this.interstitialLoaded)) {
+      void this.preloadInterstitial(); // a load that failed (offline launch, no fill) gets another try
+      return false;
+    }
+    return this.fullScreen.run(() => this.showInterstitial(), false);
+  }
+
+  private async showInterstitial(): Promise<boolean> {
     await adBreakNotice();
     music.duck(true);
     try {
+      let shown: boolean;
       if (native) {
         this.interstitialLoaded = false;
-        await AdMob.showInterstitial();
+        // Ends when the ad closes; the next one is preloaded only then (see ad-show.ts).
+        ({ shown } = await playFullScreenAd(() => AdMob.showInterstitial(), {
+          onDismissed: (fn) => AdMob.addListener(InterstitialAdPluginEvents.Dismissed, fn),
+          onFailedToShow: (fn) => AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, fn),
+          onReturn,
+        }));
       } else {
-        await webStub('Interstitial ad', 'Between boards only, never mid-puzzle.', 1200);
+        shown = await webStub('Interstitial ad', 'Between boards only, never mid-puzzle.', 1200);
       }
+      if (!shown) return false; // nothing to show (no fill): the board goes on
       save.ads.clearsSinceInterstitial = 0;
       save.ads.lastInterstitialAt = Date.now();
       save.ads.interstitialsShown++;
       persist();
       return true;
-    } catch {
-      return false; // no fill: skip silently
+    } catch (err) {
+      // The plugin wouldn't take a listener: skip this ad rather than strand the player between boards.
+      console.warn('ads: interstitial skipped', err);
+      return false;
     } finally {
       music.duck(false);
       void this.preloadInterstitial();
@@ -186,26 +239,37 @@ class AdService {
     return !native || (this.ready && this.rewardedLoaded);
   }
 
-  /** Show a rewarded ad. Resolves true only if the reward was earned. */
-  async rewarded(): Promise<boolean> {
+  /** Show a rewarded ad. Resolves true only if the reward was earned; a second tap while one is up is refused. */
+  rewarded(): Promise<boolean> {
+    return this.fullScreen.run(() => this.playRewarded(), false);
+  }
+
+  private async playRewarded(): Promise<boolean> {
     let ok = false;
     music.duck(true);
-    if (!native) ok = await webStub('Rewarded ad', 'On Android a short video plays here.', 1400);
-    else if (this.ready) {
-      if (!this.rewardedLoaded) await this.preloadRewarded();
-      if (this.rewardedLoaded) {
-        try {
+    try {
+      if (!native) ok = await webStub('Rewarded ad', 'On Android a short video plays here.', 1400);
+      else if (this.ready) {
+        if (!this.rewardedLoaded) await this.preloadRewarded();
+        if (this.rewardedLoaded) {
           this.rewardedLoaded = false;
-          const item = await AdMob.showRewardVideoAd();
-          ok = !!item && item.amount >= 0;
-        } catch {
-          ok = false;
-        } finally {
-          void this.preloadRewarded();
+          // Ends when the ad closes, rewarded or not (closed early, the plugin's show call never settles).
+          ({ rewarded: ok } = await playFullScreenAd(() => AdMob.showRewardVideoAd(), {
+            onDismissed: (fn) => AdMob.addListener(RewardAdPluginEvents.Dismissed, fn),
+            onFailedToShow: (fn) => AdMob.addListener(RewardAdPluginEvents.FailedToShow, fn),
+            onRewarded: (fn) => AdMob.addListener(RewardAdPluginEvents.Rewarded, fn),
+            onReturn,
+          }));
         }
       }
+    } catch (err) {
+      // The plugin wouldn't take a listener: no reward, and the board carries on.
+      console.warn('ads: rewarded ad skipped', err);
+      ok = false;
+    } finally {
+      music.duck(false);
+      void this.preloadRewarded();
     }
-    music.duck(false);
     if (ok) {
       save.ads.lastRewardedAt = Date.now();
       save.ads.rewardedWatched++;
@@ -243,7 +307,7 @@ function adBreakNotice(): Promise<void> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.className = 'ad-break';
-    el.innerHTML = '<div class="ad-break__card"><span class="seal seal--sm">짝</span><div><b>Short break</b><br><span>An ad keeps Jjak free. Back in a moment.</span></div></div>';
+    el.innerHTML = '<div class="ad-break__card"><span class="seal seal--sm">짝</span><div><b>Short break</b><br><span>An ad keeps Jjak free. Back in a moment.</span><br><small>Remove ads any time in Settings.</small></div></div>';
     document.body.append(el);
     setTimeout(() => {
       el.remove();

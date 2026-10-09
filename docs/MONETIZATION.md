@@ -22,7 +22,7 @@ Numbers from vendor blogs are directional. Validate them with Jjak's own data (s
 | Loop | Cadence | Hook |
 |---|---|---|
 | **Combo → Fever** | Seconds | Pairs within 4 s chain 짝짝짝…. At ×5 the board blooms (**만개 · 満開**) for 6 s of double points. |
-| **Journey** | Minutes | Up to three blossoms per level, a new mechanic each season, and a **lantern gift every 4 levels** (petals + a hint or shuffle). The Home card counts down to the next lantern. |
+| **Journey** | Minutes | Up to three blossoms per level, a new mechanic each season, and a **lantern gift every 4 levels** (petals; a chapter's last lantern holds more). The Home card counts down to the next lantern. |
 | **Near miss** | Per board | Missing a blossom puts "Retry for 3 blossoms" on the result sheet, along with what you missed. |
 | **Rush** | Minutes | A 60-second score attack. Pairs add 1 s (2 s at ×3+), clearing a board adds 8 s, and boards grow as the run goes on. You chase your personal best. |
 | **Daily Jjak** | Daily | The same board worldwide, a weekday theme, a streak, a 7-day strip, and a share card. |
@@ -30,8 +30,8 @@ Numbers from vendor blogs are directional. Validate them with Jjak's own data (s
 | **Daily reminder** | Daily | Opt-in only, offered inline after your first Daily (never a pop-up). It names that day's theme ("Leaf-fall Wednesday · Daily #8 is ready"), skips days you've already played, and uses inexact alarms (no special permission). |
 | **Card sets** | Per board | Clearing a real yaku set inside one board scores a named bonus, a discovery layer for players who learn the deck. |
 | **Album, Seals, papers** | Weeks | 48 cards, 44 seals including real yaku sets, and 12 board papers. |
-| **Flower Path 꽃길 · 花道** | Every board → ~50 h | Free 100-rank track fed by XP from all play. A title every 10 ranks, a reward on every rank (petals, tools, Warm tea, gold-leaf cards), and six exclusives that can't be bought (`back:moon` r25 … `music:moonlight` r100). Rank 2 comes in the first session, rank 5 in the first hour, rank 100 at about 50 hours. |
-| **Daily missions** | Daily | Three a day (light, steady, long) drawn from 40 templates across Journey, Daily, Rush and Zen, one free swap each. Completing them fills a **weekly chest** (15 → XP, tools and a gold-leaf card). Missing days costs nothing. |
+| **Flower Path 꽃길 · 花道** | Every board → ~50 h | Free 100-rank track fed by XP from all play. A title every 10 ranks, a reward on every rank (petals, Warm tea, gold-leaf cards), and six exclusives that can't be bought (`back:moon` r25 … `music:moonlight` r100). Rank 2 comes in the first session, rank 5 in the first hour, rank 100 at about 50 hours. |
+| **Daily missions** | Daily | Three a day (light, steady, long) drawn from 40 templates across Journey, Daily, Rush and Zen, one free swap each. Completing them fills a **weekly chest** (15 → XP, petals and a gold-leaf card). Missing days costs nothing. |
 | **Star chests** | Per chapter | Three chests per 12-level chapter at 12 / 24 / 36 blossoms: a reason to replay for missing blossoms. |
 | **Gold leaf 金箔** | Months | Rare foil editions of album cards from rank rewards, weekly and 36-blossom chests, and a small chance on perfect first clears later on. Never for sale. |
 | **Warm tea** | Daily | A streak freeze (hold up to 2). Missed days are covered automatically when the Daily is next solved. |
@@ -43,13 +43,13 @@ shaming, no fake countdown offers, and no ads that block progress.
 
 | Placement | Format | When | Rules |
 |---|---|---|---|
-| Out of hints or shuffles | Rewarded | Player taps Hint/Shuffle with none left | Opt-in. +1 on completion only. |
+| Out of hints or shuffles | Rewarded | Player taps Hint/Shuffle with none left | Opt-in. +1 on completion only. With buying for petals, this is the only way to get more tools. |
 | Double petals | Rewarded | Result sheet | Opt-in, once per board. |
 | Draw one more card | Rewarded | Result sheet | Opt-in, until the album is complete. |
 | Rush "Keep going +20 s" | Rewarded | Rush time runs out | Opt-in, once per run. This is the highest-intent placement. |
 | Daily gift ×2 | Rewarded | Gift sheet | Opt-in, once per day. |
 | Between boards | Interstitial | After a board, before the next one starts | Never before level 5, at most 1 per 3 boards and 150 s, never within **6 minutes of a rewarded ad**, always preceded by a **"Short break" notice**, never mid-puzzle. |
-| Home and Album | Adaptive banner | On menus only | Never over the board. |
+| Home and Album | Adaptive banner | On menus only | Never over the board. Home says beside it that ads can be removed. |
 | App-open | — | — | **Not used**: high annoyance, low value for a puzzle game. |
 
 All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without touching game code.
@@ -63,10 +63,97 @@ All numbers live in `src/config.ts` (`AD_POLICY`), so you can tune them without 
   chooses them and some players like the rewards.
 * Ownership is re-checked with Play on every launch. "Restore purchase" is in Settings,
   and resetting progress never removes the purchase.
-* The only nudges: a Settings row, and a small text link on the result sheet **at most once
-  a day, and only after 3+ interstitials**. No pop-ups.
+* Where players learn they can remove ads (quiet text, plus the asks in §4a): a Settings row; a
+  Remove ads card in Market → Tools → Support Jjak; one line above the banner on Home
+  ("Ads keep Jjak free · Remove ads for $2.99"); a line on every "Short break" card; and a
+  small text link on the result sheet **at most once a day, from the first interstitial on**.
+  The Home line and the Market card appear only when Play has the product (no dead buttons).
+* Ads themselves are capped at **G** in code, and the AdMob console blocks sensitive
+  categories and keeps interstitials to still images (PLAY_STORE_RELEASE.md §2, step 8).
 * Implemented with `@capgo/native-purchases` (Capacitor 8, Google Play Billing). Purchases
   are auto-acknowledged.
+
+## 4a. When the game asks (first start, then one festival week a month)
+
+The game itself opens the Remove ads sheet only on these occasions (`src/services/ad-offer.ts`,
+triggered from Home by `askRemoveAdsIfDue` in `src/ui/remove-ads.ts`):
+
+* **First start:** the first time a player reaches Home (for a new player that's after the
+  intro, the first minute and the first board). Existing players who update are asked once
+  the same way, since they were never asked before.
+* **Then at most once a month, during a festival week** (seven days from the festival's date,
+  or from Seollal's eve, by the phone's own calendar day), and **never within 14 days of the
+  last ask**. A week asks for the month it **starts** in: a week that runs into the next month
+  (Chuseok from 30 September) is one ask for its first month, and its tail days never ask
+  again. The first ask counts the same way, so a first start inside a festival week is one
+  ask, not two. Saves from before the ask date was kept assume the last ask was on the last
+  day of its month, so the spacing holds for them too. (A phone clock set back in time simply
+  holds the asks until the calendar passes the last one again.)
+* **Never** once ads are off (Remove ads, the festival product or the Supporter pack), and
+  never after **"Don't ask again"**, a quiet button beside "Not now" that appears only on
+  these asks. It's a preference: Reset progress keeps it (and keeps the ask history, so a
+  reset isn't a new first start). Remove ads stays in Settings, Market and on Home.
+* Only on Home, Android only, after the launch loader has gone, after the daily gift (and any
+  card it reveals) has closed, never over the road's reveal, the board, or mid-puzzle. If the
+  player leaves Home before it's time, the next visit to Home asks instead; if they opened
+  Remove ads themselves this session, a later launch asks instead.
+
+**Festival calendar.** Twelve fixed-date Korean and Japanese festivals, one per month, plus
+Korea's lunar festivals while the verified date table lasts (`src/services/lunar-festivals.ts`).
+
+| Month | Festival | Native name | Week |
+|---|---|---|---|
+| Jan | New Year | 正月 · 신정 | Jan 1–7 |
+| Feb | Setsubun | 節分 | Feb 3–9 |
+| Mar | Hinamatsuri | 雛祭り | Mar 3–9 |
+| Apr | Hanami | 花見 | Apr 1–7 |
+| May | Children's Day | 어린이날 · こどもの日 | May 5–11 |
+| Jun | Summer solstice | 하지 · 夏至 | Jun 21–27 |
+| Jul | Tanabata | 七夕 | Jul 7–13 |
+| Aug | Obon | お盆 | Aug 13–19 |
+| Sep | Autumn equinox | 추분 · 秋分 | Sep 22–28 |
+| Oct | Hangeul Day | 한글날 | Oct 9–15 |
+| Nov | Shichi-Go-San | 七五三 | Nov 15–21 |
+| Dec | Dongji | 동지 · 冬至 | Dec 22–28 |
+
+| Lunar festival | Lunar date | Native name | Seal | Rank | Week | 2026 |
+|---|---|---|---|---|---|---|
+| Seollal | 1/1 | 설날 | 설 | major | from the eve (lunar 12/29 or 12/30) | Feb 16–22 |
+| Jeongwol Daeboreum | 1/15 | 정월대보름 | 望 | minor | from the day | Mar 3–9 |
+| Dano | 5/5 | 단오 | 端 | minor | from the day | Jun 19–25 |
+| Chilseok | 7/7 | 칠석 | 星 | minor | from the day | Aug 19–25 |
+| Chuseok · Tsukimi | 8/15 | 추석 · お月見 · 十五夜 | 月 | major | from the day | Sep 25–Oct 1 |
+
+* **Dates are read, never computed.** The table covers **2026–2045**, from KASI's official
+  Korean lunar calendar (the converter at astro.kasi.re.kr, `/life/lunc`; Seollal eves read back
+  through `/life/solc`), and every one of the 100 dates was cross-checked against the
+  `korean-lunar-calendar` package 0.4.0; Seollal and Chuseok also against the Korean public
+  holidays in the `holidays` package 0.106. No date disagreed. `tests/lunar-festivals.test.ts`
+  pins every date, and fails from 2044 on as a reminder to add the next years the same way.
+  After 2045 (or on a phone set before 2026) the fixed festivals run alone.
+* **Seollal and Chuseok take their month.** A fixed festival whose month holds the start of a
+  Seollal or Chuseok week never asks that month (Setsubun in a February Seollal year, the
+  New Year week when Seollal's eve falls in January, the equinox in a September Chuseok year).
+  Its week still shows its seal and price if the player opens Remove ads themselves.
+* **Daeboreum, Dano and Chilseok are peers** of the fixed festivals: whichever festival week
+  the player meets first carries the month's one ask.
+* **Overlapping days** show the major festival, else the minor one, else the one that began
+  last (e.g. Chuseok over the equinox, Daeboreum over Hinamatsuri on 3–9 March 2026).
+* **Names.** Japanese names only where Japan keeps the same night: Tsukimi (お月見, 十五夜) is
+  Chuseok's full moon, so the two share a week. Seollal isn't kept in Japan as such. Japan moved
+  Tango no Sekku to 5 May (our fixed Children's Day week) and keeps Tanabata on 7 July (our
+  fixed July week), so Dano and Chilseok are Korea's lunar days and separate weeks: Chilseok
+  and Tanabata are the same legend on two calendars, each with its own seal (星 and 夕).
+
+**The festival price.** A second one-time, non-consumable product, `jjak_remove_ads_festival`
+(suggested **US$2.49** against the regular US$2.99; Play sets local prices). It does exactly
+what Remove ads does and is restored the same way. While a festival week is on, the Remove
+ads sheet (asked or opened by the player) shows the festival's seal, date and names and, only
+when Play reported both prices in the same currency and the festival one is lower, says
+plainly: "Remove ads for $2.49 this week (usually $2.99)", and its Buy button buys the
+festival product. If the festival product isn't set up (or isn't cheaper), the sheet still
+shows the festival but sells Remove ads at the regular price and claims no discount. No
+countdowns, no "last chance", no percentages.
 
 ## 4b. Petal pouches and the Supporter pack
 
@@ -86,8 +173,13 @@ in one quiet "Support Jjak" section of the Market (`bundlesSection()` in
   pouches cost a little less per petal, simply because the prices step that way.
 * **No pay-to-skip:** petals buy cosmetics, garden pieces and tools. Journey levels,
   ranks, titles, the Flower Path exclusives and gold leaf can't be bought. For scale, a
-  steady player earns about 300 petals an hour, so the large pouch is roughly 13 hours of
-  play and the whole Market (~12,000) about 40.
+  steady player earns about 460 petals an hour, so the large pouch is roughly 9 hours of
+  play and the whole Market (~12,000) about 26.
+* **Tools come from ads or petals only:** players start with 5 hints and 5 shuffles. More
+  come only from the rewarded ad on the "Out of hints" sheet or the petal price (20 a hint,
+  15 a shuffle, or threes in the Market's Tools tab). Every other reward that once held a
+  tool (gift calendar, rank rewards, star and weekly chests, lanterns, the chapter gift)
+  gives that tool's price in petals instead (`tests/rewards.test.ts`).
 * **Paid seal is opt-in:** the Supporter seal joins the seal book only for owners, so
   completing the book never requires a purchase.
 * **Consumables are consumed** right after the petals are credited and saved. A

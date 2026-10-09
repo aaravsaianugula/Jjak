@@ -14,13 +14,14 @@ import {
   placedItems,
   seasonOf,
 } from '../../art/garden';
-import { sfx, unlockAudio } from '../../services/audio';
+import { audioReady, sfx, unlockAudio } from '../../services/audio';
 import { claimVisit, isHidden, isOwned, ownedPieces, setHidden, shownPieces, takeNewPieces, todaysVisit, VISITOR_LINES } from '../../services/garden';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { esc, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { openSheet } from '../modal';
+import { petalBump, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 const SEASONS = [
@@ -29,6 +30,9 @@ const SEASONS = [
   { en: 'Autumn', ja: '秋' },
   { en: 'Winter', ja: '冬' },
 ];
+
+/** When the fountain's rocker strikes the stone in its 6 s loop (keyframe 88.9% of ga-tip). */
+const FOUNTAIN_STRIKE_MS = 5333;
 
 /** Pieces granted by the Flower Path rather than sold for petals. */
 const PATH_RANK: Record<string, number> = { crane: 55 };
@@ -73,31 +77,41 @@ export function gardenScreen(): Screen {
   const petalsEl = el.querySelector<HTMLElement>('.gd-petals')!;
   let fresh = takeNewPieces();
 
+  let shownPetals = save.petals;
   const updatePetals = () => {
-    petalsEl.setAttribute('aria-label', `${save.petals} petals`);
-    petalsEl.querySelector('.petals__n')!.textContent = String(save.petals);
-    petalsEl.classList.remove('is-bump');
-    void petalsEl.offsetWidth;
-    petalsEl.classList.add('is-bump');
+    petalBump(petalsEl, shownPetals, save.petals);
+    shownPetals = save.petals;
   };
 
+  /** A previewed season only shows today's visitor if it would come then. */
+  const visitFits = (visit: { visitor: { seasons?: number[] } }) => !visit.visitor.seasons || visit.visitor.seasons.includes(season);
+
   /* ── the scene ── */
-  const renderScene = () => {
+  const renderScene = (fade = false) => {
+    // A season or time change dissolves the old scene over the new one (ids are unique per render).
+    const was = fade && !reducedMotion() ? sceneEl.querySelector('.garden-art') : null;
     const visit = todaysVisit();
     const shown = shownPieces();
     sceneEl.dataset.season = String(season);
     sceneEl.classList.toggle('is-night', night);
     sceneEl.classList.toggle('is-empty', !shown.length);
-    // A previewed season only shows today's visitor if it would come then.
-    const fits = !!visit && (!visit.visitor.seasons || visit.visitor.seasons.includes(season));
     const svg = gardenSvg(season, shown, {
       night,
-      visitor: fits && !visit.claimed ? visit.visitor.id : null,
+      visitor: visit && visitFits(visit) && !visit.claimed ? visit.visitor.id : null,
       note: visit?.claimed ? visit.visitor.id : null,
     });
     sceneEl.innerHTML = `${svg}<div class="gd-particles" aria-hidden="true">${particles(season, night)}</div>`;
     sceneEl.querySelector('svg')?.setAttribute('aria-label', sceneLabel(shown, season, night));
     for (const id of fresh) sceneEl.querySelector(`[data-item="${id}"]`)?.classList.add('is-new');
+    if (was) {
+      const veil = document.createElement('div');
+      veil.className = 'gd-was';
+      veil.setAttribute('aria-hidden', 'true');
+      veil.append(was);
+      sceneEl.append(veil);
+      veil.addEventListener('animationend', () => veil.remove(), { once: true });
+      setTimeout(() => veil.remove(), 900);
+    }
   };
 
   /* ── the lines under the scene ── */
@@ -114,10 +128,13 @@ export function gardenScreen(): Screen {
       return;
     }
     const pct = Math.round((owned.length / total) * 100);
+    const now = SEASONS[realSeason].en.toLowerCase();
     const v = visit
       ? visit.claimed
         ? `<button class="gd-visit is-done" data-open-note>${ICONS.check}<span>${esc(visit.visitor.name)} came by today and left a note. <u>Read it</u></span></button>`
-        : `<button class="gd-visit" data-open-visit><i class="gd-visit__dot" aria-hidden="true"></i><span>A visitor ${esc(visit.visitor.where)} today. <b>Tap it</b> to say hello.</span></button>`
+        : visitFits(visit)
+          ? `<button class="gd-visit" data-open-visit><i class="gd-visit__dot" aria-hidden="true"></i><span>A visitor ${esc(visit.visitor.where)} today. <b>Tap it</b> to say hello.</span></button>`
+          : `<button class="gd-visit" data-season-now><i class="gd-visit__dot" aria-hidden="true"></i><span>Today’s visitor doesn’t come in ${esc(SEASONS[season].en.toLowerCase())}. <b>Back to ${esc(now)}</b> to say hello.</span></button>`
       : `<p class="gd-visit is-quiet muted">No visitors yet. Birds and animals come to gardens with a wall, a pond, trees or a lantern.</p>`;
     info.innerHTML = `<div class="gd-progress">
         <div class="gd-progress__line"><b>${owned.length}</b> of ${total} pieces${owned.length === total ? ' · complete' : ''}</div>
@@ -236,16 +253,18 @@ export function gardenScreen(): Screen {
   /* ── interactions ── */
   el.querySelector('[data-back]')!.addEventListener('click', () => nav.home());
 
-  el.querySelector('.gd-seasons')!.addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-season]');
-    if (!b) return;
-    const next = Number(b.dataset.season);
+  const setSeason = (next: number) => {
     if (next === season) return;
     season = next;
     sfx.tap();
-    el.querySelectorAll('.gd-seasons button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    el.querySelectorAll<HTMLElement>('.gd-seasons button').forEach((x) => x.setAttribute('aria-pressed', String(Number(x.dataset.season) === season)));
     fresh = [];
-    renderScene();
+    renderScene(true);
+    renderInfo();
+  };
+  el.querySelector('.gd-seasons')!.addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-season]');
+    if (b) setSeason(Number(b.dataset.season));
   });
 
   const timeBtn = el.querySelector<HTMLElement>('[data-time]')!;
@@ -255,7 +274,7 @@ export function gardenScreen(): Screen {
     timeBtn.setAttribute('aria-pressed', String(night));
     timeBtn.innerHTML = night ? MOON : SUN;
     fresh = [];
-    renderScene();
+    renderScene(true);
   });
 
   sceneEl.addEventListener('click', (e) => {
@@ -276,6 +295,7 @@ export function gardenScreen(): Screen {
   info.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
     if (t.closest('[data-market]')) nav.market('garden');
+    else if (t.closest('[data-season-now]')) setSeason(realSeason);
     else if (t.closest('[data-open-visit]') || t.closest('[data-open-note]')) {
       sfx.tap();
       openVisit();
@@ -293,6 +313,20 @@ export function gardenScreen(): Screen {
   const onVis = () => el.classList.toggle('is-paused', document.hidden);
   document.addEventListener('visibilitychange', onVis);
 
+  // The fountain clacks softly each time its rocker strikes the stone in the
+  // ambient loop (ga-tip in garden.css: 6 s, the strike lands at 88.9%). No
+  // animation (reduced motion, paused, put away) means no clack.
+  let clackTimer = 0;
+  const onTip = (e: Event) => {
+    if ((e as AnimationEvent).animationName !== 'ga-tip') return;
+    clearTimeout(clackTimer);
+    clackTimer = window.setTimeout(() => {
+      if (!document.hidden && el.isConnected && audioReady()) sfx.clack(0.35);
+    }, FOUNTAIN_STRIKE_MS);
+  };
+  sceneEl.addEventListener('animationstart', onTip);
+  sceneEl.addEventListener('animationiteration', onTip);
+
   refresh();
   if (fresh.length) {
     const names = fresh.map((id) => item(id)?.name).filter(Boolean);
@@ -305,6 +339,7 @@ export function gardenScreen(): Screen {
     el,
     destroy() {
       document.removeEventListener('visibilitychange', onVis);
+      clearTimeout(clackTimer);
     },
   };
 }
@@ -312,7 +347,8 @@ export function gardenScreen(): Screen {
 /** Little reactions when a piece is tapped. */
 function poke(g: Element, id: string): void {
   if (id === 'chime') sfx.chime();
-  else if (id === 'fountain') sfx.clack();
+  // the tapped rocker strikes the stone 75% into ga-tip-now (1.3 s)
+  else if (id === 'fountain') setTimeout(() => sfx.clack(), 975);
   else sfx.tap();
   const cls = id === 'cat' ? 'is-twitch' : id === 'chime' ? 'is-ring' : id === 'fountain' ? 'is-tip' : '';
   if (!cls) return;

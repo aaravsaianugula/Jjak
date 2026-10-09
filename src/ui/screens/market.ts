@@ -6,7 +6,8 @@
  * effects, papers, garden, music. Rules live in services/market.ts.
  */
 import { MONTH_TINTS, cardSvg } from '../../art/cards';
-import { GARDEN_ITEMS, gardenItemSvg } from '../../art/garden';
+import { art, deckle } from '../../art/market-art';
+import { GARDEN_ITEMS, gardenItemSvgCached } from '../../art/garden';
 import { cardBackPreviewSvg, cardPreviewSvg } from '../../art/styles';
 import { ECONOMY } from '../../config';
 import { MONTHS, cardDef, monthDef } from '../../data/deck';
@@ -33,9 +34,10 @@ import { music } from '../../services/music';
 import { save } from '../../services/storage';
 import { type Screen } from '../app';
 import { brushStroke, burstFx, type Pt } from '../brush-fx';
-import { esc, frag, h, toast } from '../dom';
+import { esc, fmt, frag, h, toast } from '../dom';
 import { ICONS } from '../icons';
 import { type SheetHandle, openSheet } from '../modal';
+import { petalBump, reducedMotion } from '../motion';
 import { nav } from '../nav';
 
 // ── Extension points ────────────────────────────────────────────────
@@ -62,8 +64,6 @@ export function bundlesSection(): HTMLElement | null {
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-const fmt = (n: number) => n.toLocaleString('en-US');
 const petal = (n: number) => `<span class="mk-price__icon" aria-hidden="true">${ICONS.petal}</span><span class="num">${fmt(n)}</span>`;
 const lockIcon =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';
@@ -86,44 +86,55 @@ const monthHave = (m: number) => [0, 1, 2, 3].filter((v) => save.album.includes(
 
 // ── Previews ────────────────────────────────────────────────────────
 
-const TEA = `<svg class="mk-ill" viewBox="0 0 120 90" aria-hidden="true">
-  <path class="mk-ill__steam" d="M50 30c-5-6 5-9 0-16M62 28c-5-6 5-9 0-16M74 30c-5-6 5-9 0-16"/>
-  <ellipse class="mk-ill__fill2" cx="62" cy="76" rx="40" ry="6"/>
-  <path class="mk-ill__fill" d="M30 40h64c0 18-12 31-32 31S30 58 30 40z"/>
-  <path class="mk-ill__line" d="M30 40h64c0 18-12 31-32 31S30 58 30 40zM94 46c9 0 10 13-2 14"/>
-  <path class="mk-ill__accent" d="M42 50c6 3 14 3 20 0"/>
-</svg>`;
+const toolArt = (it: MarketItem, big: boolean): string => art(`tool-${it.id}`, 'mk-ill mk-ill--tool', '', big);
 
-const MUSIC_ART: Record<string, string> = {
-  default: `<path class="mk-ill__line" d="M12 50c12-22 24-22 36 0s24 22 36 0 18-18 24-8"/><circle class="mk-ill__dot" cx="22" cy="28" r="4"/><circle class="mk-ill__dot mk-ill__dot--2" cx="56" cy="22" r="4"/><circle class="mk-ill__dot mk-ill__dot--3" cx="86" cy="30" r="4"/><circle class="mk-ill__dot mk-ill__dot--4" cx="104" cy="62" r="4"/>`,
-  gayageum: `<path class="mk-ill__fill" d="M8 56c30-14 70-18 104-14l-2 9c-34-3-72 1-100 13z"/><path class="mk-ill__line" d="M8 56c30-14 70-18 104-14l-2 9c-34-3-72 1-100 13zM14 58l94-12M16 61l92-11"/><path class="mk-ill__accent" d="M30 54l3-6 3 6M46 51l3-6 3 6M62 49l3-6 3 6M78 47l3-6 3 6M94 46l3-6 3 6"/>`,
-  koto: `<path class="mk-ill__rain" d="M20 8l-4 10M40 4l-4 10M60 10l-4 10M80 4l-4 10M100 9l-4 10M30 22l-3 8M70 22l-3 8M92 24l-3 8"/><path class="mk-ill__fill" d="M10 62c32-10 66-12 100-8v8c-34-3-68-1-100 8z"/><path class="mk-ill__line" d="M10 62c32-10 66-12 100-8v8c-34-3-68-1-100 8zM16 64l90-8"/><path class="mk-ill__accent" d="M34 61l2-5 2 5M54 58l2-5 2 5M74 56l2-5 2 5M92 55l2-5 2 5"/>`,
-  flute: `<path class="mk-ill__steam" d="M10 34c6-4 10 2 16-2M8 44c7-3 11 3 18 0"/><rect class="mk-ill__fill" x="28" y="36" width="84" height="10" rx="5"/><path class="mk-ill__line" d="M33 36h74a5 5 0 0 1 0 10H33a5 5 0 0 1 0-10zM56 36v10M84 36v10"/><circle class="mk-ill__hole" cx="66" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="74" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="92" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="100" cy="41" r="1.8"/><circle class="mk-ill__hole" cx="40" cy="41" r="2.4"/>`,
-  moonlight: `<circle class="mk-ill__moon" cx="70" cy="34" r="22"/><path class="mk-ill__line" d="M30 10v18"/><path class="mk-ill__fill" d="M22 40c0-8 4-12 8-12s8 4 8 12z"/><path class="mk-ill__line" d="M22 40c0-8 4-12 8-12s8 4 8 12zM20 40h20M30 40v6"/><path class="mk-ill__accent" d="M26 50h8"/><path class="mk-ill__steam" d="M10 70c20-6 40-6 60 0s30 4 44-2"/>`,
-};
-
-const toolArt = (it: MarketItem): string => {
-  if (it.key === TOOL.tea) return TEA;
-  if (it.key === TOOL.card)
-    return `<span class="mk-cards mk-cards--draw"><span class="mk-card">${cardSvg('back')}</span><span class="mk-card">${cardSvg('back')}</span><span class="mk-card mk-card--q">${cardSvg('back')}</span></span>`;
-  const icon = it.key === TOOL.hints ? ICONS.hint : ICONS.shuffle;
-  return `<span class="mk-tool"><span class="mk-tool__chip">${icon}</span><span class="mk-tool__chip">${icon}</span><span class="mk-tool__chip">${icon}</span></span>`;
-};
-
-const paperArt = (it: MarketItem): string => {
+/**
+ * Board papers: a deckle-edged sheet held by a brass weight, with close-up
+ * detail over the real board texture. Unpainted, it's the bare sheet (the
+ * grid's placeholder until the tile is on screen).
+ */
+const paperArt = (it: MarketItem, painted: boolean): string => {
+  const seed = it.id.split('').reduce((n, c) => n * 31 + c.charCodeAt(0), 7) >>> 0;
+  const clip = `style="clip-path:${deckle(seed)}"`;
+  if (!painted) return `<span class="mk-swatch"><span class="mk-swatch__sheet" ${clip}></span></span>`;
+  let face: string;
   if (it.source?.kind === 'album') {
     const m = it.source.month;
-    return `<span class="mk-swatch"><span class="paper" style="--paper-tint:${MONTH_TINTS[m]}"><svg viewBox="0 0 100 140"><use href="#motif-${m}"/></svg></span></span>`;
-  }
-  if (it.id === 'plain') return '<span class="mk-swatch mk-swatch--plain"></span>';
-  return `<span class="mk-swatch"><span class="paper paper--market paper--${it.id}"></span></span>`;
+    face = `<span class="paper" style="--paper-tint:${MONTH_TINTS[m]}"><svg viewBox="0 0 100 140"><use href="#motif-${m}"/></svg></span>${art('paper-plain', 'mk-sheet__detail', ' preserveAspectRatio="xMidYMid slice"')}`;
+  } else if (it.id === 'plain') face = `<span class="paper paper--plainsheet"></span>${art('paper-plain', 'mk-sheet__detail', ' preserveAspectRatio="xMidYMid slice"')}`;
+  else face = `<span class="paper paper--market paper--${it.id}"></span>${art(`paper-${it.id}`, 'mk-sheet__detail', ' preserveAspectRatio="xMidYMid slice"')}`;
+  return `<span class="mk-swatch"><span class="mk-swatch__sheet" ${clip}>${face}<i class="mk-swatch__light"></i></span>${art('weight', 'mk-swatch__weight')}</span>`;
 };
 
-/** Two little cards with a stroke or burst between them (static, for tiles). */
-function miniStage(big: boolean): HTMLElement {
+const MUSIC_IDS = new Set(['default', 'gayageum', 'koto', 'flute', 'moonlight']);
+const musicArt = (it: MarketItem): string => art(`music-${MUSIC_IDS.has(it.id) ? it.id : 'default'}`, 'mk-ill mk-ill--music');
+
+/** The ink each brush leaves in the inkstone (follows the theme, like the stroke itself). */
+const BRUSH_INK: Record<string, string> = {
+  ink: 'var(--path)',
+  vermilion: 'var(--mk-vermilion)',
+  indigo: 'var(--mk-indigo)',
+  petals: 'var(--mk-rose)',
+  firefly: 'var(--mk-ff-mid)',
+  gold: 'var(--mk-gold)',
+};
+
+/**
+ * Two little cards with a stroke or burst between them. Brushes are shown on a
+ * small mounted scroll beside an inkstone; effects on a patch of board.
+ * Unpainted, it's the empty scroll or board (the grid's placeholder).
+ */
+function miniStage(it: MarketItem, big: boolean, painted: boolean): { mount: HTMLElement; stage: HTMLElement } {
   const stage = h('span', { class: `mk-demo${big ? ' mk-demo--big' : ''}`, 'aria-hidden': 'true' });
-  stage.innerHTML = `<span class="mk-demo__card">${cardSvg(PAIR[0])}</span><span class="mk-demo__card">${cardSvg(PAIR[1])}</span>`;
-  return stage;
+  if (painted) stage.innerHTML = `<span class="mk-demo__card">${cardSvg(PAIR[0])}</span><span class="mk-demo__card">${cardSvg(PAIR[1])}</span>`;
+  if (it.category === 'brush') {
+    const scroll = h('span', { class: 'mk-scroll', style: `--mka-ink:${BRUSH_INK[it.id] ?? BRUSH_INK.ink}` });
+    const paper = h('span', { class: 'mk-scroll__paper' }, stage);
+    scroll.append(paper);
+    scroll.insertAdjacentHTML('beforeend', `<i class="mk-scroll__rod"></i><i class="mk-scroll__rod mk-scroll__rod--r"></i>${art('inkstone', 'mk-scroll__stone')}`);
+    return { mount: scroll, stage };
+  }
+  return { mount: h('span', { class: 'mk-board' }, stage), stage };
 }
 
 /** Card width and path corners for a demo stage of width W (cards at 22% / 78%). */
@@ -177,8 +188,10 @@ function paintStill(stage: HTMLElement, it: MarketItem): void {
     brushStroke(demoLayer(stage), g.pts, it.id, { cw: g.cw, uid: `mkd-${++demoSeq}`, width: stage.clientWidth, height: stage.clientHeight, still: true, keep: true });
   } else {
     stage.classList.add('is-cleared');
-    burstFx(stage, g.ax, g.cy - g.ch * 0.08, it.id, { cw: g.cw * 1.2, still: true });
-    burstFx(stage, g.bx, g.cy - g.ch * 0.08, it.id, { cw: g.cw * 1.2, still: true });
+    // A frozen frame: the pair lifting away, the burst caught mid-flight (the same
+    // particles as the game, placed by a fixed seed so every tile is composed).
+    burstFx(stage, g.ax, g.cy - g.ch * 0.12, it.id, { cw: g.cw * 1.2, still: true, seed: 17 });
+    burstFx(stage, g.bx, g.cy - g.ch * 0.12, it.id, { cw: g.cw * 1.2, still: true, seed: 41 });
   }
 }
 
@@ -208,30 +221,112 @@ function playDemo(stage: HTMLElement, it: MarketItem, brush: string, fx: string)
   return rm ? 1200 : 2600;
 }
 
+/*
+ * Previews in the grid are painted lazily: a tile gets a placeholder first
+ * (blank cards, a bare sheet, an empty scroll) and its art once it's on screen,
+ * one tile per frame. Opening a tab never waits on the art, and tiles below
+ * the fold cost nothing until reached.
+ */
+type Paint = () => void;
+const lazyFills = new WeakMap<Element, Paint>();
+const lazyQueue: Element[] = [];
+let lazyRaf = 0;
+const lazyIo =
+  typeof IntersectionObserver === 'undefined'
+    ? null
+    : new IntersectionObserver(
+        (entries, io) => {
+          for (const e of entries) {
+            if (!e.isIntersecting) continue;
+            io.unobserve(e.target);
+            lazyQueue.push(e.target);
+          }
+          pumpLazy();
+        },
+        { rootMargin: '160px 0px' },
+      );
+function pumpLazy() {
+  if (lazyRaf || !lazyQueue.length) return;
+  lazyRaf = requestAnimationFrame(() => {
+    lazyRaf = 0;
+    // One tile per frame: most of a preview's cost is the browser styling and
+    // painting its art after this returns, so that's the unit that fits a frame.
+    for (let el = lazyQueue.shift(); el; el = lazyQueue.shift()) {
+      const fill = lazyFills.get(el);
+      if (!fill || !el.isConnected) continue;
+      fill();
+      el.classList.add('is-painted');
+      break;
+    }
+    pumpLazy();
+  });
+}
+/** Show `blank` now and run `fill` once `wrap` is on screen; `now` (the detail sheet) fills at once. */
+function lazyPaint(wrap: HTMLElement, blank: Paint, fill: Paint, now: boolean) {
+  if (now) {
+    fill();
+    return;
+  }
+  blank();
+  lazyFills.set(wrap, fill);
+  if (lazyIo) lazyIo.observe(wrap);
+  else {
+    lazyQueue.push(wrap);
+    pumpLazy();
+  }
+}
+/** lazyPaint for previews that are plain markup. */
+function lazyArt(wrap: HTMLElement, blank: string, fill: () => string, now: boolean) {
+  lazyPaint(
+    wrap,
+    () => {
+      wrap.innerHTML = blank;
+    },
+    () => {
+      wrap.innerHTML = fill();
+    },
+    now,
+  );
+}
+
 function itemArt(it: MarketItem, big = false): HTMLElement {
   const wrap = h('span', { class: `mk-art mk-art--${it.category}${big ? ' mk-art--big' : ''}`, 'aria-hidden': 'true' });
   switch (it.category) {
     case 'tool':
-      wrap.innerHTML = toolArt(it);
+      wrap.innerHTML = toolArt(it, big);
       break;
-    case 'deck':
-      wrap.innerHTML = `<span class="mk-cards mk-cards--fan">${DECK_CARDS.map((id) => `<span class="mk-card">${cardPreviewSvg(id, it.id)}</span>`).join('')}</span>`;
+    case 'deck': {
+      const fan = (art: (id: number) => string) => `<span class="mk-cards mk-cards--fan">${DECK_CARDS.map((id) => `<span class="mk-card">${art(id)}</span>`).join('')}</span>`;
+      lazyArt(wrap, fan(() => ''), () => fan((id) => cardPreviewSvg(id, it.id)), big);
       break;
-    case 'back':
-      wrap.innerHTML = `<span class="mk-cards mk-cards--pair"><span class="mk-card">${cardBackPreviewSvg(it.id)}</span><span class="mk-card">${cardBackPreviewSvg(it.id)}</span></span>`;
+    }
+    case 'back': {
+      const pair = (a: string, b: string) => `<span class="mk-cards mk-cards--pair"><span class="mk-card">${a}</span><span class="mk-card">${b}</span></span>`;
+      lazyArt(wrap, pair('', ''), () => pair(cardBackPreviewSvg(it.id), cardBackPreviewSvg(it.id)), big);
       break;
+    }
     case 'garden':
-      wrap.innerHTML = `<span class="mk-garden">${gardenItemSvg(it.id)}</span>`;
+      lazyArt(wrap, '<span class="mk-garden"></span>', () => `<span class="mk-garden">${gardenItemSvgCached(it.id)}</span>`, big);
       break;
     case 'paper':
-      wrap.innerHTML = paperArt(it);
+      lazyArt(wrap, paperArt(it, false), () => paperArt(it, true), big);
       break;
     case 'music':
-      wrap.innerHTML = `<svg class="mk-ill mk-ill--music" viewBox="0 0 120 80" aria-hidden="true">${MUSIC_ART[it.id] ?? MUSIC_ART.default}</svg>`;
+      wrap.innerHTML = musicArt(it);
       break;
     case 'brush':
     case 'fx':
-      wrap.append(miniStage(big));
+      lazyPaint(
+        wrap,
+        () => wrap.replaceChildren(miniStage(it, big, false).mount),
+        () => {
+          const { mount, stage } = miniStage(it, big, true);
+          wrap.replaceChildren(mount);
+          // Grid tiles show a still frame; the detail sheet runs its own demo.
+          if (!big) paintStill(stage, it);
+        },
+        big,
+      );
       break;
   }
   return wrap;
@@ -293,13 +388,18 @@ export function marketScreen(tab?: string): Screen {
   const startTab = MARKET_TABS.some((t) => t.id === tab) ? tab! : lastTab;
   let current = startTab;
   let openDemo: { stop(): void } | null = null;
+  /** Tiles whose state just changed (bought, equipped, unequipped): they settle in on the next render. */
+  let changedKeys: string[] = [];
 
   const balanceN = h('span', { class: 'petals__n num' }, fmt(save.petals));
   const balance = h('span', { class: 'petals mk-balance', role: 'status', 'aria-label': `${save.petals} petals`, html: ICONS.petal });
   balance.append(balanceN);
+  let shownBalance = save.petals;
+  /** Show the balance; a change counts over and bumps the pill (the purchase ghost already counted down). */
   const setBalance = (n = save.petals) => {
-    balanceN.textContent = fmt(n);
-    balance.setAttribute('aria-label', `${n} petals`);
+    if (n === shownBalance) return;
+    petalBump(balance, shownBalance, n, { format: fmt, ms: 360 });
+    shownBalance = n;
   };
 
   const rail = h('div', { class: 'mk-rail scroll', role: 'tablist', 'aria-label': 'Market sections' });
@@ -343,7 +443,7 @@ export function marketScreen(tab?: string): Screen {
     const have = it.category === 'tool' ? haveLine(it) : '';
     const native = `<span lang="ko">${esc(it.ko)}</span> · <span class="ja" lang="ja">${esc(it.ja)}</span>`;
     const label = `${it.name}. ${st === 'buy' || st === 'short' ? `${it.price} petals` : st === 'locked' ? sourceLine(it) : st === 'equipped' ? 'In use' : st === 'owned' ? 'Owned' : ''}`;
-    const tile = h('button', { class: `mk-tile is-${st}${fresh ? ' is-new' : ''}`, 'data-key': it.key, 'aria-label': label });
+    const tile = h('button', { class: `mk-tile is-${st}${fresh ? ' is-new' : ''}${changedKeys.includes(it.key) ? ' is-changed' : ''}`, 'data-key': it.key, 'aria-label': label });
     tile.append(itemArt(it));
     if ((st === 'owned' || st === 'equipped') && !it.isDefault && it.category !== 'paper') tile.append(frag('<span class="mk-seal mk-seal--sm" aria-hidden="true">Yours</span>'));
     if (fresh) tile.append(h('i', { class: 'mk-dot', 'aria-hidden': 'true' }));
@@ -355,25 +455,19 @@ export function marketScreen(tab?: string): Screen {
     return tile;
   }
 
-  function paintStills(root: HTMLElement) {
-    requestAnimationFrame(() => {
-      root.querySelectorAll<HTMLElement>('.mk-tile').forEach((t) => {
-        const stage = t.querySelector<HTMLElement>('.mk-demo');
-        const it = itemsIn(t.dataset.key!.split(':')[0] as MarketItem['category']).find((x) => x.key === t.dataset.key);
-        if (stage && it) paintStill(stage, it);
-      });
-    });
-  }
-
   function showTab(id: string, keepScroll = false) {
     const t = MARKET_TABS.find((x) => x.id === id) ?? MARKET_TABS[0];
     const changed = t.id !== current;
+    // The new section slides in from the side of the tab that was tapped.
+    const dir = MARKET_TABS.findIndex((x) => x.id === t.id) > MARKET_TABS.findIndex((x) => x.id === current) ? 1 : -1;
+    body.style.setProperty('--tab-dir', String(dir));
+    body.classList.toggle('is-switching', changed);
     current = lastTab = t.id;
     renderRail();
     const btn = rail.querySelector<HTMLElement>(`[data-tab="${t.id}"]`);
     btn?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: changed && !reducedMotion() ? 'smooth' : 'auto' });
     body.setAttribute('aria-label', t.name);
-    const scrollTop = keepScroll ? body.scrollTop : 0;
+    const scrollTop = body.scrollTop;
     const items = itemsIn(t.category).filter(isListed);
     const owned = items.filter((it) => !it.consumable && isOwned(it.key)).length;
     const frag0 = document.createDocumentFragment();
@@ -392,7 +486,15 @@ export function marketScreen(tab?: string): Screen {
     }
     const grid = (list: MarketItem[]) => {
       const g = h('div', { class: `mk-grid mk-grid--${t.category}` });
-      for (const it of list) g.append(tileFor(it, isNew(it)));
+      list.forEach((it, i) => {
+        const tile = tileFor(it, isNew(it));
+        // The first tiles of a new section follow it in, one after another.
+        if (changed && i < 4) {
+          tile.classList.add('is-stagger');
+          tile.style.setProperty('--i', String(i));
+        }
+        g.append(tile);
+      });
       return g;
     };
     if (t.category === 'paper') {
@@ -408,9 +510,12 @@ export function marketScreen(tab?: string): Screen {
       frag0.append(earnPanel(false));
     }
     frag0.append(frag(`<p class="mk-fine">Prices are always in petals. Nothing here is random, and nothing runs out.</p>`));
+    // A new section starts at the top; reset before the swap, while layout is
+    // clean, so the tap doesn't force a layout of the new section.
+    if (!keepScroll) body.scrollTop = 0;
     body.replaceChildren(frag0);
-    body.scrollTop = scrollTop;
-    paintStills(body);
+    changedKeys = [];
+    if (keepScroll) body.scrollTop = scrollTop;
     // Dots stay for this visit; next time they're gone.
     markSeen(...items.filter((it) => isNew(it)).map((it) => it.key));
   }
@@ -470,6 +575,8 @@ export function marketScreen(tab?: string): Screen {
     let loop: ReturnType<typeof setTimeout> | null = null;
     if (it.category === 'brush' || it.category === 'fx') {
       const demo = big.querySelector<HTMLElement>('.mk-demo')!;
+      // Place the pair at once, so the picture never shows unsized cards before the first run.
+      requestAnimationFrame(() => layoutDemo(demo));
       const run = () => {
         if (!demo.isConnected) return;
         const ms = playDemo(demo, it, activeBrush(), activeFx());
@@ -532,7 +639,9 @@ export function marketScreen(tab?: string): Screen {
             h('button', {
               class: 'btn btn--primary btn--block',
               onclick: () => {
+                const was = itemsIn(it.category).find((x) => x.key !== it.key && isEquipped(x.key));
                 if (equip(slot, it.id)) {
+                  changedKeys = [it.key, ...(was ? [was.key] : [])];
                   sfx.hint();
                   haptic.medium();
                   refresh();
@@ -550,6 +659,7 @@ export function marketScreen(tab?: string): Screen {
               class: 'btn btn--ghost btn--block',
               onclick: () => {
                 setGardenShown(it.id, !shown);
+                changedKeys = [it.key];
                 haptic.light();
                 refresh();
                 render();
@@ -636,6 +746,7 @@ export function marketScreen(tab?: string): Screen {
           revealCard(res.drawn);
         } else {
           floatNote(stage, it.key === TOOL.tea ? '+1 cup' : '+3');
+          changedKeys = [it.key];
           rerender();
           // The "you have" line turns green for a moment: the purchase landed.
           const have = stage.parentElement?.querySelector('.mk-have');
@@ -648,6 +759,7 @@ export function marketScreen(tab?: string): Screen {
         sfx.stamp();
         haptic.success();
         stampYours(stage, rm);
+        changedKeys = [it.key];
         rerender();
       }
       refresh();
@@ -745,10 +857,38 @@ export function marketScreen(tab?: string): Screen {
   }
 
   showTab(startTab);
+  // While the player looks around, prepare the deck previews in idle time (one
+  // card per idle slot), so the Decks tab opens warm. Then the drawn art of the
+  // other tabs, one sprite symbol or garden vignette per idle slot, so a tile's
+  // art is ready by the time it's painted.
+  const warmArt = [
+    ...itemsIn('tool').map((it) => `tool-${it.id}`),
+    'inkstone',
+    'weight',
+    ...['plain', ...itemsIn('paper').filter((it) => !it.source && !it.isDefault).map((it) => it.id)].map((id) => `paper-${id}`),
+    ...[...MUSIC_IDS].map((id) => `music-${id}`),
+  ];
+  const warm: (() => void)[] = [
+    ...itemsIn('deck').flatMap((it) => DECK_CARDS.map((id) => () => cardPreviewSvg(id, it.id))),
+    ...warmArt.map((sym) => () => art(sym)),
+    ...itemsIn('garden').filter(isListed).map((it) => () => gardenItemSvgCached(it.id)),
+  ];
+  let warmId = 0;
+  const idle = (fn: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 2000 }) : window.setTimeout(fn, 120));
+  const unidle = (n: number) => (typeof cancelIdleCallback === 'function' ? cancelIdleCallback(n) : clearTimeout(n));
+  const warmNext = () => {
+    if (!el.isConnected) return;
+    const job = warm.shift();
+    if (!job) return;
+    job();
+    warmId = idle(warmNext);
+  };
+  warmId = idle(warmNext);
   return {
     name: 'market',
     el,
     destroy() {
+      unidle(warmId);
       music.stopPreview();
       openDemo?.stop();
     },

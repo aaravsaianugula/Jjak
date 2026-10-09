@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { stampDate, stampShape, stampSvg } from '../src/art/stamp';
 import { ALL_CARD_IDS, BONUS_IDS, cardDef, monthDef } from '../src/data/deck';
 import { ROUTE, ROUTE_CHAPTERS, ROUTE_LEVELS, chapterFirstLevel, festivalTitle, placeLine, routeOf } from '../src/data/route';
-import { EMPTY, STONE, type Board, cardsLeft, isCard, monthOf } from '../src/engine/board';
+import { EMPTY, STONE, type Board, cardsLeft, isCard, isGate, isInk, isTerrain, monthOf } from '../src/engine/board';
 import { generateBoard, reshuffle } from '../src/engine/generate';
 import {
   CHAPTERS,
@@ -20,7 +20,7 @@ import { type Wind, applyGravity, findMove } from '../src/engine/moves';
 import { createRng } from '../src/engine/rng';
 import { LUCKY_PETALS, LUCKY_SCORE, Session } from '../src/engine/session';
 import { possibleYaku, newYaku } from '../src/engine/yaku';
-import { defaultJourney, hydrateJourney } from '../src/services/save-journey';
+import { defaultEndless, defaultJourney, hydrateJourney } from '../src/services/save-journey';
 
 const grid = (rows: string[]): Board => {
   // '.' empty, '#' stone, digit/letter = month (card id = month * 4)
@@ -97,7 +97,7 @@ describe('the Flower Road route', () => {
       expect(c.postcard.length).toBeGreaterThan(30);
       expect(c.postcard.length).toBeLessThan(130);
       expect(c.postcard.endsWith('.')).toBe(true);
-      expect(['basics', 'stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'mix']).toContain(c.focus);
+      expect(['basics', 'stones', 'leaves', 'snow', 'lucky', 'knots', 'wind', 'gates', 'fences', 'torii', 'streams', 'seals', 'ink', 'mix']).toContain(c.focus);
     }
   });
 
@@ -141,8 +141,9 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 700; n++) {
       const sp = journeyLevel(n);
       expect(sp.number).toBe(n);
+      // 8 rows × 7 columns at most (8×7 only on late peak and festival boards): tappable at 360 wide.
       expect(sp.rows).toBeLessThanOrEqual(8);
-      expect(sp.cols).toBeLessThanOrEqual(6);
+      expect(sp.cols).toBeLessThanOrEqual(sp.festival || routeOf(n).slot === 10 ? 7 : 6);
       expect(sp.stones).toBeLessThanOrEqual(maxStones(sp.rows, sp.cols));
       expect(sp.stones % 2).toBe(0);
       expect((sp.rows * sp.cols - sp.stones) % 2).toBe(0);
@@ -160,7 +161,7 @@ describe('journey level curve', () => {
     for (let ch = 0; ch < 60; ch++) {
       const sp = journeyLevel((ch + 1) * 12);
       expect(sp.festival).toBe(true);
-      expect(sp.rows * sp.cols).toBe(48);
+      expect(sp.rows * sp.cols).toBeGreaterThanOrEqual(48);
       expect(!!sp.lucky).toBe(ch >= MECHANIC_INTRO.lucky);
       const regular = journeyLevel((ch + 1) * 12 - 1);
       expect(sp.par).toBeGreaterThan(regular.par - 20);
@@ -172,10 +173,10 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 600; n++) {
       const sp = journeyLevel(n);
       const w = windOf(sp);
-      const seen = { stones: sp.stones > 0, leaves: w === 'down', snow: sp.snow > 0, lucky: !!sp.lucky, knots: (sp.knots ?? 0) > 0, wind: !!w && w !== 'down' };
+      const seen = { stones: sp.stones > 0, leaves: w === 'down', snow: sp.snow > 0, lucky: !!sp.lucky, knots: (sp.knots ?? 0) > 0, wind: !!w && w !== 'down', gates: (sp.gates ?? 0) > 0, fences: (sp.fences ?? 0) > 0 };
       for (const [k, on] of Object.entries(seen)) if (on && first[k] == null) first[k] = Math.floor((n - 1) / 12);
     }
-    expect(first).toEqual({ stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8 });
+    expect(first).toEqual({ stones: 1, leaves: 2, snow: 3, lucky: 4, knots: 6, wind: 8, gates: 10, fences: 13 });
     // The first board of each new idea shows it alone, so its tip is the only lesson.
     for (const [m, ch] of Object.entries(MECHANIC_INTRO)) {
       const n = ch * 12 + 2;
@@ -222,7 +223,7 @@ describe('journey level curve', () => {
     for (let n = 1; n <= 700; n++) {
       const sp = journeyLevel(n);
       const b = buildBoard(sp);
-      expect(cardsLeft(b) + b.cells.filter((v) => v === STONE).length).toBe(sp.rows * sp.cols);
+      expect(cardsLeft(b) + b.cells.filter((v) => v === STONE || isGate(v) || isTerrain(v) || isInk(v)).length).toBe(sp.rows * sp.cols);
       const counts = new Map<number, number>();
       for (const v of b.cells) if (isCard(v)) counts.set(monthOf(v), (counts.get(monthOf(v)) ?? 0) + 1);
       for (const c of counts.values()) expect(c % 2).toBe(0);
@@ -450,6 +451,22 @@ describe('solvability fuzz across the mechanics', () => {
     expect(out.cells.filter(isCard).sort()).toEqual([32, 35]);
   });
 
+  it('a shuffle that re-deals onto other cells says so and frees snow and knots (they cannot follow a card)', () => {
+    const cells = new Array(48).fill(EMPTY);
+    for (const i of [10, 13, 15, 32, 34, 39]) cells[i] = STONE;
+    cells[33] = 35;
+    cells[44] = 32;
+    const s = new Session(spec({ rows: 8, cols: 6, seed: 'pocket' }), 0, { rows: 8, cols: 6, cells });
+    s.hidden.add(33);
+    s.knots.add(44);
+    s.shuffle();
+    expect(s.relaid).toBe(true);
+    expect(s.hidden.size + s.knots.size).toBe(0);
+    // Every lock left refers to a cell that still holds a card.
+    for (const i of [...s.hidden, ...s.knots]) expect(isCard(s.board.cells[i])).toBe(true);
+    expect(s.findMove()).not.toBeNull();
+  });
+
   it('solvable-by-construction still holds for boards built with lucky cards', () => {
     for (let k = 0; k < 120; k++) {
       const rng = createRng(`luckgen-${k}`);
@@ -469,7 +486,7 @@ describe('solvability fuzz across the mechanics', () => {
 describe('journey save slice and stamps', () => {
   it('hydrates old and broken slices', () => {
     expect(hydrateJourney(undefined)).toEqual(defaultJourney());
-    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0 });
+    expect(hydrateJourney({ v: 1 })).toEqual({ v: 1, stamps: {}, luckyPairs: 0, luckyPetals: 0, yearStamps: {}, revealed: false, endless: defaultEndless() });
     const h = hydrateJourney({ v: 1, stamps: { gyeongju: '2026-10-07', bad: 3 }, luckyPairs: -2, luckyPetals: 30 });
     expect(h.stamps).toEqual({ gyeongju: '2026-10-07' });
     expect(h.luckyPairs).toBe(0);
@@ -494,7 +511,7 @@ describe('journey save slice and stamps', () => {
 });
 
 describe('recordClear: lucky petals and passport stamps', () => {
-  it('credits lucky petals and stamps the place on the first festival clear only', async () => {
+  it('credits lucky petals and stamps the place on the first festival clear only (no farming on replays)', async () => {
     const { save } = await import('../src/services/storage');
     const { recordClear, syncStamps } = await import('../src/services/progress');
     save.journey = defaultJourney();
@@ -519,11 +536,43 @@ describe('recordClear: lucky petals and passport stamps', () => {
     expect(save.petals).toBeGreaterThanOrEqual(first.petals + LUCKY_PETALS);
     const again = play();
     expect(again.stamp).toBeUndefined(); // one stamp per place
-    expect(again.lucky).toBe(LUCKY_PETALS);
+    // Replays can't be farmed: the lucky pair still counts, but petals came with the first clear.
+    expect(again.lucky).toBeUndefined();
+    expect(save.journey.luckyPairs).toBe(2);
+    expect(save.journey.luckyPetals).toBe(LUCKY_PETALS);
     // Older saves: festival boards cleared before stamps existed get theirs back.
     save.stars[24] = 2;
     expect(syncStamps()).toBe(1);
     expect(save.journey.stamps.kamakura).toBeTruthy();
     expect(syncStamps()).toBe(0);
+  });
+});
+
+describe('past level 600: Wanderer stamps', () => {
+  it('stamps each place once per year on the endless road, apart from the first-pass passport', async () => {
+    const { save } = await import('../src/services/storage');
+    const { recordClear } = await import('../src/services/progress');
+    save.journey = defaultJourney();
+    save.stars = {};
+    save.level = 612;
+    const play = (n: number) => {
+      const s = new Session({ ...journeyLevel(n), number: n }, 0, { rows: 1, cols: 2, cells: [0, 1] });
+      s.tap(0, 10);
+      s.tap(1, 20);
+      return recordClear(s);
+    };
+    const r = play(612); // Gyeongju, year 1
+    expect(r.stamp).toMatchObject({ id: 'gyeongju', year: 1 });
+    expect(save.journey.yearStamps['gyeongju@1']).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(save.journey.stamps.gyeongju).toBeUndefined();
+    expect(play(612).stamp).toBeUndefined();
+    expect(play(1212).stamp).toMatchObject({ id: 'gyeongju', year: 2 });
+  });
+
+  it('hydrates the endless-road fields on older saves', () => {
+    const j = hydrateJourney({ v: 1, stamps: { gyeongju: '2026-10-01' } });
+    expect(j.yearStamps).toEqual({});
+    expect(j.revealed).toBe(false);
+    expect(hydrateJourney({ revealed: 'yes', yearStamps: { 'a@1': 3 } })).toMatchObject({ revealed: false, yearStamps: {} });
   });
 });
