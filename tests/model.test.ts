@@ -9,7 +9,10 @@ import { DIRECTOR, decide, pinnedTier, recordAttempt, targetFor, tierD } from '.
 import { MODEL, engagement, expected, ingest, performance, proficiency } from '../src/director/model';
 import { designedBase } from '../src/director/plan';
 import { playStyle } from '../src/director/profile';
+import { SKILL } from '../src/director/skills';
 import { journeyLevel, rushLevel } from '../src/engine/levels';
+import { monthOf } from '../src/engine/board';
+import { findPath } from '../src/engine/path';
 import { Session } from '../src/engine/session';
 import { tracking } from '../src/services/analytics';
 import { emit } from '../src/services/events';
@@ -348,7 +351,8 @@ describe('analytics save slice', () => {
     expect(a.tries).toEqual({ n: 0, count: 0 });
     expect(a.days).toEqual(['2026-10-01']);
     expect(a.sessions).toEqual({ count: 0, ms: 0 });
-    expect(a.mech).toEqual({ stones: { n: 0, score: 1, quits: 0, replays: 0 } });
+    // the per-mechanic skill rating hydrates from the overall rating, with a fresh deviation
+    expect(a.mech).toEqual({ stones: { n: 0, score: 1, quits: 0, replays: 0, r: a.rating, dev: SKILL.devStart } });
     expect(a.recent).toHaveLength(1);
     expect(a.recent[0]).toMatchObject({ cleared: false, ended: 'quit', turns: [0, 0, 0], firstTaps: [[0, 1]], mech: ['stones'], hour: 23, d: -1 });
     expect(a.last).toMatchObject({ n: 0, reason: '' });
@@ -411,8 +415,8 @@ describe('analytics service (events → records)', () => {
   beforeEach(fresh);
 
   /** Play a board through its taps until cleared (or `pairs` pairs), emitting tap events. */
-  function play(s: Session, pairs = Infinity) {
-    let t = s.startedAt;
+  function play(s: Session, pairs = Infinity, from = s.startedAt) {
+    let t = from;
     for (let made = 0; made < pairs && !s.done; made++) {
       const m = s.findMove();
       if (!m) break;
@@ -445,6 +449,36 @@ describe('analytics service (events → records)', () => {
     expect(a.boards).toBe(1);
     expect(a.days).toHaveLength(1);
     expect(tracking()).toBeNull();
+  });
+
+  it('records path shapes, pair rhythm, the longest find and fast misreads', () => {
+    const s = new Session({ ...journeyLevel(30), tier: 2 }, 0);
+    emit('start', { session: s });
+    // two blocked taps on a same-flower pair with no path: one quick, one after a long look
+    const cells = s.board.cells;
+    let blocked: [number, number] | null = null;
+    for (let i = 0; i < cells.length && !blocked; i++)
+      for (let j = i + 1; j < cells.length && !blocked; j++)
+        if (cells[i] >= 0 && cells[j] >= 0 && monthOf(cells[i]) === monthOf(cells[j]) && !findPath(s.board, i, j) && !s.hidden.has(i) && !s.hidden.has(j) && !s.knots.has(i) && !s.knots.has(j)) blocked = [i, j];
+    expect(blocked).not.toBeNull();
+    const [i, j] = blocked!;
+    const tap = (cell: number, t: number) => emit('tap', { session: s, cell, result: s.tap(cell, t), now: t });
+    tap(i, 100);
+    tap(j, 400);
+    tap(i, 600);
+    tap(j, 5000);
+    play(s, Infinity, 5000);
+    emit('clear', { session: s, summary: { stars: 3, firstClear: true, petals: 0, drawn: null } });
+    const r = save.analytics.recent[0];
+    expect(r.blocked).toBe(2);
+    expect(r.quickMisses).toBe(1);
+    // detours and rim routes always take two bends
+    expect(r.detour![0]).toBeLessThanOrEqual(r.turns[2]);
+    expect(r.edgeRoute![0]).toBeLessThanOrEqual(r.turns[2]);
+    expect(r.edgeRoute![0]).toBeGreaterThan(0);
+    expect(r.gapCv).toBeGreaterThanOrEqual(0);
+    expect(r.longMs).toBeGreaterThanOrEqual(r.gapMs);
+    expect(r.longMs).toBeGreaterThanOrEqual(r.firstMs);
   });
 
   it('records quits and restarts, counts failed tries and replays', () => {

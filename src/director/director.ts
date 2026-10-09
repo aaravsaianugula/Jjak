@@ -5,14 +5,26 @@
  *          + skillOffset                           clamp(R − chapterMean(n), ±0.2) · confidence
  *            (measured against the chapter's average, so the sawtooth's peaks and rests
  *            survive and a player of skill R averages boards of difficulty R)
- *          + pacing                                relief −0.08 (−0.14 after 2+ struggles in a row)
- *                                                  after struggle; stretch +0.08 after 3+ fast clean clears
+ *          + pacing                                from the flow state (flow.ts):
+ *                                                  struggling → relief −0.08 (−0.14 after 2+ struggles)
+ *                                                  frozen     → ease −0.05
+ *                                                  after a peak or festival → breather −0.06
+ *                                                  bored (3+ quick clean clears) → stretch +0.08
  *          + flow                                  a nudge (±0.06) toward an 80 % clean-clear rate
+ *            ("clean" = no assist beyond the player's habit, see model.ts)
  *
- * mapped to a tier, moving at most one tier from the previous board (two for deep relief).
+ * mapped to the tier (0–4) whose board difficulty is closest, then:
+ *  - a **mastery floor** (`masteryFloor`): never below the tier the player has shown,
+ *    with confidence, they can handle (rating − 2·dev − 0.05), unless they are
+ *    struggling or frozen right now. It rises as the rating rises and the deviation
+ *    shrinks, so nobody is trapped on the gentlest tier.
+ *  - **hysteresis**: the previous board's tier is kept unless another is clearly closer
+ *    (by `hold`), so measurement scatter between levels doesn't flip tiers;
+ *  - **smooth steps**: at most one tier from the previous Journey board, always.
  *
- * mapped to the tier (0–4) whose board difficulty is closest. The aim is 75–85 % of
- * boards cleared without assists, with real peaks (the curve's sawtooth) and rests.
+ * The aim is 75–85 % of boards cleared without assists, with real peaks (the curve's
+ * sawtooth) and rests. The tier is the main control; the `ChallengeRequest`
+ * (challenge.ts) only says what to lean on inside it and never changes it.
  *
  * Pinning: a level's tier is fixed the first time it is started (`save.analytics.tiers`,
  * char n−1), so a retry or replay is the same board. After two failed attempts at an
@@ -22,16 +34,22 @@
 import { save, persist } from '../services/storage';
 import type { AnalyticsSave } from '../services/save-analytics';
 import { TIERS, bankSpec } from './bank';
-import { MODEL, engagement, isClean } from './model';
-import { designedBase } from './plan';
+import { type ChallengeRequest, noteChallenge, pinnedChallenge, planChallenge, plainChallenge } from './challenge';
+import { flowState } from './flow';
+import { MODEL, engagement, habitualAssists, isCleanFor } from './model';
+import { designedBase, levelPlan } from './plan';
 import { LEVELS_PER_CHAPTER } from '../engine/levels';
+
+export type { ChallengeRequest, Emphasis } from './challenge';
 
 export interface TierChoice {
   tier: number;
   /** target difficulty 0–1 */
   target: number;
-  /** why (dev panel): e.g. 'pinned', 'skill', 'relief', 'stretch' */
+  /** why (dev panel): e.g. 'pinned', 'skill', 'relief', 'stretch', 'breather' */
   reason: string;
+  /** what to lean on inside the tier (for the search's fitness; never changes the tier) */
+  challenge: ChallengeRequest;
 }
 
 export const DIRECTOR = {
@@ -43,6 +61,10 @@ export const DIRECTOR = {
   relief: 0.08,
   deepRelief: 0.14,
   stretch: 0.08,
+  /** after a long silence (frozen) */
+  ease: 0.05,
+  /** after a peak or festival board */
+  breather: 0.06,
   /** fast clean clears in a row before a stretch board */
   stretchAfter: 3,
   /** failed attempts at an uncleared level before re-pinning one tier lower */
@@ -58,11 +80,21 @@ export const DIRECTOR = {
    * clears than its rests give back (success is concave above 50 %).
    */
   aim: -0.025,
-  flowGain: 0.5,
-  flowMax: 0.06,
+  flowGain: 0.8,
+  flowMax: 0.08,
+  /**
+   * Hysteresis: keep the last board's tier unless another sits this much closer to the
+   * target. Bank boards' measured d scatter a little from level to level, so without it
+   * the nearest tier flips back and forth on noise; pacing moves (≥ 0.05) still act.
+   */
+  hold: 0.025,
+  /** mastery floor: rating − devs · dev − margin */
+  floorDevs: 2,
+  floorMargin: 0.05,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const PEAKS = new Set(['peak', 'festival']);
 
 /** The pinned tier for level n, or null. */
 export function pinnedTier(a: AnalyticsSave, n: number): number | null {
@@ -100,13 +132,25 @@ export function tierFor(n: number, target: number): number {
   return best;
 }
 
+/**
+ * The lowest tier level n may get while the player isn't struggling: the highest tier
+ * whose board sits at or under the rating's lower confidence bound (R − 2·dev − 0.05).
+ * More evidence (smaller dev) and a higher rating raise it.
+ */
+export function masteryFloor(a: AnalyticsSave, n: number): number {
+  const bound = a.rating - DIRECTOR.floorDevs * a.dev - DIRECTOR.floorMargin;
+  let floor = 0;
+  for (let t = 0; t < TIERS; t++) if (tierD(n, t) <= bound) floor = t;
+  return floor;
+}
+
 export interface TargetParts {
   base: number;
   skill: number;
   pacing: number;
   flow: number;
   target: number;
-  reason: 'skill' | 'relief' | 'stretch';
+  reason: 'skill' | 'relief' | 'stretch' | 'ease' | 'breather';
 }
 
 /** Mean designed difficulty of the chapter that holds level n (the sawtooth's centre line). */
@@ -117,10 +161,17 @@ export function chapterMean(n: number): number {
   return sum / LEVELS_PER_CHAPTER;
 }
 
-/** Recent clean-clear rate (null with too little data). */
+/** Recent clean-clear rate, assists within the player's habit allowed (null with too little data). */
 export function cleanRate(a: AnalyticsSave, window = DIRECTOR.flowWindow): number | null {
+  const habit = habitualAssists(a);
   const rs = a.recent.filter((r) => r.mode !== 'rush').slice(0, window);
-  return rs.length >= DIRECTOR.flowMin ? rs.filter(isClean).length / rs.length : null;
+  return rs.length >= DIRECTOR.flowMin ? rs.filter((r) => isCleanFor(r, habit)).length / rs.length : null;
+}
+
+/** The last board was a peak or festival and level n is not one: time to breathe. */
+export function breatherDue(a: AnalyticsSave, n: number): boolean {
+  const prev = a.recent.find((r) => r.mode === 'journey' && r.n > 0);
+  return !!prev && prev.n !== n && PEAKS.has(levelPlan(prev.n).role) && !PEAKS.has(levelPlan(n).role);
 }
 
 /** The Director's target difficulty for level n, with its parts (pure; for tests and the dev panel). */
@@ -128,13 +179,19 @@ export function targetFor(a: AnalyticsSave, n: number): TargetParts {
   const base = designedBase(n);
   const confidence = clamp(a.boards / DIRECTOR.fullConfidenceAt, 0, 1);
   const skill = clamp(a.rating - chapterMean(n), -DIRECTOR.maxOffset, DIRECTOR.maxOffset) * confidence;
-  const eng = engagement(a);
+  const state = flowState(a).state;
   let pacing = 0;
   let reason: TargetParts['reason'] = 'skill';
-  if (eng.mood === 'struggling') {
-    pacing = -(eng.struggles >= 2 ? DIRECTOR.deepRelief : DIRECTOR.relief);
+  if (state === 'struggling') {
+    pacing = -(engagement(a).struggles >= 2 ? DIRECTOR.deepRelief : DIRECTOR.relief);
     reason = 'relief';
-  } else if (eng.streak >= DIRECTOR.stretchAfter) {
+  } else if (state === 'frozen') {
+    pacing = -DIRECTOR.ease;
+    reason = 'ease';
+  } else if (breatherDue(a, n)) {
+    pacing = -DIRECTOR.breather;
+    reason = 'breather';
+  } else if (state === 'bored') {
     pacing = DIRECTOR.stretch;
     reason = 'stretch';
   }
@@ -152,34 +209,41 @@ export function chooseTier(n: number): TierChoice {
   return out;
 }
 
-/** The pure policy behind chooseTier (mutates `a`: pins and the tries counter). */
+/** The pure policy behind chooseTier (mutates `a`: pins, the tries counter and the emphasis record). */
 export function decide(a: AnalyticsSave, n: number, cleared: boolean): TierChoice {
   if (n <= DIRECTOR.fixedUpTo) {
     pinTier(a, n, DIRECTOR.designedTier);
-    return { tier: DIRECTOR.designedTier, target: designedBase(n), reason: 'intro' };
+    const tier = DIRECTOR.designedTier;
+    return { tier, target: designedBase(n), reason: 'intro', challenge: plainChallenge(n, tier, 'intro') };
   }
   const pinned = pinnedTier(a, n);
   if (pinned != null) {
     if (!cleared && a.tries.n === n && a.tries.count >= DIRECTOR.reliefAfterTries && pinned > 0) {
-      // Two failed attempts: the same place and idea, one notch gentler.
+      // Two failed attempts: the same place and idea, one notch gentler, nothing leaned on.
       const tier = pinned - 1;
       pinTier(a, n, tier);
       a.tries = { n, count: 0 };
-      return { tier, target: tierD(n, tier), reason: 'relief-repin' };
+      const challenge = plainChallenge(n, tier, 'relief-repin');
+      noteChallenge(a, challenge);
+      return { tier, target: tierD(n, tier), reason: 'relief-repin', challenge };
     }
-    return { tier: pinned, target: tierD(n, pinned), reason: 'pinned' };
+    return { tier: pinned, target: tierD(n, pinned), reason: 'pinned', challenge: pinnedChallenge(a, n, pinned) };
   }
   const t = targetFor(a, n);
+  const calm = t.reason === 'relief' || t.reason === 'ease';
   let tier = tierFor(n, t.target);
-  // Smooth steps: at most one tier from the last Journey board (two for deep relief),
-  // so pacing reads as a breath, not a lurch.
   const prev = a.recent.find((r) => r.mode === 'journey' && r.tier >= 0);
-  if (prev) {
-    const down = t.pacing <= -DIRECTOR.deepRelief ? 2 : 1;
-    tier = clamp(tier, prev.tier - down, prev.tier + 1);
-  }
+  if (prev && tier !== prev.tier && Math.abs(tierD(n, prev.tier) - t.target) <= Math.abs(tierD(n, tier) - t.target) + DIRECTOR.hold) tier = prev.tier;
+  if (!calm) tier = Math.max(tier, masteryFloor(a, n));
+  // Smooth steps: at most one tier from the last Journey board, so pacing reads as a
+  // breath, not a lurch (deep relief comes from the target, and from re-pinning).
+  if (prev) tier = clamp(tier, prev.tier - 1, prev.tier + 1);
   pinTier(a, n, tier);
-  return { tier, target: t.target, reason: t.reason };
+  const role = levelPlan(n).role;
+  const quiet = calm || t.reason === 'breather' ? t.reason : role === 'rest' || role === 'tutorial' ? role : null;
+  const challenge = planChallenge(a, n, tier, quiet);
+  noteChallenge(a, challenge);
+  return { tier, target: t.target, reason: t.reason, challenge };
 }
 
 /**

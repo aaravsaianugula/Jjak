@@ -13,6 +13,7 @@
  */
 import { recordAttempt } from '../director/director';
 import { ingest, median, noteDay, specD } from '../director/model';
+import { shapeOfPath } from '../director/skills';
 import { localDateKey } from '../engine/levels';
 import { mechanicsOf } from '../engine/mechanics';
 import type { Session, TapResult } from '../engine/session';
@@ -24,6 +25,8 @@ import { flush, persist, save } from './storage';
 export const FIRST_TAPS = 3;
 /** A quit's time is capped at this long after the last tap (the pause menu may have sat open). */
 const IDLE_TAIL_MS = 30_000;
+/** A blocked tap this soon after selecting the first card is a fast misread. */
+export const QUICK_MISS_MS = 1000;
 
 interface Live {
   session: Session;
@@ -34,8 +37,12 @@ interface Live {
   taps: [number, number][];
   /** board time of the first tap (-1 = none yet) */
   firstTapAt: number;
-  /** board time of each pair and its bends */
-  pairs: { t: number; turns: number }[];
+  /** board time of each pair, its bends and its path shape */
+  pairs: { t: number; turns: number; detour: boolean; edge: boolean }[];
+  /** board time of the current selection (-1 = none) */
+  selectAt: number;
+  /** blocked taps within QUICK_MISS_MS of the selection */
+  quickMisses: number;
   hintAfterMs: number;
   /** board time of the last tap */
   lastAt: number;
@@ -75,6 +82,14 @@ function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: n
   const turnMs: [number, number, number] = [0, 1, 2].map((k) =>
     Math.round(median(finds.filter((f) => f.turns === k).map((f) => f.ms))),
   ) as [number, number, number];
+  const route = (pick: (i: number) => boolean): [number, number] => {
+    const ms = finds.filter((_, i) => pick(i)).map((f) => f.ms);
+    return [ms.length, Math.round(median(ms))];
+  };
+  // Pair rhythm: how uneven the gaps between pairs are (std / mean), with enough of them.
+  const gaps = finds.slice(1).map((f) => f.ms);
+  const mean = gaps.length ? gaps.reduce((x, y) => x + y, 0) / gaps.length : 0;
+  const gapCv = gaps.length >= 3 && mean > 0 ? Math.sqrt(gaps.reduce((x, g) => x + (g - mean) ** 2, 0) / gaps.length) / mean : -1;
   return {
     mode,
     n: spec.mode === 'journey' ? spec.number : 0,
@@ -105,6 +120,11 @@ function buildRecord(l: Live, ended: BoardRecord['ended'], stars: number, now: n
     hintAfterMs: l.hintAfterMs,
     date: l.date,
     hour: l.hour,
+    detour: route((i) => l.pairs[i].detour),
+    edgeRoute: route((i) => l.pairs[i].edge),
+    gapCv: Math.round(gapCv * 100) / 100,
+    longMs: Math.round(finds.reduce((m, f) => Math.max(m, f.ms), 0)),
+    quickMisses: l.quickMisses,
   };
 }
 
@@ -137,6 +157,8 @@ on('start', ({ session }) => {
     taps: [],
     firstTapAt: -1,
     pairs: [],
+    selectAt: -1,
+    quickMisses: 0,
     hintAfterMs: -1,
     lastAt: 0,
   };
@@ -149,7 +171,15 @@ on('tap', ({ session, cell, result, now }) => {
   if (l.firstTapAt < 0) l.firstTapAt = t;
   l.lastAt = t;
   if (l.taps.length < FIRST_TAPS) l.taps.push(cellFraction(session.board.rows, session.board.cols, cell));
-  if (result.kind === 'match') l.pairs.push({ t, turns: result.turns });
+  if (result.kind === 'select' || result.kind === 'reselect') l.selectAt = t;
+  else if (result.kind === 'mismatch') {
+    if (result.reason === 'path' && l.selectAt >= 0 && t - l.selectAt < QUICK_MISS_MS) l.quickMisses++;
+    l.selectAt = -1;
+  } else if (result.kind === 'match') {
+    const shape = shapeOfPath(result.path, session.board.rows, session.board.cols);
+    l.pairs.push({ t, turns: result.turns, detour: shape.detour, edge: shape.edge });
+    l.selectAt = -1;
+  }
 });
 
 on('tool', ({ kind }) => {

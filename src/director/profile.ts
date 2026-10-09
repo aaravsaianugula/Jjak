@@ -9,9 +9,11 @@
  * `confidence` (0–1) says how much there is behind it. Pure: reads, never writes.
  */
 import { MECHANIC_IDS } from '../engine/mechanics';
-import { type AnalyticsSave, type BoardRecord } from '../services/save-analytics';
+import { type AnalyticsSave, type BoardRecord, PATH_SHAPES, type PathShape } from '../services/save-analytics';
 import { save } from '../services/storage';
-import { assistsOf, engagement, isClean, median, parRatio, proficiency } from './model';
+import { type FlowState, flowState } from './flow';
+import { assistsOf, engagement, habitualAssists, isClean, median, parRatio, proficiency } from './model';
+import { shapeEvidence, skillConfidence } from './skills';
 
 export interface ScanPattern {
   /** share of first taps on the outer ring of the board (0–1; 0.5 with no data) */
@@ -226,5 +228,130 @@ export function playStyle(a: AnalyticsSave = save.analytics): PlayStyle {
     assists: assistsOfRecords(rs),
     session: rhythmOf(a, rs),
     mood: engagement(a).mood,
+  };
+}
+
+// ───────────────────────────── Habits (what the Director tailors against) ─────────────────────────────
+
+/**
+ * The habits a challenge can lean on (EXPANSION_PLAN §C1): where first taps land,
+ * which path shapes slow them, which mechanics trail their usual, rushing vs freezing,
+ * and their assist habit. Every part has a confidence 0–1 and reads 'unknown' (or an
+ * empty list) while the evidence is thin. Pure: reads, never writes.
+ */
+export interface PlayerHabits {
+  /** boards it was read from */
+  boards: number;
+  scan: {
+    /** shares of first taps (0–1): on the outer ring, inside the middle half both ways, top half, bottom half */
+    edge: number;
+    centre: number;
+    top: number;
+    bottom: number;
+    start: 'edges' | 'centre' | 'mixed' | 'unknown';
+    vertical: 'top' | 'bottom' | 'mixed' | 'unknown';
+    samples: number;
+    confidence: number;
+  };
+  /** path shapes that take clearly longer than their usual pair, slowest first */
+  slowShapes: { shape: PathShape; costRatio: number; rating: number; confidence: number }[];
+  /** mechanics whose rating trails their overall rating, weakest first */
+  weakMechanics: { id: string; rating: number; gap: number; confidence: number }[];
+  tempo: {
+    /** 'rush': many fast misreads; 'freeze': long think times or long silences */
+    style: 'rush' | 'freeze' | 'balanced' | 'unknown';
+    /** fast misreads per pair (quick misses + half the other blocked taps) */
+    misreadRate: number;
+    /** median think time before the first pair, ms (0 = no data) */
+    thinkMs: number;
+    /** median longest-find / usual gap (0 = no data) */
+    longRatio: number;
+    confidence: number;
+  };
+  assists: { habitual: number; confidence: number };
+  flow: FlowState;
+}
+
+export const HABITS = {
+  /** first taps before the scan region reads as known, and for full confidence */
+  scanMin: 6,
+  scanFull: 24,
+  /** boards with a shape before its cost counts, and the cost that reads as slow */
+  shapeMin: 3,
+  slowCost: 1.3,
+  /** rating gap (d units) below their overall that marks a weak mechanic */
+  weakGap: 0.03,
+  tempoMin: 5,
+  rushRate: 0.2,
+  freezeThinkMs: 12_000,
+  freezeLong: 6,
+};
+
+const isCentre = ([r, c]: [number, number]) => r >= 0.25 && r <= 0.75 && c >= 0.25 && c <= 0.75;
+
+function scanHabit(rs: BoardRecord[]): PlayerHabits['scan'] {
+  const s = scanOf(rs);
+  const taps = rs.flatMap((r) => r.firstTaps ?? []);
+  const known = taps.length >= HABITS.scanMin;
+  const centre = share(taps.map(isCentre), 0);
+  const bottom = share(taps.map(([r]) => r > 0.5), 0.5);
+  return {
+    edge: s.edge, centre, top: s.top, bottom, samples: taps.length,
+    // centre-first: rarely on the rim, and mostly in the middle half
+    start: !known ? 'unknown' : s.edge >= 0.6 ? 'edges' : s.edge <= 0.2 && centre >= 0.4 ? 'centre' : 'mixed',
+    vertical: !known ? 'unknown' : s.top >= 0.65 ? 'top' : bottom >= 0.65 ? 'bottom' : 'mixed',
+    confidence: clamp(taps.length / HABITS.scanFull, 0, 1),
+  };
+}
+
+function slowShapes(a: AnalyticsSave, rs: BoardRecord[]): PlayerHabits['slowShapes'] {
+  const out: PlayerHabits['slowShapes'] = [];
+  for (const k of PATH_SHAPES) {
+    const ratios = rs.flatMap((r) => {
+      const e = shapeEvidence(r)[k];
+      return e && r.gapMs > 0 ? [e[1] / r.gapMs] : [];
+    });
+    const s = a.shapes[k];
+    if (ratios.length < HABITS.shapeMin || !s) continue;
+    const costRatio = median(ratios);
+    if (costRatio >= HABITS.slowCost) out.push({ shape: k, costRatio, rating: s.r, confidence: skillConfidence(s) });
+  }
+  return out.sort((x, y) => y.costRatio - x.costRatio);
+}
+
+function weakMechanics(a: AnalyticsSave): PlayerHabits['weakMechanics'] {
+  return Object.entries(a.mech)
+    .filter(([, st]) => st.n >= 3 && st.r < a.rating - HABITS.weakGap)
+    .map(([id, st]) => ({ id, rating: st.r, gap: st.r - a.rating, confidence: skillConfidence(st) }))
+    .sort((x, y) => x.gap - y.gap);
+}
+
+function tempoHabit(rs: BoardRecord[]): PlayerHabits['tempo'] {
+  const made = rs.reduce((s, r) => s + r.made, 0);
+  const quick = rs.reduce((s, r) => s + (r.quickMisses ?? 0), 0);
+  const blocked = rs.reduce((s, r) => s + r.blocked, 0);
+  const misreadRate = made ? (quick + 0.5 * Math.max(0, blocked - quick)) / made : 0;
+  const thinkMs = Math.round(median(rs.map((r) => r.firstMs).filter((v) => v > 0)));
+  const longRatio = median(rs.filter((r) => (r.longMs ?? 0) > 0 && r.gapMs > 0).map((r) => (r.longMs ?? 0) / r.gapMs));
+  const style: PlayerHabits['tempo']['style'] =
+    rs.length < HABITS.tempoMin ? 'unknown'
+    : misreadRate >= HABITS.rushRate ? 'rush'
+    : thinkMs >= HABITS.freezeThinkMs || longRatio >= HABITS.freezeLong ? 'freeze'
+    : 'balanced';
+  return { style, misreadRate, thinkMs, longRatio, confidence: clamp(rs.length / 15, 0, 1) };
+}
+
+/** The player's habits, from the on-device history ('unknown' with thin evidence). */
+export function playerHabits(a: AnalyticsSave = save.analytics): PlayerHabits {
+  const rs = a.recent.filter((r) => r && r.mode !== 'rush');
+  const quickClears = rs.filter((r) => r.cleared && parRatio(r) <= 1.05).length;
+  return {
+    boards: rs.length,
+    scan: scanHabit(rs),
+    slowShapes: slowShapes(a, rs),
+    weakMechanics: weakMechanics(a),
+    tempo: tempoHabit(rs),
+    assists: { habitual: habitualAssists(a), confidence: clamp(quickClears / 10, 0, 1) },
+    flow: flowState(a).state,
   };
 }
