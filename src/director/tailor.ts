@@ -21,9 +21,9 @@
  */
 import { type BankCandidate, bankCandidates, bankSpec, candidateSpec } from './bank';
 import { type ChallengeRequest, type Emphasis } from './challenge';
-import { type Knobs, type LevelPlan, knobRange, levelPlan } from './plan';
+import { type KnobId, type Knobs, type LevelPlan, knobRange, levelPlan } from './plan';
 import { type FeatureKey, type ReadingFeatures } from './reading';
-import { type LevelSpec } from '../engine/levels';
+import { type LevelSpec, type Mechanic } from '../engine/levels';
 
 export const TAILOR = {
   /** an alternate's d is within this of the tier's board (the bank builder keeps it so) */
@@ -33,9 +33,20 @@ export const TAILOR = {
 };
 
 const SHAPE: Partial<Record<string, FeatureKey>> = { twoBend: 'twoBend', detour: 'detour', edge: 'edge' };
-const MECH_KNOB: Partial<Record<string, keyof Knobs>> = {
-  stones: 'stones', snow: 'snow', knots: 'knots', gates: 'gates', fences: 'fences', torii: 'torii', streams: 'streams', seals: 'seals', ink: 'ink',
-};
+/**
+ * The mechanics a board carries as a count, named as their knob. The one list both the
+ * bank builder's lean vector (scripts/lib/leans.ts) and `leanOf` read, so an alternate
+ * the builder keeps for a mechanic is one a `mech:<id>` request can find.
+ */
+export const MECH_KNOBS = ['stones', 'snow', 'knots', 'gates', 'fences', 'torii', 'streams', 'seals', 'ink'] as const satisfies readonly (Mechanic & KnobId)[];
+export type MechKnob = (typeof MECH_KNOBS)[number];
+const isMechKnob = (id: string): id is MechKnob => (MECH_KNOBS as readonly string[]).includes(id);
+
+/** Where a mechanic's count sits in the level's range, 0–1, or null when the range doesn't vary. */
+export function mechLean(plan: LevelPlan, knobs: Knobs, k: MechKnob): number | null {
+  const [lo, hi] = knobRange(plan)[k];
+  return hi > lo && typeof knobs[k] === 'number' ? Math.min(1, Math.max(0, (knobs[k] - lo) / (hi - lo))) : null;
+}
 
 /**
  * How much a board leans on an emphasis, 0–1, or null when the emphasis has no
@@ -43,12 +54,7 @@ const MECH_KNOB: Partial<Record<string, keyof Knobs>> = {
  * mechanic the level doesn't have or that has no count).
  */
 export function leanOf(f: ReadingFeatures | null, e: Emphasis, knobs: Knobs, plan: LevelPlan): number | null {
-  if (e.kind === 'mechanic') {
-    const k = MECH_KNOB[e.id];
-    if (!k || !(plan.mechanics as string[]).includes(e.id) || typeof knobs[k] !== 'number') return null;
-    const [lo, hi] = knobRange(plan)[k as Exclude<keyof Knobs, 'layout'>] as [number, number];
-    return hi > lo ? Math.min(1, Math.max(0, ((knobs[k] as number) - lo) / (hi - lo))) : null;
-  }
+  if (e.kind === 'mechanic') return isMechKnob(e.id) && (plan.mechanics as string[]).includes(e.id) ? mechLean(plan, knobs, e.id) : null;
   if (!f) return null;
   if (e.kind === 'shape') {
     const k = SHAPE[e.shape];

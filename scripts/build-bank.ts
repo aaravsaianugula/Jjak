@@ -22,14 +22,15 @@ import { fileURLToPath } from 'node:url';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { bankSeed, encodeSlot } from '../src/director/bank';
 import { type Metrics, funChecks, measure } from '../src/director/metrics';
-import { type LevelPlan, knobRange, levelPlan } from '../src/director/plan';
-import { FEATURE_KEYS, type ReadingFeatures, encodeFeatures, featuresOf } from '../src/director/reading';
+import { type LevelPlan, levelPlan } from '../src/director/plan';
+import { type ReadingFeatures, encodeFeatures, featuresOf } from '../src/director/reading';
 import { type Candidate, type Feature, featureOf, funScore, neighbour, searchTiers, tierTarget, tryCandidate } from '../src/director/search';
 import { TAILOR } from '../src/director/tailor';
 import { boardHash } from '../src/director/validate';
 import { buildBoard, windOf } from '../src/engine/levels';
 import { legacyJourneyLevel } from './lib/legacy-journey';
 import { type CurveFile, type CurveLevel, renderAudit, withKept } from './lib/audit';
+import { leanVector, pickAlternates } from './lib/leans';
 
 const LEVELS = 600;
 const TIERS = 5;
@@ -70,16 +71,12 @@ const funCode = (m: Metrics) => {
   return `${+c.foothold}${+c.crunch}${+c.finale}`;
 };
 
-/** Tailoring alternates per (level, tier), and how many pool boards are read to choose them. */
-const ALTERNATES = 2;
+/** How many pool boards are read to choose a slot's alternates. */
 const READ_AT_MOST = 8;
-/** an alternate must add at least this much lean (summed over what it leans on more) */
-const MIN_LEAN = 0.08;
 
 /** A board's reading features: the solver's line only (no playouts needed). */
 const readingOf = (c: Candidate): ReadingFeatures => featuresOf(c.board, measure(c.spec, c.board, { reading: true, random: 0, human: 0 }).reading!);
 
-const MECH_KNOBS = ['stones', 'snow', 'knots', 'gates', 'fences'] as const;
 /** fresh deals of the chosen knobs tried per tier, numbered from FRESH_FROM (clear of the search's attempts) */
 const FRESH = 5;
 const FRESH_FROM = 900;
@@ -91,16 +88,6 @@ const FRESH_FROM = 900;
  * own neighbours do), so more of them land within the d tolerance.
  */
 const MORE = 20;
-
-/** What a board leans on, as one vector: its reading features and its mechanic counts within the level's range. */
-function leanVector(plan: LevelPlan, c: Candidate, f: ReadingFeatures): number[] {
-  const range = knobRange(plan);
-  const mech = MECH_KNOBS.map((k) => {
-    const [lo, hi] = range[k] as [number, number];
-    return hi > lo ? (c.knobs[k] - lo) / (hi - lo) : 0;
-  });
-  return [...FEATURE_KEYS.map((k) => f[k]), ...mech];
-}
 
 /**
  * An alternate's 2-bend lean counts only if the board's legal moves along the solver's
@@ -119,7 +106,7 @@ const median = (xs: number[]) => {
 };
 
 /**
- * The bank slot for one tier: its board and its features, then up to ALTERNATES other
+ * The bank slot for one tier: its board and its features, then up to ALTERNATES (lib/leans.ts) other
  * valid boards from the same search or fresh deals (within the d tolerance, as fun, with
  * a foothold) that each lean clearly more on something the boards before them don't
  * (greedy). Also returns how many alternates the slot holds.
@@ -136,7 +123,7 @@ function slotFor(plan: LevelPlan, tier: number, pick: Candidate, searched: reado
     let r = read.get(h);
     if (!r) {
       const f = confirmTwoBend(readingOf(c), c, f0, pick);
-      r = { c, f, v: leanVector(plan, c, f) };
+      r = { c, f, v: leanVector(plan, c.knobs, f) };
       read.set(h, r);
     }
     return r;
@@ -163,17 +150,8 @@ function slotFor(plan: LevelPlan, tier: number, pick: Candidate, searched: reado
       .sort((a, b) => Math.abs(a.c.metrics.d - pick.metrics.d) - Math.abs(b.c.metrics.d - pick.metrics.d))
       .slice(0, READ_AT_MOST)
       .map(({ c, h }) => readOf(c, h));
-    const boards = [primary];
-    let top = leanVector(plan, pick, f0);
-    for (let k = 0; k < ALTERNATES && cands.length; k++) {
-      const gain = (v: number[]) => v.reduce((s, x, i) => s + Math.max(0, x - top[i]), 0);
-      cands.sort((a, b) => gain(b.v) - gain(a.v));
-      const best = cands.shift()!;
-      if (gain(best.v) < MIN_LEAN) break;
-      boards.push({ entry: { attempt: best.c.attempt, knobs: best.c.knobs, d: best.c.metrics.d, hash: hash(best.c) }, features: encodeFeatures(best.f) });
-      top = top.map((x, i) => Math.max(x, best.v[i]));
-    }
-    return boards;
+    const alts = pickAlternates(leanVector(plan, pick.knobs, f0), cands);
+    return [primary, ...alts.map(({ c, f }) => ({ entry: { attempt: c.attempt, knobs: c.knobs, d: c.metrics.d, hash: hash(c) }, features: encodeFeatures(f) }))];
   };
   const gaps: number[] = [];
   for (let k = 0; k < FRESH; k++) {
